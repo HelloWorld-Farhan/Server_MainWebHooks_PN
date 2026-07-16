@@ -150,6 +150,69 @@ Source: `src/modules/company/company.controller.ts`
 
 ---
 
+## Branch Invitations (Public)
+
+Source: `src/modules/invitations/invitations.controller.ts`
+
+### `GET /api/invitations/branch/:token`
+
+**Auth:** None
+
+**Response `200` (valid):**
+
+```json
+{
+  "valid": true,
+  "invitation": {
+    "id": "clx...",
+    "email": "admin@example.com",
+    "status": "PENDING",
+    "expiresAt": "2026-08-01T00:00:00.000Z",
+    "branch": { "id": "br_1", "name": "Andheri" },
+    "company": {
+      "id": "co_1",
+      "name": "Acme Realty",
+      "clerkOrganizationId": "org_..."
+    }
+  }
+}
+```
+
+**Response `200` (invalid):**
+
+```json
+{
+  "valid": false,
+  "error": "expired",
+  "message": "This invitation expired on 8/1/2026...",
+  "expiresAt": "2026-08-01T00:00:00.000Z"
+}
+```
+
+`error` values: `not_found`, `accepted`, `cancelled`, `expired`, `not_pending`
+
+---
+
+### `POST /api/invitations/branch/:token/accept`
+
+**Auth:** Clerk `userId` (session email must match invitation email)
+
+**Request body:** None
+
+**Response `200`:**
+
+```json
+{ "success": true }
+```
+
+**Response `401`:** `{ "error": "Unauthorized" }`
+
+**Response `403`:** `{ "error": "Mismatched email" }`
+
+**Response `400`:** `{ "error": "Invitation is no longer pending" }` or `{ "error": "Invitation has expired" }`
+
+---
+
 ## Contact Requests (Public)
 
 Source: `src/modules/company/company.controller.ts` (`ContactRequestsController`)

@@ -10,6 +10,7 @@ import { GraphQLModule } from "../graphql/graphql.module";
 import { IntegrationsController } from "../integrations/integrations.controller";
 import { InternalController } from "../internal/internal.controller";
 import { PageCacheController } from "../page-cache/page-cache.controller";
+import { InvitationsController } from "../invitations/invitations.controller";
 import { WebhooksController } from "../webhooks/webhooks.controller";
 
 @Module({
@@ -20,6 +21,7 @@ import { WebhooksController } from "../webhooks/webhooks.controller";
     WebhooksController,
     InternalController,
     IntegrationsController,
+    InvitationsController,
     AgentsController,
     ToolsController,
     ContactPhonesController,
