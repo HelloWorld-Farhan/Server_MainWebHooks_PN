@@ -1,0 +1,26 @@
+type AgentLibraryQueries {
+  list: [AgentLibraryEntry!]!
+  bySlug(slug: String!): AgentLibraryEntry
+}
+
+type AgentLibraryEntry {
+  id: ID!
+  slug: String!
+  name: String!
+  profile: String!
+  category: String!
+  useCases: [String!]!
+  defaultType: String!
+  estimatedSetupMinutes: Int!
+  samplePrompt: String!
+  defaultFirstMessage: String!
+  defaultVariables: JSON!
+  compatibleVoices: JSON!
+  demoAudioUrl: String!
+  avatarGradient: String
+  sortOrder: Int!
+}
+
+extend type Query {
+  agentLibrary: AgentLibraryQueries!
+}

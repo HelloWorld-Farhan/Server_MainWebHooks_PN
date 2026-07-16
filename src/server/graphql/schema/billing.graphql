@@ -1,0 +1,36 @@
+type BillingQueries {
+  subscription: BillingSubscription
+  invoices(first: Int, after: String): BillingInvoiceConnection!
+}
+
+type BillingSubscription {
+  id: ID!
+  planId: String!
+  planName: String!
+  status: BillingStatus!
+  currentPeriodStart: String!
+  currentPeriodEnd: String!
+  cancelAtPeriodEnd: Boolean!
+  nextInvoiceAmount: Int
+}
+
+type BillingInvoice {
+  id: ID!
+  amountCents: Int!
+  currency: String!
+  status: InvoiceStatus!
+  description: String
+  issuedAt: String!
+  dueAt: String
+  paidAt: String
+}
+
+type BillingInvoiceEdge {
+  node: BillingInvoice!
+  cursor: String!
+}
+
+type BillingInvoiceConnection {
+  edges: [BillingInvoiceEdge!]!
+  pageInfo: PageInfo!
+}

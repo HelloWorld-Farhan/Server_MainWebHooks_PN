@@ -1,0 +1,332 @@
+type AnalyticsQueries {
+  summary(
+    granularity: AnalyticsGranularity
+    dateFrom: String
+    dateTo: String
+  ): AnalyticsSummary!
+}
+
+type AnalyticsSummary {
+  totalCalls: Int!
+  connectedCalls: Int!
+  conversionRate: Float!
+  generatedLeads: Int!
+  periodStart: String
+  periodEnd: String
+}
+
+type AgentsQueries {
+  statusSummary: AgentStatusSummary!
+  list: [AiAgent!]!
+  byId(id: ID!): AiAgent
+}
+
+type AgentStatusSummary {
+  active: Int!
+  inactive: Int!
+  total: Int!
+}
+
+type AiAgent {
+  id: ID!
+  name: String!
+  type: String!
+  category: String
+  status: AgentStatus!
+  environment: String!
+  enabled: Boolean!
+  languages: [String!]!
+  firstMessage: String
+  systemPrompt: String
+  voiceConfig: JSON
+  modelConfig: JSON
+  transcriberConfig: JSON
+  serverConfig: JSON
+  structuredOutputs: JSON
+  scorecards: JSON
+  monitors: JSON
+  demoAudioUrl: String
+  branchId: ID
+  createdAt: String!
+  updatedAt: String!
+}
+
+input CreateAgentInput {
+  name: String!
+  type: String!
+  category: String
+  environment: String
+  firstMessage: String
+  systemPrompt: String
+  languages: [String!]
+  voiceConfig: JSON
+  modelConfig: JSON
+  transcriberConfig: JSON
+  serverConfig: JSON
+  structuredOutputs: JSON
+  scorecards: JSON
+  monitors: JSON
+  demoAudioUrl: String
+  libraryEntryId: ID
+  branchId: ID
+}
+
+input UpdateAgentInput {
+  name: String
+  type: String
+  category: String
+  status: AgentStatus
+  environment: String
+  enabled: Boolean
+  firstMessage: String
+  systemPrompt: String
+  languages: [String!]
+  voiceConfig: JSON
+  modelConfig: JSON
+  transcriberConfig: JSON
+  serverConfig: JSON
+  structuredOutputs: JSON
+  scorecards: JSON
+  monitors: JSON
+  demoAudioUrl: String
+  branchId: ID
+}
+
+type AgentsMutations {
+  create(input: CreateAgentInput!): AiAgent!
+  update(id: ID!, input: UpdateAgentInput!): AiAgent!
+}
+
+type PhoneNumbersQueries {
+  list: [PhoneNumber!]!
+  byId(id: ID!): PhoneNumber
+}
+
+type PhoneNumber {
+  id: ID!
+  number: String!
+  label: String
+  provider: String!
+  status: String!
+  inboundAgentId: ID
+  outboundAgentId: ID
+  inboundAgent: AiAgent
+  outboundAgent: AiAgent
+  inboundCallsCount: Int!
+  outboundCallsCount: Int!
+  lastActivityAt: String
+  createdAt: String!
+  updatedAt: String!
+}
+
+input CreatePhoneNumberInput {
+  number: String!
+  provider: String!
+  label: String
+  inboundAgentId: ID
+  outboundAgentId: ID
+}
+
+input UpdatePhoneNumberInput {
+  label: String
+  status: String
+  inboundAgentId: ID
+  outboundAgentId: ID
+}
+
+type PhoneNumbersMutations {
+  create(input: CreatePhoneNumberInput!): PhoneNumber!
+  update(id: ID!, input: UpdatePhoneNumberInput!): PhoneNumber!
+}
+
+type UploadedContact {
+  id: ID!
+  phone: String!
+  name: String
+  email: String
+  address: String
+  branchIds: [ID!]!
+  branches: [Branch!]!
+  createdAt: String!
+}
+
+input ImportedContactInput {
+  phone: String!
+  name: String
+  email: String
+  address: String
+  branchNames: [String!]
+}
+
+type UploadedContactsQueries {
+  list: [UploadedContact!]!
+}
+
+type UploadedContactImportResult {
+  created: Int!
+  skipped: Int!
+  invalid: Int!
+  unmatchedBranches: [String!]!
+}
+
+type UploadedContactsMutations {
+  create(phone: String!): UploadedContact!
+  importContacts(contacts: [ImportedContactInput!]!): UploadedContactImportResult!
+  delete(id: ID!): Boolean!
+  bulkDelete(ids: [ID!]!): Int!
+}
+
+input LeadFilter {
+  dormantOnly: Boolean
+  minDaysInactive: Int
+  temperature: String
+}
+
+type LeadsQueries {
+  connection(first: Int, after: String, filter: LeadFilter): LeadConnection!
+  byId(id: ID!): Lead
+  temperatureBreakdown: LeadTemperatureBreakdown!
+}
+
+input LeadImportRowInput {
+  firstName: String
+  lastName: String
+  email: String
+  phone: String!
+  temperature: String!
+}
+
+type LeadImportResult {
+  hot: Int!
+  warm: Int!
+  cold: Int!
+  total: Int!
+  invalid: Int!
+  created: Int!
+  updated: Int!
+}
+
+type LeadsMutations {
+  importRows(rows: [LeadImportRowInput!]!): LeadImportResult!
+}
+
+type Lead {
+  id: ID!
+  firstName: String
+  lastName: String
+  email: String
+  phone: String
+  temperature: String
+  score: Int!
+  lastContactedAt: String
+  sourceName: String
+  stageName: String
+}
+
+type DormantLead {
+  id: ID!
+  contactName: String!
+  phoneNumber: String!
+  lastContactAt: String!
+  daysInactive: Int!
+  agentId: String!
+  agentName: String!
+  source: String!
+  temperature: String
+  score: Int!
+}
+
+type LeadEdge {
+  node: Lead!
+  cursor: String!
+}
+
+type LeadConnection {
+  edges: [LeadEdge!]!
+  pageInfo: PageInfo!
+}
+
+type LeadTemperatureBreakdown {
+  hot: Int!
+  warm: Int!
+  cold: Int!
+  total: Int!
+}
+
+type CampaignsQueries {
+  list: [Campaign!]!
+}
+
+type Campaign {
+  id: ID!
+  name: String!
+  status: String!
+  agentId: ID
+  agentName: String!
+  totalCalls: Int!
+  connectedCalls: Int!
+  conversionRate: Float!
+  generatedLeads: Int!
+  createdAt: String!
+}
+
+type NotificationQueries {
+  list(first: Int, after: String): NotificationConnection!
+}
+
+type Notification {
+  id: ID!
+  type: String!
+  title: String!
+  body: String!
+  readAt: String
+  createdAt: String!
+}
+
+type NotificationEdge {
+  node: Notification!
+  cursor: String!
+}
+
+type NotificationConnection {
+  edges: [NotificationEdge!]!
+  pageInfo: PageInfo!
+}
+
+type IntegrationQueries {
+  list: [Integration!]!
+}
+
+type Integration {
+  id: ID!
+  type: String!
+  status: IntegrationStatus!
+  connectedAccount: String
+  lastSyncAt: String
+}
+
+type SchedulerQueries {
+  upcoming(limit: Int): [SchedulerEvent!]!
+}
+
+type SchedulerEvent {
+  id: ID!
+  type: String!
+  status: String!
+  title: String!
+  startAt: String!
+  endAt: String
+}
+
+type EventQueries {
+  recent(limit: Int): [SystemEvent!]!
+}
+
+type SystemEvent {
+  id: ID!
+  type: SystemEventType!
+  title: String!
+  entityType: String
+  entityId: String
+  createdAt: String!
+}

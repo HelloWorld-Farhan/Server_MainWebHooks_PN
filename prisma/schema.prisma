@@ -1,0 +1,1460 @@
+// Propnex AI — MongoDB schema (multi-tenant SaaS)
+// https://www.prisma.io/docs/orm/overview/databases/mongodb
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum CompanyStatus {
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
+}
+
+enum BranchStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum PrimaryUseCase {
+  LEAD_QUALIFICATION
+  CUSTOMER_SUPPORT
+  APPOINTMENT_BOOKING
+}
+
+enum CallVolumeRange {
+  RANGE_1_100     @map("1-100")
+  RANGE_100_500   @map("100-500")
+  RANGE_500_1000  @map("500-1000")
+  RANGE_1000_PLUS @map("1000+")
+}
+
+enum UserStatus {
+  ACTIVE
+  INVITED
+  SUSPENDED
+  DEACTIVATED
+}
+
+enum UserRole {
+  OWNER
+  ADMIN
+  MANAGER
+  AGENT
+  SALES
+  SUPPORT
+}
+
+enum MemberStatus {
+  ACTIVE
+  INVITED
+  DEACTIVATED
+  REMOVED
+}
+
+enum BranchAccessType {
+  ALL
+  SELECTED
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
+enum LeadSourceType {
+  WEBSITE
+  REFERRAL
+  CSV
+  CAMPAIGN
+  INTEGRATION
+  MANUAL
+  OTHER
+}
+
+enum LeadTemperature {
+  HOT
+  WARM
+  COLD
+}
+
+enum LeadActivityType {
+  STATUS_CHANGE
+  NOTE
+  CALL
+  EMAIL
+  ASSIGNMENT
+  IMPORT
+  AI_ACTION
+}
+
+enum TelephonyProvider {
+  TWILIO
+  EXOTEL
+  PROPNEX
+}
+
+enum PhoneNumberStatus {
+  ACTIVE
+  INACTIVE
+  DISABLED
+}
+
+enum CallDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum CallStatus {
+  COMPLETED
+  MISSED
+  VOICEMAIL
+  FAILED
+}
+
+enum CallOutcome {
+  INTERESTED
+  CALLBACK_REQUESTED
+  SITE_VISIT_SCHEDULED
+  NOT_INTERESTED
+  NO_ANSWER
+  WRONG_NUMBER
+  CONVERTED
+}
+
+enum AgentType {
+  INBOUND
+  OUTBOUND
+  HYBRID
+}
+
+enum AgentStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum AgentEnvironment {
+  PRODUCTION
+  STAGING
+  DEVELOPMENT
+}
+
+enum CommunicationChannelType {
+  WHATSAPP
+  WEB_CHAT
+  INSTAGRAM
+  FACEBOOK_MESSENGER
+  TELEGRAM
+  VOICE
+}
+
+enum AgentToolId {
+  FAQ
+  BILLING
+  GOOGLE_CALENDAR
+  GOOGLE_SHEETS
+}
+
+enum KnowledgeSourceType {
+  DOCUMENT
+  FAQ
+  URL
+  KNOWLEDGE_BASE
+}
+
+enum KnowledgeSourceStatus {
+  SYNCED
+  PENDING
+  ERROR
+}
+
+enum AnalyticsGranularity {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+enum AnalyticsScope {
+  WORKSPACE
+  USER
+  AI_AGENT
+}
+
+enum CampaignStatus {
+  ACTIVE
+  PAUSED
+  DRAFT
+  COMPLETED
+}
+
+enum SchedulerEventType {
+  MEETING
+  REMINDER
+  FOLLOW_UP
+  DEMO
+}
+
+enum SchedulerEventStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+enum IntegrationType {
+  GOOGLE_SHEETS
+  GOOGLE_CALENDAR
+  WEBHOOK
+  HUBSPOT
+  SALESFORCE
+  EMAIL
+  WHATSAPP
+}
+
+enum IntegrationStatus {
+  CONNECTED
+  NOT_CONNECTED
+  SYNCING
+  ERROR
+}
+
+enum SyncResult {
+  SUCCESS
+  PARTIAL
+  ERROR
+}
+
+enum NotificationType {
+  ALERT
+  INFO
+  SUCCESS
+  WARNING
+  SYSTEM
+}
+
+enum CsvImportStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum CreditUsageReason {
+  CALL
+  CHANNEL_TIME
+  AGENT_TEST
+  MANUAL_ADJUSTMENT
+  PURCHASE
+  REFUND
+}
+
+enum BillingStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  TRIALING
+}
+
+enum InvoiceStatus {
+  DRAFT
+  OPEN
+  PAID
+  VOID
+  UNCOLLECTIBLE
+}
+
+enum SystemEventType {
+  CALL_COMPLETED
+  LEAD_CREATED
+  AGENT_DEPLOYED
+  CREDIT_LOW
+  INTEGRATION_SYNC
+  BILLING_ALERT
+}
+
+enum SupportRequestReason {
+  GENERAL_INQUIRY
+  SALES_PRICING
+  TECHNICAL_SUPPORT
+  BILLING_CREDITS
+  BILLING_CHANNELS
+  ENTERPRISE_PLAN
+  ACCOUNT_ACCESS
+  OTHER
+}
+
+enum SupportRequestStatus {
+  NEW
+  IN_PROGRESS
+  RESOLVED
+}
+
+// ─── AI Dialer Enums ─────────────────────────────────────────────────────────
+
+enum CallingQueueStatus {
+  PENDING
+  ASSIGNED
+  IN_CALL
+  COMPLETED
+  FAILED
+}
+
+enum ChannelStatus {
+  AVAILABLE
+  RESERVED
+  BUSY
+  UNAVAILABLE
+}
+
+enum AgentCallStatus {
+  ANSWERED
+  NO_ANSWER
+  BUSY
+  FAILED
+  VOICEMAIL
+}
+
+enum DialerIntegrationType {
+  CRM_UPDATE
+  GOOGLE_SHEET_UPDATE
+  CALENDAR_EVENT
+  WHATSAPP_FOLLOWUP
+  EMAIL_FOLLOWUP
+}
+
+enum DialerIntegrationStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  RETRYING
+}
+
+// ─── Core Tenancy & Users ────────────────────────────────────────────────────
+
+model Company {
+  id                  String           @id @default(auto()) @map("_id") @db.ObjectId
+  /// Clerk org id (`org_…`) or synthetic `local:{clerkUserId}` when orgs are disabled.
+  clerkOrganizationId String?
+  /// Unique 10-character uppercase alphanumeric activation code for initial signup.
+  /// Unique 10-character uppercase alphanumeric activation code for initial signup.
+  contractId          String           @unique
+  claimedAt           DateTime?
+  /// Clerk user id of the owner who claimed this company via contract ID.
+  ownerUserId         String?
+  name                String
+  slug                String           @unique
+  status              CompanyStatus    @default(ACTIVE)
+  primaryUseCase      PrimaryUseCase?
+  callVolume          CallVolumeRange?
+  settings            Json             @default("{}")
+  /// Demo tenant for client trials; hidden from admin panel and reusable contract ID.
+  isDemo              Boolean          @default(false)
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  members                    CompanyMember[]
+  invitations                Invitation[]
+  leadSources                LeadSource[]
+  pipelineStages             LeadPipelineStage[]
+  leads                      Lead[]
+  phoneNumbers               PhoneNumber[]
+  uploadedContacts           UploadedContact[]
+  aiAgents                   AiAgent[]
+  callLogs                   CallLog[]
+  campaigns                  Campaign[]
+  analyticsSnapshots         AnalyticsSnapshot[]
+  schedulerEvents            SchedulerEvent[]
+  integrations               Integration[]
+  webhookEndpoints           WebhookEndpoint[]
+  auditLogs                  AuditLog[]
+  notifications              Notification[]
+  csvImportBatches           CsvImportBatch[]
+  apiKeys                    ApiKey[]
+  creditBalance              CreditBalance?
+  creditUsages               CreditUsage[]
+  billingSubscription        BillingSubscription?
+  billingInvoices            BillingInvoice[]
+  systemEvents               SystemEvent[]
+  roles                      Role[]
+  knowledgeSources           KnowledgeSource[]
+  agentPromptTemplates       AgentPromptTemplate[]
+  contact                    CompanyContact?
+  setupConfig                CompanySetupConfig?
+  channels                   CompanyChannel[]
+  billingRates               CompanyBillingRates?
+  dialerChannels             Channel[]
+  dialerCalls                DialerCall[]
+  branches                   Branch[]
+  agentCommunicationChannels AgentCommunicationChannel[]
+  branchInvitations          BranchInvitation[]
+  supportRequests            SupportRequest[]
+
+  @@index([status])
+  @@index([clerkOrganizationId])
+  @@index([isDemo])
+}
+
+model User {
+  id          String     @id @default(auto()) @map("_id") @db.ObjectId
+  clerkUserId String     @unique
+  email       String     @unique
+  firstName   String?
+  lastName    String?
+  imageUrl    String?
+  phone       String?
+  status      UserStatus @default(ACTIVE)
+  lastLoginAt DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  memberships       CompanyMember[]
+  invitationsSent   Invitation[]     @relation("InvitedBy")
+  assignedLeads     Lead[]           @relation("LeadAssignee")
+  leadAssignments   LeadAssignment[] @relation("AssignmentTarget")
+  leadAssignmentsBy LeadAssignment[] @relation("AssignmentActor")
+  leadNotes         LeadNote[]
+  leadActivities    LeadActivity[]
+  assignedCalls     CallLog[]        @relation("CallHumanAgent")
+  schedulerEvents   SchedulerEvent[]
+  auditLogs         AuditLog[]
+  notifications     Notification[]
+  supportRequests   SupportRequest[]
+
+  @@index([status])
+}
+
+model CompanyMember {
+  id               String           @id @default(auto()) @map("_id") @db.ObjectId
+  companyId        String           @db.ObjectId
+  userId           String           @db.ObjectId
+  roleId           String?          @db.ObjectId
+  role             UserRole         @default(AGENT)
+  status           MemberStatus     @default(ACTIVE)
+  jobTitle         String?
+  branchAccessType BranchAccessType @default(ALL)
+  invitedAt        DateTime?
+  joinedAt         DateTime?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  company      Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customRole   Role?                @relation(fields: [roleId], references: [id])
+  branchAccess MemberBranchAccess[]
+
+  @@unique([companyId, userId])
+  @@index([companyId, role])
+  @@index([companyId, status])
+}
+
+model MemberBranchAccess {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  memberId  String   @db.ObjectId
+  branchId  String   @db.ObjectId
+  createdAt DateTime @default(now())
+
+  member CompanyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  branch Branch        @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, branchId])
+  @@index([memberId])
+  @@index([branchId])
+}
+
+model Invitation {
+  id                  String           @id @default(auto()) @map("_id") @db.ObjectId
+  companyId           String           @db.ObjectId
+  email               String
+  role                UserRole         @default(AGENT)
+  roleId              String?          @db.ObjectId
+  jobTitle            String?
+  branchAccessType    BranchAccessType @default(ALL)
+  branchIds           String[]         @default([])
+  token               String           @unique
+  clerkInvitationId   String?
+  clerkOrganizationId String?
+  status              InvitationStatus @default(PENDING)
+  expiresAt           DateTime
+  invitedById         String           @db.ObjectId
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  invitedBy User    @relation("InvitedBy", fields: [invitedById], references: [id])
+
+  @@index([companyId, email])
+  @@index([companyId, status])
+}
+
+// ─── Leads Management ────────────────────────────────────────────────────────
+
+model LeadSource {
+  id         String         @id @default(auto()) @map("_id") @db.ObjectId
+  companyId  String         @db.ObjectId
+  name       String
+  type       LeadSourceType @default(MANUAL)
+  isActive   Boolean        @default(true)
+  externalId String?
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  leads   Lead[]
+
+  @@index([companyId, isActive])
+}
+
+model LeadPipelineStage {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  companyId String   @db.ObjectId
+  name      String
+  slug      String
+  order     Int
+  color     String?
+  isDefault Boolean  @default(false)
+  isClosed  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  leads   Lead[]
+
+  @@unique([companyId, slug])
+  @@index([companyId, order])
+}
+
+model Lead {
+  id                String             @id @default(auto()) @map("_id") @db.ObjectId
+  companyId         String             @db.ObjectId
+  stageId           String             @db.ObjectId
+  sourceId          String?            @db.ObjectId
+  assignedUserId    String?            @db.ObjectId
+  firstName         String?
+  lastName          String?
+  email             String?
+  phone             String?
+  companyName       String?
+  temperature       LeadTemperature?
+  score             Int                @default(0)
+  customFields      Json               @default("{}")
+  tags              String[]           @default([])
+  lastContactedAt   DateTime?
+  nextFollowUpAt    DateTime?
+  queueStatus       CallingQueueStatus @default(PENDING)
+  assignedAiAgentId String?            @db.ObjectId
+  lockedAt          DateTime?
+  channelId         String?            @db.ObjectId
+  branchId          String?            @db.ObjectId
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  company         Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  stage           LeadPipelineStage @relation(fields: [stageId], references: [id])
+  source          LeadSource?       @relation(fields: [sourceId], references: [id])
+  assignedUser    User?             @relation("LeadAssignee", fields: [assignedUserId], references: [id])
+  assignedAiAgent AiAgent?          @relation("DialerLeadAgent", fields: [assignedAiAgentId], references: [id])
+  dialerChannel   Channel?          @relation(fields: [channelId], references: [id])
+  branch          Branch?           @relation(fields: [branchId], references: [id])
+  assignments     LeadAssignment[]
+  notes           LeadNote[]
+  activities      LeadActivity[]
+  callLogs        CallLog[]
+  schedulerEvents SchedulerEvent[]
+  dialerCalls     DialerCall[]
+
+  @@index([companyId, stageId])
+  @@index([companyId, assignedUserId])
+  @@index([companyId, phone])
+  @@index([companyId, email])
+  @@index([companyId, lastContactedAt])
+  @@index([companyId, createdAt])
+  @@index([companyId, queueStatus, createdAt])
+  @@index([companyId, branchId])
+}
+
+model LeadAssignment {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  leadId       String   @db.ObjectId
+  assignedToId String   @db.ObjectId
+  assignedById String   @db.ObjectId
+  reason       String?
+  assignedAt   DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  lead       Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  assignedTo User @relation("AssignmentTarget", fields: [assignedToId], references: [id])
+  assignedBy User @relation("AssignmentActor", fields: [assignedById], references: [id])
+
+  @@index([leadId, assignedAt])
+}
+
+model LeadNote {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  leadId     String   @db.ObjectId
+  authorId   String   @db.ObjectId
+  content    String
+  isInternal Boolean  @default(true)
+  isPinned   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  lead   Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  author User @relation(fields: [authorId], references: [id])
+
+  @@index([leadId, createdAt])
+}
+
+model LeadActivity {
+  id        String           @id @default(auto()) @map("_id") @db.ObjectId
+  leadId    String           @db.ObjectId
+  type      LeadActivityType
+  actorId   String?          @db.ObjectId
+  summary   String
+  metadata  Json             @default("{}")
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  lead  Lead  @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  actor User? @relation(fields: [actorId], references: [id])
+
+  @@index([leadId, createdAt])
+}
+
+// ─── Call Logs ─────────────────────────────────────────────────────────────────
+
+model PhoneNumber {
+  id                 String            @id @default(auto()) @map("_id") @db.ObjectId
+  companyId          String            @db.ObjectId
+  number             String
+  label              String?
+  provider           TelephonyProvider
+  inboundAgentId     String?           @db.ObjectId
+  outboundAgentId    String?           @db.ObjectId
+  status             PhoneNumberStatus @default(ACTIVE)
+  inboundCallsCount  Int               @default(0)
+  outboundCallsCount Int               @default(0)
+  lastActivityAt     DateTime?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  company            Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  inboundAgent       AiAgent?         @relation("InboundAgent", fields: [inboundAgentId], references: [id])
+  outboundAgent      AiAgent?         @relation("OutboundAgent", fields: [outboundAgentId], references: [id])
+  callLogs           CallLog[]
+  channelAssignments CompanyChannel[]
+
+  @@unique([companyId, number])
+  @@index([companyId, status])
+}
+
+model UploadedContact {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  companyId String   @db.ObjectId
+  phone     String
+  name      String?
+  email     String?
+  address   String?
+  branchIds String[] @default([])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, phone])
+  @@index([companyId, createdAt])
+}
+
+model CallLog {
+  id              String        @id @default(auto()) @map("_id") @db.ObjectId
+  companyId       String        @db.ObjectId
+  leadId          String?       @db.ObjectId
+  phoneNumberId   String?       @db.ObjectId
+  aiAgentId       String?       @db.ObjectId
+  assignedUserId  String?       @db.ObjectId
+  branchId        String?       @db.ObjectId
+  direction       CallDirection
+  status          CallStatus
+  outcome         CallOutcome?
+  startedAt       DateTime
+  durationSeconds Int           @default(0)
+  recordingUrl    String?
+  transcriptUrl   String?
+  aiSummary       Json?
+  sentiment       Json?
+  engagement      Json?
+  cost            Float?
+  creditsUsed     Int?
+  provider        String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  company      Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lead         Lead?           @relation(fields: [leadId], references: [id])
+  phoneNumber  PhoneNumber?    @relation(fields: [phoneNumberId], references: [id])
+  aiAgent      AiAgent?        @relation(fields: [aiAgentId], references: [id])
+  assignedUser User?           @relation("CallHumanAgent", fields: [assignedUserId], references: [id])
+  branch       Branch?         @relation(fields: [branchId], references: [id])
+  transcript   CallTranscript?
+
+  @@index([companyId, startedAt])
+  @@index([companyId, status, startedAt])
+  @@index([companyId, leadId])
+  @@index([companyId, aiAgentId])
+  @@index([companyId, assignedUserId])
+  @@index([companyId, branchId])
+}
+
+model CallTranscript {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  callLogId String   @unique @db.ObjectId
+  segments  Json     @default("[]")
+  fullText  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  callLog CallLog @relation(fields: [callLogId], references: [id], onDelete: Cascade)
+}
+
+// ─── Agent Library (global catalog) ────────────────────────────────────────────
+
+model AgentLibraryEntry {
+  id                    String    @id @default(auto()) @map("_id") @db.ObjectId
+  slug                  String    @unique
+  name                  String
+  profile               String
+  category              String
+  useCases              String[]  @default([])
+  defaultType           AgentType
+  estimatedSetupMinutes Int       @default(5)
+  samplePrompt          String
+  defaultFirstMessage   String
+  defaultVariables      Json      @default("[]")
+  compatibleVoices      Json      @default("[]")
+  demoAudioUrl          String
+  avatarGradient        String?
+  isPublished           Boolean   @default(true)
+  sortOrder             Int       @default(0)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  deployedAgents AiAgent[]
+}
+
+// ─── AI Agents ─────────────────────────────────────────────────────────────────
+
+model AiAgent {
+  id                String           @id @default(auto()) @map("_id") @db.ObjectId
+  companyId         String           @db.ObjectId
+  libraryEntryId    String?          @db.ObjectId
+  branchId          String?          @db.ObjectId
+  name              String
+  description       String?
+  type              AgentType
+  category          String?
+  status            AgentStatus      @default(ACTIVE)
+  environment       AgentEnvironment @default(PRODUCTION)
+  enabled           Boolean          @default(true)
+  languages         String[]         @default([])
+  firstMessage      String?
+  systemPrompt      String?
+  voiceConfig       Json             @default("{}")
+  modelConfig       Json             @default("{}")
+  transcriberConfig Json             @default("{}")
+  serverConfig      Json             @default("{}")
+  structuredOutputs Json             @default("[]")
+  scorecards        Json             @default("[]")
+  monitors          Json             @default("[]")
+  demoAudioUrl      String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  company              Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  libraryEntry         AgentLibraryEntry?    @relation(fields: [libraryEntryId], references: [id])
+  branch               Branch?               @relation(fields: [branchId], references: [id])
+  promptTemplates      AgentPromptTemplate[]
+  toolAssignments      AgentToolAssignment[]
+  knowledgeSources     KnowledgeSource[]
+  inboundPhoneNumbers  PhoneNumber[]         @relation("InboundAgent")
+  outboundPhoneNumbers PhoneNumber[]         @relation("OutboundAgent")
+  callLogs             CallLog[]
+  campaigns            Campaign[]
+  dialerLeads          Lead[]                @relation("DialerLeadAgent")
+  channels             Channel[]
+  dialerCalls          DialerCall[]
+  communicationChannels AgentCommunicationChannel[]
+
+  @@index([companyId, status])
+  @@index([companyId, type])
+  @@index([companyId, enabled, status])
+  @@index([libraryEntryId])
+  @@index([companyId, branchId])
+}
+
+model AgentCommunicationChannel {
+  id        String                   @id @default(auto()) @map("_id") @db.ObjectId
+  companyId String                   @db.ObjectId
+  aiAgentId String                   @db.ObjectId
+  type      CommunicationChannelType
+  enabled   Boolean                  @default(true)
+  settings  Json                     @default("{}")
+  createdAt DateTime                 @default(now())
+  updatedAt DateTime                 @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  aiAgent AiAgent @relation(fields: [aiAgentId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, type])
+  @@index([aiAgentId])
+  @@index([companyId])
+}
+
+model AgentPromptTemplate {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  companyId    String   @db.ObjectId
+  aiAgentId    String   @db.ObjectId
+  name         String
+  version      Int      @default(1)
+  systemPrompt String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  aiAgent AiAgent @relation(fields: [aiAgentId], references: [id], onDelete: Cascade)
+
+  @@index([aiAgentId, isActive])
+}
+
+model AgentToolAssignment {
+  id        String      @id @default(auto()) @map("_id") @db.ObjectId
+  aiAgentId String      @db.ObjectId
+  toolId    AgentToolId
+  enabled   Boolean     @default(false)
+  config    Json        @default("{}")
+  usage     Json        @default("{}")
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  aiAgent AiAgent @relation(fields: [aiAgentId], references: [id], onDelete: Cascade)
+
+  @@unique([aiAgentId, toolId])
+}
+
+model KnowledgeSource {
+  id        String                @id @default(auto()) @map("_id") @db.ObjectId
+  companyId String                @db.ObjectId
+  aiAgentId String?               @db.ObjectId
+  name      String
+  type      KnowledgeSourceType
+  status    KnowledgeSourceStatus @default(PENDING)
+  sourceUrl String?
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+
+  company Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  aiAgent AiAgent? @relation(fields: [aiAgentId], references: [id])
+
+  @@index([companyId, status])
+  @@index([aiAgentId])
+}
+
+// ─── Dashboard Analytics ───────────────────────────────────────────────────────
+
+model AnalyticsSnapshot {
+  id               String               @id @default(auto()) @map("_id") @db.ObjectId
+  companyId        String               @db.ObjectId
+  granularity      AnalyticsGranularity
+  periodStart      DateTime
+  periodEnd        DateTime
+  scope            AnalyticsScope
+  scopeId          String               @default("global")
+  metrics          Json                 @default("{}")
+  leadBreakdown    Json                 @default("{}")
+  agentPerformance Json                 @default("[]")
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, granularity, periodStart, scope, scopeId])
+  @@index([companyId, periodStart])
+}
+
+model Campaign {
+  id             String         @id @default(auto()) @map("_id") @db.ObjectId
+  companyId      String         @db.ObjectId
+  aiAgentId      String?        @db.ObjectId
+  name           String
+  status         CampaignStatus @default(DRAFT)
+  totalCalls     Int            @default(0)
+  connectedCalls Int            @default(0)
+  conversionRate Float          @default(0)
+  generatedLeads Int            @default(0)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  company Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  aiAgent AiAgent? @relation(fields: [aiAgentId], references: [id])
+
+  @@index([companyId, status])
+}
+
+// ─── Scheduler ─────────────────────────────────────────────────────────────────
+
+model SchedulerEvent {
+  id                 String               @id @default(auto()) @map("_id") @db.ObjectId
+  companyId          String               @db.ObjectId
+  type               SchedulerEventType
+  status             SchedulerEventStatus @default(SCHEDULED)
+  title              String
+  description        String?
+  startAt            DateTime
+  endAt              DateTime?
+  timezone           String               @default("UTC")
+  leadId             String?              @db.ObjectId
+  assignedUserId     String?              @db.ObjectId
+  externalCalendarId String?
+  externalEventId    String?
+  reminderAt         DateTime?
+  metadata           Json                 @default("{}")
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  company      Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lead         Lead?   @relation(fields: [leadId], references: [id])
+  assignedUser User?   @relation(fields: [assignedUserId], references: [id])
+
+  @@index([companyId, startAt])
+  @@index([companyId, assignedUserId, startAt])
+}
+
+// ─── Integrations ──────────────────────────────────────────────────────────────
+
+model Integration {
+  id               String            @id @default(auto()) @map("_id") @db.ObjectId
+  companyId        String            @db.ObjectId
+  type             IntegrationType
+  status           IntegrationStatus @default(NOT_CONNECTED)
+  connectedAccount String?
+  config           Json              @default("{}")
+  credentialsRef   String?
+  lastSyncAt       DateTime?
+  errorMessage     String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  company          Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  syncLogs         IntegrationSyncLog[]
+  webhookEndpoints WebhookEndpoint[]
+
+  @@unique([companyId, type])
+}
+
+model IntegrationSyncLog {
+  id            String     @id @default(auto()) @map("_id") @db.ObjectId
+  integrationId String     @db.ObjectId
+  result        SyncResult
+  rowsSynced    Int        @default(0)
+  message       String?
+  startedAt     DateTime
+  completedAt   DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  integration Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([integrationId, startedAt])
+}
+
+model WebhookEndpoint {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  companyId     String   @db.ObjectId
+  integrationId String?  @db.ObjectId
+  url           String
+  events        String[] @default([])
+  secretRef     String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  integration Integration? @relation(fields: [integrationId], references: [id])
+
+  @@index([companyId, isActive])
+}
+
+// ─── Audit Logs & Notifications ────────────────────────────────────────────────
+
+model AuditLog {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  companyId  String   @db.ObjectId
+  userId     String?  @db.ObjectId
+  action     String
+  entityType String
+  entityId   String
+  changes    Json     @default("{}")
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id])
+
+  @@index([companyId, createdAt])
+  @@index([entityType, entityId])
+}
+
+model Notification {
+  id        String           @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String           @db.ObjectId
+  companyId String           @db.ObjectId
+  type      NotificationType @default(INFO)
+  title     String
+  body      String
+  readAt    DateTime?
+  data      Json             @default("{}")
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@index([companyId, createdAt])
+  @@index([userId, companyId, readAt])
+}
+
+// ─── Supporting Entities ───────────────────────────────────────────────────────
+
+model CsvImportBatch {
+  id           String          @id @default(auto()) @map("_id") @db.ObjectId
+  companyId    String          @db.ObjectId
+  fileName     String
+  status       CsvImportStatus @default(PENDING)
+  rowCount     Int             @default(0)
+  successCount Int             @default(0)
+  failedRows   Json            @default("[]")
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, createdAt])
+}
+
+model ApiKey {
+  id         String    @id @default(auto()) @map("_id") @db.ObjectId
+  companyId  String    @db.ObjectId
+  name       String
+  keyPrefix  String
+  hashedKey  String
+  lastUsedAt DateTime?
+  expiresAt  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([keyPrefix])
+}
+
+model CreditBalance {
+  id               String    @id @default(auto()) @map("_id") @db.ObjectId
+  companyId        String    @unique @db.ObjectId
+  creditsRemaining Int       @default(0)
+  creditsUsed      Int       @default(0)
+  planId           String?
+  renewalAt        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+// ─── Roles & RBAC ─────────────────────────────────────────────────────────────
+
+model Role {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  companyId   String?  @db.ObjectId
+  name        String
+  slug        String
+  permissions String[] @default([])
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company Company?        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  members CompanyMember[]
+
+  @@unique([companyId, slug])
+  @@index([companyId])
+}
+
+// ─── Credits Ledger ───────────────────────────────────────────────────────────
+
+model CreditUsage {
+  id          String            @id @default(auto()) @map("_id") @db.ObjectId
+  companyId   String            @db.ObjectId
+  amount      Int
+  reason      CreditUsageReason
+  callLogId   String?           @db.ObjectId
+  description String?
+  metadata    Json              @default("{}")
+  createdAt   DateTime          @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, createdAt])
+  @@index([companyId, callLogId])
+}
+
+// ─── Billing ──────────────────────────────────────────────────────────────────
+
+model BillingSubscription {
+  id                   String        @id @default(auto()) @map("_id") @db.ObjectId
+  companyId            String        @unique @db.ObjectId
+  planId               String
+  planName             String
+  status               BillingStatus @default(TRIALING)
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  currentPeriodStart   DateTime
+  currentPeriodEnd     DateTime
+  cancelAtPeriodEnd    Boolean       @default(false)
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  company  Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  invoices BillingInvoice[]
+}
+
+model BillingInvoice {
+  id             String        @id @default(auto()) @map("_id") @db.ObjectId
+  companyId      String        @db.ObjectId
+  subscriptionId String        @db.ObjectId
+  externalId     String?       @unique
+  status         InvoiceStatus @default(DRAFT)
+  amountCents    Int
+  currency       String        @default("USD")
+  description    String?
+  issuedAt       DateTime
+  dueAt          DateTime?
+  paidAt         DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  company      Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  subscription BillingSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, issuedAt])
+  @@index([companyId, status])
+}
+
+// ─── System Events ────────────────────────────────────────────────────────────
+
+model SystemEvent {
+  id         String          @id @default(auto()) @map("_id") @db.ObjectId
+  companyId  String          @db.ObjectId
+  type       SystemEventType
+  actorId    String?         @db.ObjectId
+  entityType String?
+  entityId   String?
+  title      String
+  payload    Json            @default("{}")
+  createdAt  DateTime        @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, createdAt])
+  @@index([companyId, type])
+}
+
+// ─── Admin Panel Extensions ───────────────────────────────────────────────────
+
+model CompanyContact {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  companyId String   @unique @db.ObjectId
+  name      String
+  email     String
+  phone     String?
+  title     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+model CompanySetupConfig {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  companyId        String   @unique @db.ObjectId
+  totalChannels    Int      @default(0)
+  pulseTimeSeconds Int      @default(60)
+  deltaSeconds     Int      @default(2)
+  agentsAllocated  Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+model CompanyChannel {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  companyId     String   @db.ObjectId
+  channelIndex  Int
+  label         String?
+  phoneNumberId String?  @db.ObjectId
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  phoneNumber PhoneNumber? @relation(fields: [phoneNumberId], references: [id])
+
+  @@unique([companyId, channelIndex])
+  @@index([companyId])
+}
+
+model CompanyBillingRates {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  companyId        String   @unique @db.ObjectId
+  costPerChannel   Float    @default(650)
+  costPerCredit    Float    @default(0.31)
+  pulseTimeSeconds Int      @default(60)
+  setupOneTimeCost Float    @default(0)
+  currency         String   @default("INR")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+model SupportRequest {
+  id          String               @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  email       String
+  reason      SupportRequestReason
+  planId      String?
+  planName    String?
+  message     String
+  status      SupportRequestStatus @default(NEW)
+  userId      String?              @db.ObjectId
+  companyId   String?              @db.ObjectId
+  clerkUserId String?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  user    User?    @relation(fields: [userId], references: [id])
+  company Company? @relation(fields: [companyId], references: [id])
+
+  @@index([status, createdAt])
+  @@index([companyId])
+  @@index([email])
+}
+
+// ─── AI Dialer ─────────────────────────────────────────────────────────────────
+
+model Channel {
+  id                 String        @id @default(auto()) @map("_id") @db.ObjectId
+  companyId          String        @db.ObjectId
+  number             String
+  status             ChannelStatus @default(AVAILABLE)
+  aiAgentId          String?       @db.ObjectId
+  lastStatusChangeAt DateTime?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  aiAgent     AiAgent?     @relation(fields: [aiAgentId], references: [id])
+  leads       Lead[]
+  dialerCalls DialerCall[]
+
+  @@unique([companyId, number])
+  @@index([companyId, status])
+}
+
+model DialerCall {
+  id              String          @id @default(auto()) @map("_id") @db.ObjectId
+  companyId       String          @db.ObjectId
+  leadId          String          @db.ObjectId
+  channelId       String          @db.ObjectId
+  aiAgentId       String          @db.ObjectId
+  callStatus      AgentCallStatus
+  durationSeconds Int             @default(0)
+  assignedNumber  String?
+  customerPhone   String?
+  customerName    String?
+  customerEmail   String?
+  customerAddress String?
+  customerCity    String?
+  customerState   String?
+  customerZip     String?
+  customerCountry String?
+  recordingUrl    String?
+  transcript      String?
+  summary         String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  company         Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lead            Lead                   @relation(fields: [leadId], references: [id])
+  channel         Channel                @relation(fields: [channelId], references: [id])
+  aiAgent         AiAgent                @relation(fields: [aiAgentId], references: [id])
+  analysis        CallAnalysis?
+  events          CallEvent[]
+  integrationLogs DialerIntegrationLog[]
+
+  @@index([companyId, createdAt])
+  @@index([companyId, leadId])
+  @@index([companyId, channelId])
+}
+
+model CallAnalysis {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  dialerCallId     String   @unique @db.ObjectId
+  sentiment        String?
+  intent           String?
+  interested       Boolean  @default(false)
+  followUpRequired Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  dialerCall DialerCall @relation(fields: [dialerCallId], references: [id], onDelete: Cascade)
+}
+
+model CallEvent {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  dialerCallId String   @db.ObjectId
+  event        String
+  timestamp    DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  dialerCall DialerCall @relation(fields: [dialerCallId], references: [id], onDelete: Cascade)
+
+  @@index([dialerCallId, timestamp])
+}
+
+model DialerIntegrationLog {
+  id           String                  @id @default(auto()) @map("_id") @db.ObjectId
+  dialerCallId String                  @db.ObjectId
+  type         DialerIntegrationType
+  status       DialerIntegrationStatus @default(PENDING)
+  response     Json                    @default("{}")
+  retryCount   Int                     @default(0)
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+
+  dialerCall DialerCall @relation(fields: [dialerCallId], references: [id], onDelete: Cascade)
+
+  @@index([dialerCallId, type])
+  @@index([dialerCallId, createdAt])
+}
+
+// ─── Branches (generic business units) ─────────────────────────────────────────
+
+model Branch {
+  id             String       @id @default(auto()) @map("_id") @db.ObjectId
+  companyId      String       @db.ObjectId
+  name           String
+  status         BranchStatus @default(ACTIVE)
+  address        String?
+  phone          String?
+  email          String?
+  notes          String?
+  customFields   Json         @default("{}")
+  /// Per-branch AI toggle. AI configuration is stored per branch, not globally.
+  aiEnabled      Boolean      @default(false)
+  /// Branch-specific system prompt controlling the AI agent behavior.
+  systemPrompt   String?
+  /// Extensible AI settings bag (model, temperature, knowledgeBase, voice, etc.).
+  aiConfig       Json         @default("{}")
+  lastActivityAt DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  company      Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  leads        Lead[]
+  callLogs     CallLog[]
+  documents    BranchDocument[]
+  activities   BranchActivity[]
+  memberAccess MemberBranchAccess[]
+  agents       AiAgent[]
+  invitation   BranchInvitation?
+
+  @@index([companyId, status])
+  @@index([companyId, name])
+  @@index([companyId, lastActivityAt])
+  @@index([companyId, aiEnabled])
+}
+
+model BranchDocument {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  companyId    String   @db.ObjectId
+  branchId     String   @db.ObjectId
+  name         String
+  url          String
+  mimeType     String?
+  sizeBytes    Int?
+  uploadedById String?  @db.ObjectId
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@index([branchId, createdAt])
+}
+
+model BranchActivity {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  companyId String   @db.ObjectId
+  branchId  String   @db.ObjectId
+  type      String
+  summary   String
+  actorId   String?  @db.ObjectId
+  metadata  Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@index([branchId, createdAt])
+}
+
+enum BranchInvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  CANCELLED
+}
+
+model BranchInvitation {
+  id                  String                 @id @default(auto()) @map("_id") @db.ObjectId
+  companyId           String                 @db.ObjectId
+  branchId            String                 @unique @db.ObjectId
+  email               String
+  token               String                 @unique
+  clerkInvitationId   String?
+  clerkOrganizationId String?
+  status              BranchInvitationStatus @default(PENDING)
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+  sentAt              DateTime               @default(now())
+  acceptedAt          DateTime?
+  expiresAt           DateTime
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branch  Branch  @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+}

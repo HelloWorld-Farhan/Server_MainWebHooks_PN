@@ -1,0 +1,93 @@
+type EmployeeRole {
+  id: ID!
+  name: String!
+  slug: String!
+  permissions: [String!]!
+  isSystem: Boolean!
+}
+
+type EmployeeBranch {
+  id: ID!
+  name: String!
+  status: BranchStatus!
+}
+
+type Employee {
+  id: ID!
+  userId: ID!
+  name: String!
+  email: String!
+  phone: String
+  imageUrl: String
+  jobTitle: String
+  role: UserRole!
+  customRole: EmployeeRole
+  branchAccessType: BranchAccessType!
+  assignedBranches: [EmployeeBranch!]!
+  status: MemberStatus!
+  invitationStatus: InvitationDisplayStatus!
+  lastActiveAt: String
+  invitedAt: String
+  joinedAt: String
+  createdAt: String!
+  updatedAt: String!
+}
+
+enum InvitationDisplayStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+}
+
+type EmployeeEdge {
+  node: Employee!
+  cursor: String!
+}
+
+type EmployeeConnection {
+  edges: [EmployeeEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+input EmployeeFilter {
+  search: String
+  role: UserRole
+  status: MemberStatus
+  branchId: ID
+}
+
+input InviteEmployeeInput {
+  name: String!
+  email: String!
+  role: UserRole!
+  jobTitle: String
+  branchAccessType: BranchAccessType!
+  branchIds: [ID!]
+}
+
+input UpdateEmployeeInput {
+  jobTitle: String
+  role: UserRole
+  branchAccessType: BranchAccessType
+  branchIds: [ID!]
+  status: MemberStatus
+  firstName: String
+  lastName: String
+  phone: String
+}
+
+type EmployeesQueries {
+  connection(first: Int, after: String, filter: EmployeeFilter): EmployeeConnection!
+  byId(id: ID!): Employee
+  permissionsForRole(role: UserRole!): [String!]!
+}
+
+type EmployeesMutations {
+  invite(input: InviteEmployeeInput!): Employee!
+  update(id: ID!, input: UpdateEmployeeInput!): Employee!
+  deactivate(id: ID!): Employee!
+  delete(id: ID!): Boolean!
+  resendInvite(id: ID!): Employee!
+  cancelInvite(id: ID!): Boolean!
+}

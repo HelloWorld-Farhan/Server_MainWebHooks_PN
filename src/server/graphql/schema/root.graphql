@@ -1,0 +1,145 @@
+scalar DateTime
+scalar JSON
+
+enum AnalyticsGranularity {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+enum CallDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum CallStatus {
+  COMPLETED
+  MISSED
+  VOICEMAIL
+  FAILED
+}
+
+enum BillingStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  TRIALING
+}
+
+enum InvoiceStatus {
+  DRAFT
+  OPEN
+  PAID
+  VOID
+  UNCOLLECTIBLE
+}
+
+enum UserRole {
+  OWNER
+  ADMIN
+  MANAGER
+  AGENT
+  SALES
+  SUPPORT
+}
+
+enum MemberStatus {
+  ACTIVE
+  INVITED
+  DEACTIVATED
+  REMOVED
+}
+
+enum BranchAccessType {
+  ALL
+  SELECTED
+}
+
+enum AgentStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum BranchStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum IntegrationStatus {
+  CONNECTED
+  NOT_CONNECTED
+  SYNCING
+  ERROR
+}
+
+enum SystemEventType {
+  CALL_COMPLETED
+  LEAD_CREATED
+  AGENT_DEPLOYED
+  CREDIT_LOW
+  INTEGRATION_SYNC
+  BILLING_ALERT
+}
+
+type PageInfo {
+  hasNextPage: Boolean!
+  endCursor: String
+}
+
+type Viewer {
+  id: ID!
+  membershipId: ID!
+  email: String!
+  firstName: String
+  lastName: String
+  role: UserRole!
+  permissions: [String!]!
+  branchAccessType: BranchAccessType!
+  branchIds: [ID!]!
+  company: Company!
+}
+
+type CompanyContact {
+  name: String!
+  email: String!
+  phone: String
+  title: String
+}
+
+type Company {
+  id: ID!
+  name: String!
+  slug: String!
+  contact: CompanyContact
+}
+
+type Query {
+  viewer: Viewer!
+  credits: CreditsQueries!
+  billing: BillingQueries!
+  callLogs: CallLogsQueries!
+  analytics: AnalyticsQueries!
+  agents: AgentsQueries!
+  phoneNumbers: PhoneNumbersQueries!
+  uploadedContacts: UploadedContactsQueries!
+  leads: LeadsQueries!
+  campaigns: CampaignsQueries!
+  notifications: NotificationQueries!
+  integrations: IntegrationQueries!
+  scheduler: SchedulerQueries!
+  events: EventQueries!
+  branches: BranchesQueries!
+  employees: EmployeesQueries!
+}
+
+type Mutation {
+  credits: CreditsMutations!
+  callLogs: CallLogsMutations!
+  agents: AgentsMutations!
+  phoneNumbers: PhoneNumbersMutations!
+  uploadedContacts: UploadedContactsMutations!
+  leads: LeadsMutations!
+  branches: BranchesMutations!
+  employees: EmployeesMutations!
+}

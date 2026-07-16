@@ -1,0 +1,163 @@
+type Branch {
+  id: ID!
+  name: String!
+  status: BranchStatus!
+  address: String
+  phone: String
+  email: String
+  notes: String
+  customFields: JSON
+  aiEnabled: Boolean!
+  systemPrompt: String
+  aiConfig: JSON
+  contactsCount: Int!
+  callLogsCount: Int!
+  documentsCount: Int!
+  agentsCount: Int!
+  lastActivityAt: String
+  createdAt: String!
+  updatedAt: String!
+  invitationEmailSent: Boolean
+  invitation: BranchInvitation
+}
+
+type BranchEdge {
+  node: Branch!
+  cursor: String!
+}
+
+type BranchConnection {
+  edges: [BranchEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type BranchContact {
+  id: ID!
+  firstName: String
+  lastName: String
+  email: String
+  phone: String
+  createdAt: String
+}
+
+type BranchCallLog {
+  id: ID!
+  direction: String!
+  status: String!
+  durationSeconds: Int!
+  startedAt: String!
+  leadPhone: String
+  leadName: String
+}
+
+type BranchDocument {
+  id: ID!
+  name: String!
+  url: String!
+  mimeType: String
+  sizeBytes: Int
+  createdAt: String!
+}
+
+type BranchActivity {
+  id: ID!
+  type: String!
+  summary: String!
+  metadata: JSON
+  createdAt: String!
+}
+
+input BranchFilter {
+  search: String
+  status: BranchStatus
+  aiEnabled: Boolean
+}
+
+input CreateBranchInput {
+  name: String!
+  status: BranchStatus
+  address: String
+  phone: String
+  email: String
+  notes: String
+  customFields: JSON
+  aiEnabled: Boolean
+  systemPrompt: String
+  aiConfig: JSON
+}
+
+input UpdateBranchInput {
+  name: String
+  status: BranchStatus
+  address: String
+  phone: String
+  email: String
+  notes: String
+  customFields: JSON
+}
+
+input UpdateBranchAiInput {
+  aiEnabled: Boolean
+  systemPrompt: String
+  aiConfig: JSON
+}
+
+enum BranchBulkAction {
+  ENABLE_AI
+  DISABLE_AI
+  UPDATE_PROMPT
+  CHANGE_STATUS
+  ARCHIVE
+}
+
+input BulkBranchUpdateInput {
+  ids: [ID!]!
+  action: BranchBulkAction!
+  systemPrompt: String
+  status: BranchStatus
+}
+
+type BulkBranchUpdateResult {
+  updated: Int!
+}
+
+type BranchesQueries {
+  connection(first: Int, after: String, filter: BranchFilter): BranchConnection!
+  byId(id: ID!): Branch
+  contacts(branchId: ID!, first: Int, after: String): [BranchContact!]!
+  callLogs(branchId: ID!, first: Int, after: String): [BranchCallLog!]!
+  documents(branchId: ID!): [BranchDocument!]!
+  activities(branchId: ID!, limit: Int): [BranchActivity!]!
+  agents(branchId: ID!): [AiAgent!]!
+}
+
+type BranchesMutations {
+  create(input: CreateBranchInput!): Branch!
+  update(id: ID!, input: UpdateBranchInput!): Branch!
+  updateAi(id: ID!, input: UpdateBranchAiInput!): Branch!
+  bulkUpdate(input: BulkBranchUpdateInput!): BulkBranchUpdateResult!
+  archive(id: ID!): Branch!
+  resendInvitation(branchId: ID!): Branch!
+  cancelInvitation(branchId: ID!): Branch!
+  generateNewInvitation(branchId: ID!): Branch!
+}
+
+enum BranchInvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  CANCELLED
+}
+
+type BranchInvitation {
+  id: ID!
+  email: String!
+  token: String!
+  status: BranchInvitationStatus!
+  createdAt: String!
+  updatedAt: String!
+  sentAt: String!
+  acceptedAt: String
+  expiresAt: String!
+}

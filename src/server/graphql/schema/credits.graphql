@@ -1,0 +1,35 @@
+type CreditsQueries {
+  summary: CreditSummary!
+  usageHistory(first: Int, after: String): CreditUsageConnection!
+}
+
+type CreditsMutations {
+  adjustCredits(amount: Int!, description: String!): CreditUsage!
+}
+
+type CreditSummary {
+  remaining: Int!
+  used: Int!
+  total: Int!
+  availablePercent: Int!
+  renewalAt: String
+  planId: String
+}
+
+type CreditUsage {
+  id: ID!
+  amount: Int!
+  reason: String!
+  description: String
+  createdAt: String!
+}
+
+type CreditUsageEdge {
+  node: CreditUsage!
+  cursor: String!
+}
+
+type CreditUsageConnection {
+  edges: [CreditUsageEdge!]!
+  pageInfo: PageInfo!
+}

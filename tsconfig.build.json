@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["src/**/*"],
+  "exclude": [
+    "node_modules",
+    "test",
+    "dist",
+    "**/*spec.ts",
+    "src/lib/graphql/api.ts",
+    "src/lib/graphql/client.ts",
+    "src/lib/graphql/auth-error.ts"
+  ]
+}
