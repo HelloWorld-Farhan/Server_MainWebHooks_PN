@@ -1,0 +1,13 @@
+{
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "install": "npm ci && npx prisma generate",
+  "terminals": [
+    {
+      "name": "nestjs-dev",
+      "command": "npm run start:dev"
+    }
+  ]
+}
