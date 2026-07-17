@@ -1,4 +1,6 @@
-import { getAuthFromRequest } from "@/auth/clerk";
+import type { Request as ExpressRequest } from "express";
+
+import { getAuthFromFetchRequest, getAuthFromRequest } from "@/auth/clerk";
 import { getCurrentRequest } from "@/auth/request-context";
 import { gqlDebug, gqlDebugTimed, gqlLogError } from "@/server/graphql/debug";
 import { UnauthorizedError } from "@/server/lib/errors";
@@ -9,14 +11,20 @@ import {
 } from "@/server/services/company-resolution.service";
 import type { GraphQLContext } from "@/server/types/context";
 
-export async function createGraphQLContext(): Promise<GraphQLContext> {
+export async function createGraphQLContext(
+  req?: ExpressRequest,
+  fetchRequest?: Request,
+): Promise<GraphQLContext> {
   return gqlDebugTimed("context:total", async () => {
-    const req = getCurrentRequest();
+    const expressRequest = req ?? getCurrentRequest();
     const { userId, orgId } = await gqlDebugTimed("context:auth", async () => {
-      if (!req) {
-        return { userId: null, orgId: null };
+      if (expressRequest) {
+        return getAuthFromRequest(expressRequest);
       }
-      return getAuthFromRequest(req);
+      if (fetchRequest) {
+        return getAuthFromFetchRequest(fetchRequest);
+      }
+      return { userId: null, orgId: null };
     });
     gqlDebug("context:auth", {
       hasUserId: Boolean(userId),

@@ -1,6 +1,18 @@
 type BillingQueries {
   subscription: BillingSubscription
   invoices(first: Int, after: String): BillingInvoiceConnection!
+  rates: BillingRates!
+}
+
+type BillingRates {
+  costPerChannel: Float!
+  costPerCredit: Float!
+  pulseTimeSeconds: Int!
+  setupOneTimeCost: Float!
+  currency: String!
+  minChannelPurchase: Int!
+  virtualNumberCost: Float!
+  gstRate: Float!
 }
 
 type BillingSubscription {

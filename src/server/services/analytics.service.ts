@@ -95,6 +95,113 @@ export class AnalyticsService {
     });
   }
 
+  async getTimeSeries(
+    ctx: TenantContext,
+    granularity: AnalyticsGranularity = "DAILY",
+    dateFrom?: Date,
+    dateTo?: Date,
+  ) {
+    tenantService.requirePermission(ctx, PERMISSIONS.ANALYTICS_READ);
+
+    const period = resolvePeriod(granularity, dateFrom, dateTo);
+    const logs = await this.callLogsRepo.findForTimeSeries(
+      ctx.companyId,
+      period.start,
+      period.end,
+      branchAccessService.callLogBranchFilter(ctx),
+    );
+
+    const buckets = new Map<
+      string,
+      {
+        label: string;
+        calls: number;
+        connectedCalls: number;
+        leads: number;
+        conversions: number;
+      }
+    >();
+
+    for (const log of logs) {
+      const bucketDate = this.resolveBucketDate(log.startedAt, granularity);
+      const key = bucketDate.toISOString();
+      const existing = buckets.get(key) ?? {
+        label: this.formatBucketLabel(bucketDate, granularity),
+        calls: 0,
+        connectedCalls: 0,
+        leads: 0,
+        conversions: 0,
+      };
+
+      existing.calls += 1;
+      if (log.status === "COMPLETED") {
+        existing.connectedCalls += 1;
+      }
+      if (log.leadId) {
+        existing.leads += 1;
+      }
+      if (log.outcome === "CONVERTED" || log.outcome === "INTERESTED") {
+        existing.conversions += 1;
+      }
+
+      buckets.set(key, existing);
+    }
+
+    const points = Array.from(buckets.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([periodStart, metrics]) => ({
+        periodStart,
+        label: metrics.label,
+        calls: metrics.calls,
+        connectedCalls: metrics.connectedCalls,
+        leads: metrics.leads,
+        conversions: metrics.conversions,
+        conversionRate:
+          metrics.calls > 0
+            ? Math.round((metrics.conversions / metrics.calls) * 1000) / 10
+            : 0,
+      }));
+
+    return {
+      granularity,
+      periodStart: period.start.toISOString(),
+      periodEnd: period.end.toISOString(),
+      points,
+    };
+  }
+
+  private resolveBucketDate(date: Date, granularity: AnalyticsGranularity) {
+    const bucket = new Date(date);
+    bucket.setUTCHours(0, 0, 0, 0);
+
+    if (granularity === "WEEKLY") {
+      const day = bucket.getUTCDay();
+      bucket.setUTCDate(bucket.getUTCDate() - day);
+    }
+
+    if (granularity === "MONTHLY") {
+      bucket.setUTCDate(1);
+    }
+
+    return bucket;
+  }
+
+  private formatBucketLabel(date: Date, granularity: AnalyticsGranularity) {
+    if (granularity === "MONTHLY") {
+      return date.toLocaleDateString("en-US", {
+        month: "short",
+        year: "numeric",
+        timeZone: "UTC",
+      });
+    }
+
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      timeZone: "UTC",
+    });
+  }
+
   async incrementDailyMetrics(
     companyId: string,
     delta: MetricsJson,

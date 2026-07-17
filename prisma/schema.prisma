@@ -197,6 +197,13 @@ enum CampaignStatus {
   COMPLETED
 }
 
+enum BillingQuoteStatus {
+  DRAFT
+  SENT
+  EXPIRED
+  PURCHASED
+}
+
 enum SchedulerEventType {
   MEETING
   REMINDER
@@ -397,6 +404,8 @@ model Company {
   agentCommunicationChannels AgentCommunicationChannel[]
   branchInvitations          BranchInvitation[]
   supportRequests            SupportRequest[]
+  billingQuotes              BillingQuote[]
+  callInternalNotes          CallInternalNote[]
 
   @@index([status])
   @@index([clerkOrganizationId])
@@ -427,6 +436,7 @@ model User {
   schedulerEvents   SchedulerEvent[]
   auditLogs         AuditLog[]
   notifications     Notification[]
+  callInternalNotes CallInternalNote[]
   supportRequests   SupportRequest[]
 
   @@index([status])
@@ -691,20 +701,22 @@ model CallLog {
   transcriptUrl   String?
   aiSummary       Json?
   sentiment       Json?
-  engagement      Json?
-  cost            Float?
-  creditsUsed     Int?
-  provider        String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  engagement       Json?
+  reactivationPlan Json?
+  cost             Float?
+  creditsUsed      Int?
+  provider         String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
 
-  company      Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  lead         Lead?           @relation(fields: [leadId], references: [id])
-  phoneNumber  PhoneNumber?    @relation(fields: [phoneNumberId], references: [id])
-  aiAgent      AiAgent?        @relation(fields: [aiAgentId], references: [id])
-  assignedUser User?           @relation("CallHumanAgent", fields: [assignedUserId], references: [id])
-  branch       Branch?         @relation(fields: [branchId], references: [id])
-  transcript   CallTranscript?
+  company       Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lead          Lead?              @relation(fields: [leadId], references: [id])
+  phoneNumber   PhoneNumber?       @relation(fields: [phoneNumberId], references: [id])
+  aiAgent       AiAgent?           @relation(fields: [aiAgentId], references: [id])
+  assignedUser  User?              @relation("CallHumanAgent", fields: [assignedUserId], references: [id])
+  branch        Branch?            @relation(fields: [branchId], references: [id])
+  transcript    CallTranscript?
+  internalNotes CallInternalNote[]
 
   @@index([companyId, startedAt])
   @@index([companyId, status, startedAt])
@@ -723,6 +735,49 @@ model CallTranscript {
   updatedAt DateTime @updatedAt
 
   callLog CallLog @relation(fields: [callLogId], references: [id], onDelete: Cascade)
+}
+
+model CallInternalNote {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  callLogId String   @db.ObjectId
+  companyId String   @db.ObjectId
+  authorId  String   @db.ObjectId
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  callLog CallLog @relation(fields: [callLogId], references: [id], onDelete: Cascade)
+  author  User    @relation(fields: [authorId], references: [id])
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([callLogId, createdAt])
+  @@index([companyId])
+}
+
+model BillingQuote {
+  id                   String             @id @default(auto()) @map("_id") @db.ObjectId
+  companyId            String             @db.ObjectId
+  status               BillingQuoteStatus @default(DRAFT)
+  channelQty           Int                @default(0)
+  virtualNumberQty     Int                @default(0)
+  expectedMonthlyCalls Int                @default(0)
+  channelCost          Float              @default(0)
+  virtualNumberCost    Float              @default(0)
+  callCost             Float              @default(0)
+  subtotal             Float              @default(0)
+  gst                  Float              @default(0)
+  grandTotal           Float              @default(0)
+  currency             String             @default("INR")
+  expiresAt            DateTime?
+  purchasedAt          DateTime?
+  invoiceId            String?            @db.ObjectId
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, status])
+  @@index([companyId, createdAt])
 }
 
 // ─── Agent Library (global catalog) ────────────────────────────────────────────

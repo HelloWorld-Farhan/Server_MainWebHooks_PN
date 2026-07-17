@@ -1,9 +1,5 @@
 import { yoga } from "@/server/graphql/yoga";
 
-type NextRouteContext = {
-  params: Promise<Record<string, string>>;
-};
-
 export async function executeGraphQLFromRequest<T>(
   request: Request,
   query: string,
@@ -21,7 +17,7 @@ export async function executeGraphQLFromRequest<T>(
       },
       body: JSON.stringify({ query, variables }),
     }),
-    { params: Promise.resolve({}) } as NextRouteContext,
+    {},
   );
 
   if (!response.ok) {

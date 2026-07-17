@@ -66,6 +66,7 @@ export const CALL_DETAIL_QUERY = `
         aiSummary
         sentiment
         engagement
+        reactivationPlan
         lead {
           id
           firstName
@@ -87,6 +88,17 @@ export const CALL_DETAIL_QUERY = `
           id
           fullText
           segments
+        }
+        internalNotes {
+          id
+          content
+          createdAt
+          updatedAt
+          author {
+            id
+            name
+            email
+          }
         }
       }
     }

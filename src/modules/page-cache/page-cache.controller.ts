@@ -40,7 +40,7 @@ export class PageCacheController {
 
     return runWithRequest(req, async () => {
       try {
-        const gqlContext = await createGraphQLContext();
+        const gqlContext = await createGraphQLContext(req);
         const loader = getPageLoader(pageKey);
         if (!loader) {
           return res.status(404).json({ error: "Page loader not found" });

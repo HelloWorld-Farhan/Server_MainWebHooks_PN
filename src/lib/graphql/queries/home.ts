@@ -19,6 +19,20 @@ export const HOME_PAGE_QUERY = `
         connectedCalls
         conversionRate
       }
+      timeSeries(granularity: DAILY, dateFrom: $dateFrom, dateTo: $dateTo) {
+        granularity
+        periodStart
+        periodEnd
+        points {
+          periodStart
+          label
+          calls
+          connectedCalls
+          leads
+          conversions
+          conversionRate
+        }
+      }
     }
     agents {
       statusSummary {

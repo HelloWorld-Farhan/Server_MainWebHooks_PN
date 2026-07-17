@@ -150,6 +150,49 @@ export class CallLogsRepository extends BaseRepository {
     ]).then(([totalCalls, connectedCalls]) => ({ totalCalls, connectedCalls }));
   }
 
+  findForTimeSeries(
+    companyId: string,
+    dateFrom: Date,
+    dateTo: Date,
+    scopeWhere?: Prisma.CallLogWhereInput,
+  ) {
+    const where = this.buildWhere(
+      companyId,
+      { dateFrom, dateTo },
+      scopeWhere,
+    );
+
+    return this.prisma.callLog.findMany({
+      where,
+      select: {
+        id: true,
+        startedAt: true,
+        status: true,
+        leadId: true,
+        outcome: true,
+        aiAgentId: true,
+      },
+      orderBy: { startedAt: "asc" },
+    });
+  }
+
+  updateOutcome(
+    companyId: string,
+    id: string,
+    outcome: string,
+    reactivationPlan?: Record<string, unknown> | null,
+  ) {
+    return this.prisma.callLog.updateMany({
+      where: { id, companyId },
+      data: {
+        outcome: outcome as never,
+        ...(reactivationPlan !== undefined
+          ? { reactivationPlan: reactivationPlan as never }
+          : {}),
+      },
+    });
+  }
+
   findLeadsByIds(companyId: string, ids: string[]) {
     return this.prisma.lead.findMany({
       where: { companyId, id: { in: ids } },

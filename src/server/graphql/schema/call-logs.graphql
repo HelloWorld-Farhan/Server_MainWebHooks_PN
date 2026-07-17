@@ -17,6 +17,24 @@ type CallLogsQueries {
 
 type CallLogsMutations {
   recordCallCompleted(callLogId: ID!, creditsUsed: Int!): Boolean!
+  updateOutcome(id: ID!, outcome: String!, reactivationPlan: JSON): CallLogDetail
+  addInternalNote(callLogId: ID!, content: String!): CallInternalNote!
+  updateInternalNote(id: ID!, content: String!): CallInternalNote!
+  deleteInternalNote(id: ID!): Boolean!
+}
+
+type CallInternalNote {
+  id: ID!
+  content: String!
+  createdAt: String!
+  updatedAt: String!
+  author: CallInternalNoteAuthor!
+}
+
+type CallInternalNoteAuthor {
+  id: ID!
+  name: String!
+  email: String!
 }
 
 type CallLog {
@@ -55,10 +73,12 @@ type CallLogDetail {
   aiSummary: JSON
   sentiment: JSON
   engagement: JSON
+  reactivationPlan: JSON
   lead: Lead
   aiAgent: AiAgent
   phoneNumber: PhoneNumber
   transcript: CallTranscript
+  internalNotes: [CallInternalNote!]!
 }
 
 type CallTranscript {

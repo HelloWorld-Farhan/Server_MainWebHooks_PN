@@ -1,3 +1,4 @@
+import type { Request as ExpressRequest } from "express";
 import { createYoga } from "graphql-yoga";
 
 import { createGraphQLContext } from "@/server/graphql/context";
@@ -49,14 +50,18 @@ function useGraphQLDebugPlugin() {
   };
 }
 
-export const yoga = createYoga({
+type YogaExpressServerContext = {
+  req?: ExpressRequest;
+};
+
+export const yoga = createYoga<YogaExpressServerContext>({
   schema,
   graphqlEndpoint: "/graphql",
   landingPage: isDev,
-  context: async () => {
+  context: async ({ req, request }) => {
     gqlDebug("context:create:start");
     try {
-      const ctx = await createGraphQLContext();
+      const ctx = await createGraphQLContext(req, request);
       gqlDebug("context:create:done", {
         companyId: ctx.companyId,
         userId: ctx.userId,

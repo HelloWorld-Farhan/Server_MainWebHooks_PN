@@ -84,6 +84,7 @@ export const resolvers = {
     phoneNumbers: () => ({}),
     uploadedContacts: () => ({}),
     leads: () => ({}),
+    campaigns: () => ({}),
     branches: () => ({}),
     employees: () => ({}),
   },
@@ -114,6 +115,8 @@ export const resolvers = {
       args: { first?: number; after?: string },
       ctx: TenantContext,
     ) => billingService.getInvoices(ctx, args),
+    rates: (_: unknown, __: unknown, ctx: TenantContext) =>
+      billingService.getRates(ctx),
   },
 
   CallLogsQueries: {
@@ -154,6 +157,36 @@ export const resolvers = {
       });
       return true;
     },
+    updateOutcome: (
+      _: unknown,
+      args: {
+        id: string;
+        outcome: string;
+        reactivationPlan?: Record<string, unknown> | null;
+      },
+      ctx: TenantContext,
+    ) =>
+      callLogsService.updateOutcome(
+        ctx,
+        args.id,
+        args.outcome,
+        args.reactivationPlan,
+      ),
+    addInternalNote: (
+      _: unknown,
+      args: { callLogId: string; content: string },
+      ctx: TenantContext,
+    ) => callLogsService.addInternalNote(ctx, args.callLogId, args.content),
+    updateInternalNote: (
+      _: unknown,
+      args: { id: string; content: string },
+      ctx: TenantContext,
+    ) => callLogsService.updateInternalNote(ctx, args.id, args.content),
+    deleteInternalNote: (
+      _: unknown,
+      args: { id: string },
+      ctx: TenantContext,
+    ) => callLogsService.deleteInternalNote(ctx, args.id),
   },
 
   AnalyticsQueries: {
@@ -167,6 +200,21 @@ export const resolvers = {
       ctx: TenantContext,
     ) =>
       analyticsService.getSummary(
+        ctx,
+        args.granularity,
+        args.dateFrom ? new Date(args.dateFrom) : undefined,
+        args.dateTo ? new Date(args.dateTo) : undefined,
+      ),
+    timeSeries: (
+      _: unknown,
+      args: {
+        granularity?: "DAILY" | "WEEKLY" | "MONTHLY";
+        dateFrom?: string;
+        dateTo?: string;
+      },
+      ctx: TenantContext,
+    ) =>
+      analyticsService.getTimeSeries(
         ctx,
         args.granularity,
         args.dateFrom ? new Date(args.dateFrom) : undefined,
@@ -299,6 +347,18 @@ export const resolvers = {
   CampaignsQueries: {
     list: (_: unknown, __: unknown, ctx: TenantContext) =>
       campaignsService.list(ctx),
+  },
+
+  CampaignsMutations: {
+    create: (
+      _: unknown,
+      args: { input: { name: string; aiAgentId?: string | null } },
+      ctx: TenantContext,
+    ) => campaignsService.create(ctx, args.input),
+    launch: (_: unknown, args: { id: string }, ctx: TenantContext) =>
+      campaignsService.launch(ctx, args.id),
+    pause: (_: unknown, args: { id: string }, ctx: TenantContext) =>
+      campaignsService.pause(ctx, args.id),
   },
 
   NotificationQueries: {

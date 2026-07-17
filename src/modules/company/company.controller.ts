@@ -124,6 +124,7 @@ export class CompanyController {
   @Post("contract/link")
   async linkContract(@Req() req: Request, @Res() res: Response) {
     const { userId } = await getAuthFromRequest(req);
+
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
     }

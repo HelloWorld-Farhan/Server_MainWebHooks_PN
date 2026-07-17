@@ -140,6 +140,7 @@ type Mutation {
   phoneNumbers: PhoneNumbersMutations!
   uploadedContacts: UploadedContactsMutations!
   leads: LeadsMutations!
+  campaigns: CampaignsMutations!
   branches: BranchesMutations!
   employees: EmployeesMutations!
 }

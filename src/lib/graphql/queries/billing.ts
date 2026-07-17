@@ -7,6 +7,16 @@ export const BILLING_PAGE_QUERY = `
         currentPeriodEnd
         nextInvoiceAmount
       }
+      rates {
+        costPerChannel
+        costPerCredit
+        pulseTimeSeconds
+        setupOneTimeCost
+        currency
+        minChannelPurchase
+        virtualNumberCost
+        gstRate
+      }
       invoices(first: 20, after: $after) {
         edges {
           node {

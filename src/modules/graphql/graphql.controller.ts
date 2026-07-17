@@ -9,8 +9,6 @@ export class GraphQLController {
   @All("graphql")
   @All("api/graphql")
   async handleGraphQL(@Req() req: Request, @Res() res: Response) {
-    return runWithRequest(req, () => {
-      return yoga(req, res);
-    });
+    return runWithRequest(req, async () => yoga(req, res));
   }
 }
