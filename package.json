@@ -19,7 +19,7 @@
     "test:cov": "jest --coverage",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "db:generate": "dotenv -e .env -- prisma generate",
-    "db:push": "dotenv -e .env -- cross-env NODE_ENV=development prisma db push",
+    "db:push": "dotenv -e .env -- prisma db push",
     "db:studio": "dotenv -e .env -- prisma studio"
   },
   "dependencies": {

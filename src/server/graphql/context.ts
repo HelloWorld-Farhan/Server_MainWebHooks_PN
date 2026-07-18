@@ -3,7 +3,7 @@ import type { Request as ExpressRequest } from "express";
 import { getAuthFromFetchRequest, getAuthFromRequest } from "@/auth/clerk";
 import { getCurrentRequest } from "@/auth/request-context";
 import { gqlDebug, gqlDebugTimed, gqlLogError } from "@/server/graphql/debug";
-import { UnauthorizedError } from "@/server/lib/errors";
+import { ForbiddenError, UnauthorizedError } from "@/server/lib/errors";
 import { buildTenantContext } from "@/server/lib/tenant-context-builder";
 import {
   resolveAuthenticatedTenant,
@@ -17,6 +17,11 @@ export async function createGraphQLContext(
 ): Promise<GraphQLContext> {
   return gqlDebugTimed("context:total", async () => {
     const expressRequest = req ?? getCurrentRequest();
+    const authPath: "express" | "fetch" | "none" = expressRequest
+      ? "express"
+      : fetchRequest
+        ? "fetch"
+        : "none";
     const { userId, orgId } = await gqlDebugTimed("context:auth", async () => {
       if (expressRequest) {
         return getAuthFromRequest(expressRequest);
@@ -27,6 +32,7 @@ export async function createGraphQLContext(
       return { userId: null, orgId: null };
     });
     gqlDebug("context:auth", {
+      authPath,
       hasUserId: Boolean(userId),
       hasOrgId: Boolean(orgId),
     });
@@ -58,7 +64,7 @@ export async function createGraphQLContext(
 
     if (!tenant) {
       gqlDebug("context:noCompany", { orgId, hasUserId: Boolean(userId) });
-      throw new UnauthorizedError("Organization context required");
+      throw new ForbiddenError("Tenant not provisioned");
     }
 
     const tenantContext = await gqlDebugTimed("context:buildTenant", () =>

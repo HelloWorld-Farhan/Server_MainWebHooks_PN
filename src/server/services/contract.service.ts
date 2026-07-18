@@ -8,7 +8,7 @@ import { normalizeContractId } from "@/server/lib/contract-id";
 import {
   AppError,
   ConflictError,
-  NotFoundError,
+  ContractNotFoundError,
 } from "@/server/lib/errors";
 import prisma from "@/server/lib/prisma";
 import { TenantRepository } from "@/server/repositories/tenant.repository";
@@ -137,7 +137,10 @@ export class ContractService {
       include: { contact: true },
     });
     if (!company) {
-      throw new NotFoundError("Invalid Contract ID");
+      // #region agent log
+      fetch('http://127.0.0.1:7337/ingest/56a44334-4141-484c-bb9b-95d1a3690082',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1ead72'},body:JSON.stringify({sessionId:'1ead72',location:'contract.service.ts:linkContractId',message:'contract id not in database',data:{contractId},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
+      throw new ContractNotFoundError();
     }
 
     const isDemo = company.isDemo;
@@ -183,7 +186,7 @@ export class ContractService {
       });
 
       if (!freshCompany) {
-        throw new NotFoundError("Invalid Contract ID");
+        throw new ContractNotFoundError();
       }
 
       if (!isDemo && freshCompany.ownerUserId != null) {

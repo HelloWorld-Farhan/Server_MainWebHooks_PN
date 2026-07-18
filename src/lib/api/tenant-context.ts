@@ -28,13 +28,30 @@ export async function resolveTenantContext(
 }
 
 export async function requireTenantContext(req: Request) {
-  const ctx = await resolveTenantContext(req);
-  if (!ctx) {
+  const { userId, orgId } = await getAuthFromRequest(req);
+  if (!userId) {
     return {
       error: { status: 401, body: { error: "Unauthorized" } } satisfies ApiErrorBody,
       ctx: null,
     };
   }
+
+  const tenant = await resolveAuthenticatedTenant(userId, orgId);
+  if (!tenant) {
+    return {
+      error: {
+        status: 403,
+        body: { error: "Tenant not provisioned" },
+      } satisfies ApiErrorBody,
+      ctx: null,
+    };
+  }
+
+  const ctx = await buildTenantContext(
+    userId,
+    tenant.company.id,
+    tenant.membership,
+  );
   return { error: null, ctx };
 }
 

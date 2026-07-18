@@ -14,6 +14,21 @@ export function isClerkOrganizationsDisabled(error: unknown): boolean {
   );
 }
 
+export function isClerkOrganizationsForbidden(error: unknown): boolean {
+  const err = error as ClerkApiErrorShape & { message?: string };
+  if (err.status === 403) {
+    return true;
+  }
+  return err.message?.toLowerCase().includes("forbidden") ?? false;
+}
+
+export function isClerkOrganizationsUnavailable(error: unknown): boolean {
+  return (
+    isClerkOrganizationsDisabled(error) ||
+    isClerkOrganizationsForbidden(error)
+  );
+}
+
 export function isClerkNotFound(error: unknown): boolean {
   const err = error as ClerkApiErrorShape;
   return err.status === 404;

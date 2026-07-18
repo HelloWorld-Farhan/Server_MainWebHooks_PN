@@ -10,7 +10,7 @@ import { gqlDebug, gqlDebugTimed } from "@/server/graphql/debug";
 import {
   getClerkRetryAfter,
   isClerkNotFound,
-  isClerkOrganizationsDisabled,
+  isClerkOrganizationsUnavailable,
   isClerkRateLimited,
   sleep,
 } from "@/server/lib/clerk-errors";
@@ -91,7 +91,7 @@ async function callClerkWithRetry<T>(
     } catch (error) {
       lastError = error;
 
-      if (isClerkOrganizationsDisabled(error)) {
+      if (isClerkOrganizationsUnavailable(error)) {
         throw error;
       }
 
@@ -136,7 +136,7 @@ async function fetchUserMembershipsFromClerk(
       totalCount: result.totalCount,
     };
   } catch (error) {
-    if (isClerkOrganizationsDisabled(error)) {
+    if (isClerkOrganizationsUnavailable(error)) {
       return { data: [], totalCount: 0 };
     }
     throw error;
@@ -162,7 +162,7 @@ async function fetchOrgMembershipsFromClerk(
       totalCount: result.totalCount,
     };
   } catch (error) {
-    if (isClerkNotFound(error) || isClerkOrganizationsDisabled(error)) {
+    if (isClerkNotFound(error) || isClerkOrganizationsUnavailable(error)) {
       return { data: [], totalCount: 0 };
     }
     throw error;
@@ -265,6 +265,11 @@ export class ClerkMembershipService {
 
         if (isClerkRateLimited(error)) {
           gqlDebug("clerk:memberships:rate-limited-empty", { clerkUserId });
+          return { data: [], totalCount: 0 };
+        }
+
+        if (isClerkOrganizationsUnavailable(error)) {
+          gqlDebug("clerk:memberships:orgs-unavailable-empty", { clerkUserId });
           return { data: [], totalCount: 0 };
         }
 

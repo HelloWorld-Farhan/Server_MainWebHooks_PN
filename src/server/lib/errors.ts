@@ -30,6 +30,13 @@ export class NotFoundError extends AppError {
   }
 }
 
+export class ContractNotFoundError extends AppError {
+  constructor(message = "Contract ID not found in the database") {
+    super(message, "CONTRACT_NOT_FOUND", 404);
+    this.name = "ContractNotFoundError";
+  }
+}
+
 export class ValidationError extends AppError {
   constructor(message = "Invalid input") {
     super(message, "VALIDATION", 400);
