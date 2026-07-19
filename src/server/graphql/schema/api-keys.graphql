@@ -1,0 +1,129 @@
+enum ApiKeyEnvironment {
+  TEST
+  LIVE
+}
+
+enum ApiKeyStatus {
+  ACTIVE
+  INACTIVE
+}
+
+type ApiKeyCreatedBy {
+  id: ID!
+  email: String!
+  firstName: String
+  lastName: String
+}
+
+type ApiKey {
+  id: ID!
+  name: String!
+  description: String
+  keyId: String!
+  maskedSecret: String!
+  keyPrefix: String!
+  environment: ApiKeyEnvironment!
+  status: ApiKeyStatus!
+  scopes: [String!]!
+  branchAccessType: BranchAccessType!
+  branchIds: [ID!]!
+  expiresAt: String
+  lastUsedAt: String
+  createdAt: String!
+  updatedAt: String!
+  createdBy: ApiKeyCreatedBy
+}
+
+"""Returned only from create / regenerate / rotateSecret."""
+type ApiKeyWithSecret {
+  id: ID!
+  name: String!
+  description: String
+  keyId: String!
+  maskedSecret: String!
+  keyPrefix: String!
+  environment: ApiKeyEnvironment!
+  status: ApiKeyStatus!
+  scopes: [String!]!
+  branchAccessType: BranchAccessType!
+  branchIds: [ID!]!
+  expiresAt: String
+  lastUsedAt: String
+  createdAt: String!
+  updatedAt: String!
+  createdBy: ApiKeyCreatedBy
+  secret: String!
+}
+
+type ApiKeyEdge {
+  node: ApiKey!
+  cursor: String!
+}
+
+type ApiKeyConnection {
+  edges: [ApiKeyEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type ApiKeyScopeInfo {
+  scope: String!
+  label: String!
+}
+
+type ApiKeyAccessibleBranch {
+  id: ID!
+  name: String!
+  status: BranchStatus!
+}
+
+type DeleteApiKeyResult {
+  success: Boolean!
+  id: ID!
+}
+
+input ApiKeyFilter {
+  search: String
+  status: ApiKeyStatus
+  environment: ApiKeyEnvironment
+}
+
+input CreateApiKeyInput {
+  name: String!
+  description: String
+  environment: ApiKeyEnvironment!
+  scopes: [String!]!
+  branchAccessType: BranchAccessType
+  branchIds: [ID!]
+  expiresAt: String
+}
+
+input UpdateApiKeyInput {
+  name: String
+  description: String
+}
+
+input UpdateApiKeyBranchAccessInput {
+  branchAccessType: BranchAccessType!
+  branchIds: [ID!]
+}
+
+type ApiKeysQueries {
+  connection(first: Int, after: String, filter: ApiKeyFilter): ApiKeyConnection!
+  byId(id: ID!): ApiKey
+  availableScopes: [ApiKeyScopeInfo!]!
+  accessibleBranches: [ApiKeyAccessibleBranch!]!
+}
+
+type ApiKeysMutations {
+  create(input: CreateApiKeyInput!): ApiKeyWithSecret!
+  update(id: ID!, input: UpdateApiKeyInput!): ApiKey!
+  enable(id: ID!): ApiKey!
+  disable(id: ID!): ApiKey!
+  delete(id: ID!): DeleteApiKeyResult!
+  regenerate(id: ID!): ApiKeyWithSecret!
+  rotateSecret(id: ID!): ApiKeyWithSecret!
+  updateScopes(id: ID!, scopes: [String!]!): ApiKey!
+  updateBranchAccess(id: ID!, input: UpdateApiKeyBranchAccessInput!): ApiKey!
+  updateExpiration(id: ID!, expiresAt: String): ApiKey!
+}

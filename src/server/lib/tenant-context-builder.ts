@@ -24,6 +24,7 @@ export async function buildTenantContext(
   );
 
   return {
+    authType: "user",
     userId: membership.user.id,
     clerkUserId,
     companyId,

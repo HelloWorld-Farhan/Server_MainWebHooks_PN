@@ -131,6 +131,7 @@ type Query {
   events: EventQueries!
   branches: BranchesQueries!
   employees: EmployeesQueries!
+  apiKeys: ApiKeysQueries!
 }
 
 type Mutation {
@@ -143,4 +144,5 @@ type Mutation {
   campaigns: CampaignsMutations!
   branches: BranchesMutations!
   employees: EmployeesMutations!
+  apiKeys: ApiKeysMutations!
 }

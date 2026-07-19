@@ -1,6 +1,8 @@
 import { createClerkClient } from "@clerk/backend";
 import type { Request } from "express";
 
+import { getClerkAuthorizedParties } from "@/auth/clerk-config";
+
 function getSecretKey(): string {
   const key = process.env.CLERK_SECRET_KEY;
   if (!key) {
@@ -26,28 +28,13 @@ export const clerkClient = createClerkClient({
   publishableKey: getPublishableKey(),
 });
 
+const clerkAuthorizedParties = getClerkAuthorizedParties();
+
 export type ClerkAuthState = {
   userId: string | null;
   orgId: string | null;
   sessionId: string | null;
 };
-
-function normalizeOrigin(value: string): string {
-  return value.replace(/\/$/, "");
-}
-
-function authorizedParties(): string[] {
-  const parties = [
-    process.env.MAIN_WEBSITE_URL,
-    process.env.MAIN_SERVER_URL,
-    "http://localhost:3000",
-    "http://localhost:3004",
-  ]
-    .filter((value): value is string => Boolean(value))
-    .map(normalizeOrigin);
-
-  return [...new Set(parties)];
-}
 
 function buildClerkRequestUrl(req: Request): string {
   const host = req.get("x-forwarded-host") ?? req.get("host") ?? "localhost";
@@ -71,7 +58,7 @@ function logAuthRequestSnapshot(req: Request): void {
     x_forwarded_host: req.get("x-forwarded-host"),
     x_forwarded_proto: req.get("x-forwarded-proto"),
     x_forwarded_for: req.get("x-forwarded-for"),
-    authorizedParties: authorizedParties(),
+    authorizedParties: clerkAuthorizedParties,
   });
 }
 
@@ -87,7 +74,7 @@ function logFetchAuthRequestSnapshot(request: globalThis.Request): void {
     x_forwarded_host: request.headers.get("x-forwarded-host"),
     x_forwarded_proto: request.headers.get("x-forwarded-proto"),
     x_forwarded_for: request.headers.get("x-forwarded-for"),
-    authorizedParties: authorizedParties(),
+    authorizedParties: clerkAuthorizedParties,
   });
 }
 
@@ -109,7 +96,7 @@ async function authenticateClerkRequest(
     const result = await clerkClient.authenticateRequest(request, {
       secretKey,
       publishableKey: getPublishableKey(),
-      authorizedParties: authorizedParties(),
+      authorizedParties: clerkAuthorizedParties,
     });
     const auth = result.toAuth();
 
@@ -120,7 +107,9 @@ async function authenticateClerkRequest(
       sessionId: auth?.sessionId ?? null,
       orgId: auth?.orgId ?? null,
       actor: auth?.actor ?? null,
-      reason: result.status === "signed-out" ? "signed-out" : undefined,
+      reason: result.reason ?? undefined,
+      message: result.message || undefined,
+      tokenType: result.tokenType,
     });
 
     if (!auth) {

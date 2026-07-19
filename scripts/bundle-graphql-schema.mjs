@@ -18,6 +18,7 @@ const files = [
   "agent-library.graphql",
   "branches.graphql",
   "employees.graphql",
+  "api-keys.graphql",
 ];
 
 const typeDefs = files.map((file) =>

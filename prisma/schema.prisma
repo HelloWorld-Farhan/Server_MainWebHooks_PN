@@ -255,6 +255,16 @@ enum CsvImportStatus {
   FAILED
 }
 
+enum ApiKeyEnvironment {
+  TEST
+  LIVE
+}
+
+enum ApiKeyStatus {
+  ACTIVE
+  INACTIVE
+}
+
 enum CreditUsageReason {
   CALL
   CHANNEL_TIME
@@ -438,6 +448,7 @@ model User {
   notifications     Notification[]
   callInternalNotes CallInternalNote[]
   supportRequests   SupportRequest[]
+  apiKeysCreated    ApiKey[]
 
   @@index([status])
 }
@@ -1109,20 +1120,52 @@ model CsvImportBatch {
 }
 
 model ApiKey {
-  id         String    @id @default(auto()) @map("_id") @db.ObjectId
-  companyId  String    @db.ObjectId
-  name       String
-  keyPrefix  String
-  hashedKey  String
-  lastUsedAt DateTime?
-  expiresAt  DateTime?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  id                      String            @id @default(auto()) @map("_id") @db.ObjectId
+  companyId               String            @db.ObjectId
+  name                    String
+  description             String?
+  keyId                   String            @unique
+  keyPrefix               String
+  hashedSecret            String
+  environment             ApiKeyEnvironment
+  status                  ApiKeyStatus      @default(ACTIVE)
+  scopes                  String[]          @default([])
+  branchAccessType        BranchAccessType  @default(SELECTED)
+  expiresAt               DateTime?
+  lastUsedAt              DateTime?
+  createdById             String            @db.ObjectId
+  deletedAt               DateTime?
+  previousHashedSecret    String?
+  previousSecretExpiresAt DateTime?
+  /// Forward-compatible placeholder; not enforced yet.
+  rateLimitPerMinute      Int?
+  /// Forward-compatible placeholder; not enforced yet.
+  allowedIpCidrs          String[]          @default([])
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
 
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company      Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy    User                 @relation(fields: [createdById], references: [id])
+  branchAccess ApiKeyBranchAccess[]
 
-  @@index([companyId])
+  @@unique([companyId, name])
+  @@index([companyId, status])
+  @@index([companyId, environment])
   @@index([keyPrefix])
+}
+
+model ApiKeyBranchAccess {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  apiKeyId  String   @db.ObjectId
+  branchId  String   @db.ObjectId
+  createdAt DateTime @default(now())
+
+  apiKey ApiKey @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@unique([apiKeyId, branchId])
+  @@index([apiKeyId])
+  @@index([branchId])
 }
 
 model CreditBalance {
@@ -1446,6 +1489,7 @@ model Branch {
   memberAccess MemberBranchAccess[]
   agents       AiAgent[]
   invitation   BranchInvitation?
+  apiKeyAccess ApiKeyBranchAccess[]
 
   @@index([companyId, status])
   @@index([companyId, name])

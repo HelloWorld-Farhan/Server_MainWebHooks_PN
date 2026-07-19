@@ -1,6 +1,7 @@
 import type { Request } from "express";
 
 import { getAuthFromRequest } from "@/auth/clerk";
+import { tryAuthenticateApiKeyFromRequest } from "@/server/auth/api-key-auth";
 import { buildTenantContext } from "@/server/lib/tenant-context-builder";
 import { resolveAuthenticatedTenant } from "@/server/services/company-resolution.service";
 import type { Permission } from "@/lib/permissions";
@@ -18,6 +19,9 @@ export type ApiErrorBody = { status: number; body: Record<string, unknown> };
 export async function resolveTenantContext(
   req: Request,
 ): Promise<TenantContext | null> {
+  const apiKeyCtx = await tryAuthenticateApiKeyFromRequest(req);
+  if (apiKeyCtx) return apiKeyCtx;
+
   const { userId, orgId } = await getAuthFromRequest(req);
   if (!userId) return null;
 
@@ -28,6 +32,26 @@ export async function resolveTenantContext(
 }
 
 export async function requireTenantContext(req: Request) {
+  try {
+    const apiKeyCtx = await tryAuthenticateApiKeyFromRequest(req);
+    if (apiKeyCtx) {
+      return { error: null, ctx: apiKeyCtx };
+    }
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unauthorized";
+    const status =
+      error instanceof Error &&
+      "statusCode" in error &&
+      typeof (error as { statusCode?: unknown }).statusCode === "number"
+        ? (error as { statusCode: number }).statusCode
+        : 401;
+    return {
+      error: { status, body: { error: message } } satisfies ApiErrorBody,
+      ctx: null,
+    };
+  }
+
   const { userId, orgId } = await getAuthFromRequest(req);
   if (!userId) {
     return {

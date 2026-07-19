@@ -2,6 +2,7 @@ import type { TenantContext } from "@/server/types/context";
 import { agentsService } from "@/server/services/agents.service";
 import { agentLibraryService } from "@/server/services/agent-library.service";
 import { analyticsService } from "@/server/services/analytics.service";
+import { apiKeysService } from "@/server/services/api-keys.service";
 import { billingService } from "@/server/services/billing.service";
 import { branchesService } from "@/server/services/branches.service";
 import { callLogsService } from "@/server/services/call-logs.service";
@@ -75,6 +76,7 @@ export const resolvers = {
     events: () => ({}),
     branches: () => ({}),
     employees: () => ({}),
+    apiKeys: () => ({}),
   },
 
   Mutation: {
@@ -87,6 +89,7 @@ export const resolvers = {
     campaigns: () => ({}),
     branches: () => ({}),
     employees: () => ({}),
+    apiKeys: () => ({}),
   },
 
   CreditsQueries: {
@@ -574,5 +577,78 @@ export const resolvers = {
 
   SystemEvent: {
     createdAt: (parent: { createdAt: Date }) => parent.createdAt.toISOString(),
+  },
+
+  ApiKeysQueries: {
+    connection: (
+      _: unknown,
+      args: {
+        first?: number;
+        after?: string;
+        filter?: {
+          search?: string;
+          status?: string;
+          environment?: string;
+        };
+      },
+      ctx: TenantContext,
+    ) =>
+      apiKeysService.getConnection(ctx, {
+        first: args.first,
+        after: args.after,
+        filter: args.filter as never,
+      }),
+    byId: (_: unknown, args: { id: string }, ctx: TenantContext) =>
+      apiKeysService.getById(ctx, args.id),
+    availableScopes: (_: unknown, __: unknown, ctx: TenantContext) =>
+      apiKeysService.listAvailableScopes(ctx),
+    accessibleBranches: (_: unknown, __: unknown, ctx: TenantContext) =>
+      apiKeysService.listAccessibleBranches(ctx),
+  },
+
+  ApiKeysMutations: {
+    create: (
+      _: unknown,
+      args: { input: Record<string, unknown> },
+      ctx: TenantContext,
+    ) => apiKeysService.create(ctx, args.input as never),
+    update: (
+      _: unknown,
+      args: { id: string; input: Record<string, unknown> },
+      ctx: TenantContext,
+    ) => apiKeysService.update(ctx, args.id, args.input as never),
+    enable: (_: unknown, args: { id: string }, ctx: TenantContext) =>
+      apiKeysService.enable(ctx, args.id),
+    disable: (_: unknown, args: { id: string }, ctx: TenantContext) =>
+      apiKeysService.disable(ctx, args.id),
+    delete: (_: unknown, args: { id: string }, ctx: TenantContext) =>
+      apiKeysService.delete(ctx, args.id),
+    regenerate: (_: unknown, args: { id: string }, ctx: TenantContext) =>
+      apiKeysService.regenerate(ctx, args.id),
+    rotateSecret: (_: unknown, args: { id: string }, ctx: TenantContext) =>
+      apiKeysService.rotateSecret(ctx, args.id),
+    updateScopes: (
+      _: unknown,
+      args: { id: string; scopes: string[] },
+      ctx: TenantContext,
+    ) => apiKeysService.updateScopes(ctx, args.id, args.scopes),
+    updateBranchAccess: (
+      _: unknown,
+      args: {
+        id: string;
+        input: { branchAccessType: string; branchIds?: string[] };
+      },
+      ctx: TenantContext,
+    ) => apiKeysService.updateBranchAccess(ctx, args.id, args.input as never),
+    updateExpiration: (
+      _: unknown,
+      args: { id: string; expiresAt?: string | null },
+      ctx: TenantContext,
+    ) =>
+      apiKeysService.updateExpiration(
+        ctx,
+        args.id,
+        args.expiresAt === undefined ? null : args.expiresAt,
+      ),
   },
 };

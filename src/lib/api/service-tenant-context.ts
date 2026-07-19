@@ -8,6 +8,7 @@ const SERVICE_CLERK_USER_ID = "agent-server";
 
 export function createServiceTenantContext(companyId: string): TenantContext {
   return {
+    authType: "user",
     userId: SERVICE_USER_ID,
     clerkUserId: SERVICE_CLERK_USER_ID,
     companyId,

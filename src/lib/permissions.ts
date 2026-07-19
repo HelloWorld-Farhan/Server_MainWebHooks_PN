@@ -26,9 +26,45 @@ export const PERMISSIONS = {
   EMPLOYEES_READ: "employees:read",
   EMPLOYEES_WRITE: "employees:write",
   EMPLOYEES_INVITE: "employees:invite",
+  API_KEYS_READ: "api_keys:read",
+  API_KEYS_WRITE: "api_keys:write",
+  PHONE_NUMBERS_READ: "phone_numbers:read",
+  PHONE_NUMBERS_WRITE: "phone_numbers:write",
+  WEBHOOKS_READ: "webhooks:read",
+  WEBHOOKS_WRITE: "webhooks:write",
+  ORGANIZATION_READ: "organization:read",
+  ORGANIZATION_WRITE: "organization:write",
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
+
+/** Scopes that may be assigned to an API key. */
+export const API_KEY_SCOPE_CATALOG: Permission[] = [
+  PERMISSIONS.AGENTS_READ,
+  PERMISSIONS.AGENTS_WRITE,
+  PERMISSIONS.CALL_LOGS_READ,
+  PERMISSIONS.CALL_LOGS_WRITE,
+  PERMISSIONS.ANALYTICS_READ,
+  PERMISSIONS.LEADS_READ,
+  PERMISSIONS.LEADS_WRITE,
+  PERMISSIONS.BRANCHES_READ,
+  PERMISSIONS.BRANCHES_WRITE,
+  PERMISSIONS.DOCUMENTS_READ,
+  PERMISSIONS.DOCUMENTS_WRITE,
+  PERMISSIONS.PHONE_NUMBERS_READ,
+  PERMISSIONS.PHONE_NUMBERS_WRITE,
+  PERMISSIONS.INTEGRATIONS_READ,
+  PERMISSIONS.INTEGRATIONS_WRITE,
+  PERMISSIONS.BILLING_READ,
+  PERMISSIONS.ORGANIZATION_READ,
+  PERMISSIONS.ORGANIZATION_WRITE,
+  PERMISSIONS.EMPLOYEES_READ,
+  PERMISSIONS.EMPLOYEES_WRITE,
+  PERMISSIONS.WEBHOOKS_READ,
+  PERMISSIONS.WEBHOOKS_WRITE,
+  PERMISSIONS.API_KEYS_READ,
+  PERMISSIONS.API_KEYS_WRITE,
+];
 
 export type UserRole =
   | "OWNER"
@@ -115,5 +151,24 @@ export function getPermissionLabels(): Record<Permission, string> {
     [PERMISSIONS.EMPLOYEES_READ]: "View Employees",
     [PERMISSIONS.EMPLOYEES_WRITE]: "Manage Employees",
     [PERMISSIONS.EMPLOYEES_INVITE]: "Invite Employees",
+    [PERMISSIONS.API_KEYS_READ]: "View API Keys",
+    [PERMISSIONS.API_KEYS_WRITE]: "Manage API Keys",
+    [PERMISSIONS.PHONE_NUMBERS_READ]: "View Phone Numbers",
+    [PERMISSIONS.PHONE_NUMBERS_WRITE]: "Manage Phone Numbers",
+    [PERMISSIONS.WEBHOOKS_READ]: "View Webhooks",
+    [PERMISSIONS.WEBHOOKS_WRITE]: "Manage Webhooks",
+    [PERMISSIONS.ORGANIZATION_READ]: "View Organization",
+    [PERMISSIONS.ORGANIZATION_WRITE]: "Manage Organization",
   };
+}
+
+export function getApiKeyScopeLabels(): Record<string, string> {
+  const labels = getPermissionLabels();
+  return Object.fromEntries(
+    API_KEY_SCOPE_CATALOG.map((scope) => [scope, labels[scope]]),
+  );
+}
+
+export function isApiKeyScope(scope: string): scope is Permission {
+  return (API_KEY_SCOPE_CATALOG as string[]).includes(scope);
 }

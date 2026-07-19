@@ -7,6 +7,7 @@ import { ForbiddenError } from "@/server/lib/errors";
 
 function ctx(partial: Partial<TenantContext>): TenantContext {
   return {
+    authType: "user",
     userId: "user-1",
     clerkUserId: "clerk-1",
     companyId: "company-1",

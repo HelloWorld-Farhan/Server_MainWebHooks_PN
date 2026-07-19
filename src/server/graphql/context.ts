@@ -2,6 +2,7 @@ import type { Request as ExpressRequest } from "express";
 
 import { getAuthFromFetchRequest, getAuthFromRequest } from "@/auth/clerk";
 import { getCurrentRequest } from "@/auth/request-context";
+import { tryAuthenticateApiKeyFromRequest } from "@/server/auth/api-key-auth";
 import { gqlDebug, gqlDebugTimed, gqlLogError } from "@/server/graphql/debug";
 import { ForbiddenError, UnauthorizedError } from "@/server/lib/errors";
 import { buildTenantContext } from "@/server/lib/tenant-context-builder";
@@ -17,6 +18,23 @@ export async function createGraphQLContext(
 ): Promise<GraphQLContext> {
   return gqlDebugTimed("context:total", async () => {
     const expressRequest = req ?? getCurrentRequest();
+
+    const apiKeyCtx = await gqlDebugTimed("context:apiKeyAuth", async () =>
+      tryAuthenticateApiKeyFromRequest(expressRequest, fetchRequest),
+    );
+
+    if (apiKeyCtx) {
+      gqlDebug("context:done", {
+        authType: "api_key",
+        companyId: apiKeyCtx.companyId,
+        apiKeyId: apiKeyCtx.apiKeyId,
+      });
+      return {
+        isAuthenticated: true,
+        ...apiKeyCtx,
+      };
+    }
+
     const authPath: "express" | "fetch" | "none" = expressRequest
       ? "express"
       : fetchRequest
@@ -72,6 +90,7 @@ export async function createGraphQLContext(
     );
 
     gqlDebug("context:done", {
+      authType: "user",
       companyId: tenant.company.id,
       userId: tenant.user.id,
       role: tenant.membership.role,

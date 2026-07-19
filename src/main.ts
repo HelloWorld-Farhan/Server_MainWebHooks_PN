@@ -3,6 +3,7 @@ import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import * as express from "express";
 import { AppModule } from "./app.module";
+import { getClerkAuthorizedParties } from "./auth/clerk-config";
 import { HttpExceptionFilter } from "./common/filters/http-exception.filter";
 import { PrismaExceptionFilter } from "./common/filters/prisma-exception.filter";
 import { LoggingInterceptor } from "./common/interceptors/logging.interceptor";
@@ -18,10 +19,7 @@ async function bootstrap() {
   app.use(express.urlencoded({ extended: true }));
 
   app.enableCors({
-    origin: [
-      process.env.MAIN_WEBSITE_URL ?? "http://localhost:3000",
-      "http://localhost:3000",
-    ],
+    origin: getClerkAuthorizedParties(),
     credentials: true,
   });
 

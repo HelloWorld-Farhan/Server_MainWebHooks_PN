@@ -28,6 +28,7 @@ import type { TenantContext } from "@/server/types/context";
 
 function createMockCtx(companyId: string, userId: string): TenantContext {
   return {
+    authType: "user",
     userId,
     clerkUserId: "user_test_clerk_id_123",
     companyId,

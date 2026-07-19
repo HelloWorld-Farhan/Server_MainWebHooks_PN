@@ -13,7 +13,7 @@ Tenant dashboard backend (NestJS). Default base URL: `http://localhost:3004`.
 
 | Mechanism | Used by | How |
 |---|---|---|
-| **Clerk session** | Most REST routes, GraphQL, page cache | Cookie or bearer token from authorized parties (`MAIN_WEBSITE_URL`, `MAIN_SERVER_URL`, localhost) |
+| **Clerk session** | Most REST routes, GraphQL, page cache | Cookie or bearer token from `MAIN_WEBSITE_URL` / `CLERK_AUTHORIZED_PARTIES`; localhost is allowed only outside production |
 | **Tenant context** | Tenant-scoped routes | Clerk user + active org → resolved company membership |
 | **Permission guard** | Sensitive operations | Requires permission strings such as `agents:write`, `integrations:read` |
 | **Svix HMAC** | Clerk webhook | Headers `svix-id`, `svix-timestamp`, `svix-signature` + `CLERK_WEBHOOK_SECRET` |

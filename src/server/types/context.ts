@@ -8,7 +8,10 @@ export type BranchAccessContext = {
   branchIds: string[];
 };
 
+export type TenantAuthType = "user" | "api_key";
+
 export type TenantContext = {
+  authType: TenantAuthType;
   userId: string;
   clerkUserId: string;
   companyId: string;
@@ -17,6 +20,8 @@ export type TenantContext = {
   permissions: string[];
   branchAccess: BranchAccessContext;
   loaders: ReturnType<typeof createDataLoaders>;
+  /** Present when authType === "api_key" */
+  apiKeyId?: string;
 };
 
 export type GraphQLContext = TenantContext & {

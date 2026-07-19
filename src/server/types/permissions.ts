@@ -1,26 +1,23 @@
+export {
+  PERMISSIONS,
+  API_KEY_SCOPE_CATALOG,
+  type Permission,
+  mergePermissions,
+  hasPermission,
+  hasAnyPermission,
+  hasAllPermissions,
+  getPermissionLabels,
+  getApiKeyScopeLabels,
+  isApiKeyScope,
+  ROLE_LABELS,
+} from "@/lib/permissions";
+
 import type { UserRole } from "@prisma/client";
 
 import {
   PERMISSIONS,
   type Permission,
-  mergePermissions,
-  hasPermission,
-  hasAnyPermission,
-  hasAllPermissions,
-  getPermissionLabels,
-  ROLE_LABELS,
 } from "@/lib/permissions";
-
-export {
-  PERMISSIONS,
-  type Permission,
-  mergePermissions,
-  hasPermission,
-  hasAnyPermission,
-  hasAllPermissions,
-  getPermissionLabels,
-  ROLE_LABELS,
-};
 
 const MANAGER_PERMISSIONS: Permission[] = [
   PERMISSIONS.BILLING_READ,

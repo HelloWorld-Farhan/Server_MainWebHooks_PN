@@ -6,6 +6,7 @@ import type { TenantContext } from "@/server/types/context";
 
 function ctx(partial: Partial<TenantContext>): TenantContext {
   return {
+    authType: "user",
     userId: "u1",
     clerkUserId: "clerk1",
     companyId: "c1",
