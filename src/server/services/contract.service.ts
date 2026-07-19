@@ -127,8 +127,10 @@ export class ContractService {
       }
     }
 
+    // Block only if the user already owns a *different* contract. Re-linking the
+    // same contract is allowed so a previously-interrupted link can be resumed.
     const existingLinked = await tenantRepo.findCompanyByOwnerUserId(clerkUserId);
-    if (existingLinked) {
+    if (existingLinked && existingLinked.contractId !== contractId) {
       throw new ConflictError("You have already linked a Contract ID");
     }
 
@@ -137,15 +139,17 @@ export class ContractService {
       include: { contact: true },
     });
     if (!company) {
-      // #region agent log
-      fetch('http://127.0.0.1:7337/ingest/56a44334-4141-484c-bb9b-95d1a3690082',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1ead72'},body:JSON.stringify({sessionId:'1ead72',location:'contract.service.ts:linkContractId',message:'contract id not in database',data:{contractId},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
       throw new ContractNotFoundError();
     }
 
     const isDemo = company.isDemo;
 
-    if (!isDemo && company.ownerUserId != null) {
+    // A non-demo contract already claimed by someone else cannot be linked.
+    if (
+      !isDemo &&
+      company.ownerUserId != null &&
+      company.ownerUserId !== clerkUserId
+    ) {
       throw new ConflictError("This Contract ID has already been linked");
     }
 
@@ -180,98 +184,81 @@ export class ContractService {
 
     const claimedAt = new Date();
 
-    const result = await prisma.$transaction(async (tx) => {
-      const freshCompany = await tx.company.findUnique({
-        where: { id: company.id },
-      });
-
-      if (!freshCompany) {
-        throw new ContractNotFoundError();
+    // Sequential idempotent writes (no interactive transaction). MongoDB
+    // interactive transactions add constraints that can silently roll the
+    // whole link back; instead we claim the company first via a compare-and-set
+    // so ownership is established before the membership is created, then run
+    // idempotent upserts that are safe to retry.
+    if (!isDemo) {
+      const claimData: {
+        ownerUserId: string;
+        claimedAt: Date;
+        clerkOrganizationId?: string;
+      } = { ownerUserId: clerkUserId, claimedAt };
+      if (!company.clerkOrganizationId) {
+        claimData.clerkOrganizationId = clerkOrganizationId;
       }
 
-      if (!isDemo && freshCompany.ownerUserId != null) {
-        throw new ConflictError("This Contract ID has already been linked");
-      }
-
-      if (!isDemo) {
-        const userAlreadyLinked = await tx.company.findFirst({
-          where: { ownerUserId: clerkUserId },
-        });
-        if (userAlreadyLinked) {
-          throw new ConflictError("You have already linked a Contract ID");
-        }
-      }
-
-      if (!isDemo && !freshCompany.clerkOrganizationId) {
-        await tx.company.update({
-          where: { id: company.id },
-          data: { clerkOrganizationId },
-        });
-      }
-
-      await tx.companyMember.upsert({
+      const claimResult = await prisma.company.updateMany({
         where: {
-          companyId_userId: {
-            companyId: company.id,
-            userId: dbUser.id,
-          },
+          id: company.id,
+          OR: [{ ownerUserId: null }, { ownerUserId: { isSet: false } }],
         },
-        create: {
-          companyId: company.id,
-          userId: dbUser.id,
-          role: "OWNER",
-          status: "ACTIVE",
-          joinedAt: claimedAt,
-        },
-        update: {
-          role: "OWNER",
-          status: "ACTIVE",
-        },
+        data: claimData,
       });
 
-      if (!isDemo) {
-        const claimResult = await tx.company.updateMany({
-          where: {
-            id: company.id,
-            OR: [{ ownerUserId: null }, { ownerUserId: { isSet: false } }],
-          },
-          data: {
-            ownerUserId: clerkUserId,
-            claimedAt,
-          },
+      // count === 0 means the compare-and-set did not apply. That is fine only
+      // when this same user already owns the company (resuming a prior attempt);
+      // any other owner is a genuine conflict.
+      if (claimResult.count === 0) {
+        const current = await prisma.company.findUnique({
+          where: { id: company.id },
         });
-
-        if (claimResult.count === 0) {
+        if (!current || current.ownerUserId !== clerkUserId) {
           throw new ConflictError("This Contract ID has already been linked");
         }
       }
+    }
 
-      if (!isDemo) {
-        await tx.companyContact.upsert({
-          where: { companyId: company.id },
-          create: {
-            companyId: company.id,
-            name: ownerDisplayName || primaryEmail.split("@")[0] || "Owner",
-            email: primaryEmail.toLowerCase(),
-            phone: clerkUser.phoneNumbers[0]?.phoneNumber ?? null,
-          },
-          update: {
-            name: ownerDisplayName || undefined,
-            email: primaryEmail.toLowerCase(),
-            phone: clerkUser.phoneNumbers[0]?.phoneNumber ?? undefined,
-          },
-        });
-      }
-
-      return {
-        contractId: freshCompany.contractId,
-        claimedAt: claimedAt.toISOString(),
+    await prisma.companyMember.upsert({
+      where: {
+        companyId_userId: {
+          companyId: company.id,
+          userId: dbUser.id,
+        },
+      },
+      create: {
         companyId: company.id,
-      };
+        userId: dbUser.id,
+        role: "OWNER",
+        status: "ACTIVE",
+        joinedAt: claimedAt,
+      },
+      update: {
+        role: "OWNER",
+        status: "ACTIVE",
+      },
     });
 
-    await ensureCreditBalance(result.companyId);
-    await cacheService.invalidateSettingsPages(result.companyId);
+    if (!isDemo) {
+      await prisma.companyContact.upsert({
+        where: { companyId: company.id },
+        create: {
+          companyId: company.id,
+          name: ownerDisplayName || primaryEmail.split("@")[0] || "Owner",
+          email: primaryEmail.toLowerCase(),
+          phone: clerkUser.phoneNumbers[0]?.phoneNumber ?? null,
+        },
+        update: {
+          name: ownerDisplayName || undefined,
+          email: primaryEmail.toLowerCase(),
+          phone: clerkUser.phoneNumbers[0]?.phoneNumber ?? undefined,
+        },
+      });
+    }
+
+    await ensureCreditBalance(company.id);
+    await cacheService.invalidateSettingsPages(company.id);
 
     if (!isDemo && clerkOrganizationId.startsWith("org_")) {
       await ensureClerkOrganizationMember({
@@ -281,10 +268,14 @@ export class ContractService {
       });
     }
 
+    const linkedCompany = await prisma.company.findUnique({
+      where: { id: company.id },
+    });
+
     return {
       linked: true as const,
-      contractId: result.contractId,
-      claimedAt: result.claimedAt,
+      contractId: linkedCompany?.contractId ?? company.contractId,
+      claimedAt: (linkedCompany?.claimedAt ?? claimedAt).toISOString(),
     };
   }
 }

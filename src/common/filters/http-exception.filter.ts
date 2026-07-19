@@ -35,12 +35,6 @@ export class HttpExceptionFilter implements ExceptionFilter {
       `${request.method} ${request.url} → ${status}: ${JSON.stringify(message)}`,
     );
 
-    if (isMissingRoute) {
-      // #region agent log
-      fetch('http://127.0.0.1:7337/ingest/56a44334-4141-484c-bb9b-95d1a3690082',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1ead72'},body:JSON.stringify({sessionId:'1ead72',location:'http-exception.filter.ts:catch',message:'api route missing',data:{method:request.method,url:request.url,status},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
-    }
-
     response.status(status).json({
       statusCode: status,
       error: isMissingRoute

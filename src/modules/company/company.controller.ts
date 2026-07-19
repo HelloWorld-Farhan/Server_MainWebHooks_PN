@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Logger,
   Param,
   Post,
   Put,
@@ -41,6 +42,8 @@ const linkSchema = z.object({
 
 @Controller("api/company")
 export class CompanyController {
+  private readonly logger = new Logger(CompanyController.name);
+
   @Get("contact")
   async getContact(@Req() req: Request, @Res() res: Response) {
     const result = await requireTenantContext(req);
@@ -117,6 +120,11 @@ export class CompanyController {
       if (isAppError(err)) {
         return sendAppErrorResponse(res, err);
       }
+      this.logger.error(
+        `GET /api/company/contract failed: ${
+          err instanceof Error ? err.stack ?? err.message : String(err)
+        }`,
+      );
       return res.status(500).json({ error: "Internal server error" });
     }
   }
@@ -143,11 +151,13 @@ export class CompanyController {
           .json({ error: err.issues[0]?.message ?? err.message });
       }
       if (isAppError(err)) {
-        // #region agent log
-        fetch('http://127.0.0.1:7337/ingest/56a44334-4141-484c-bb9b-95d1a3690082',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1ead72'},body:JSON.stringify({sessionId:'1ead72',location:'company.controller.ts:linkContract',message:'contract link app error',data:{code:err.code,statusCode:err.statusCode},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
-        // #endregion
         return sendAppErrorResponse(res, err);
       }
+      this.logger.error(
+        `POST /api/company/contract/link failed: ${
+          err instanceof Error ? err.stack ?? err.message : String(err)
+        }`,
+      );
       return res.status(500).json({ error: "Internal server error" });
     }
   }
