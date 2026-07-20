@@ -540,6 +540,21 @@ export const resolvers = {
       parent.phoneNumberId
         ? ctx.loaders.phoneNumber.load(parent.phoneNumberId)
         : null,
+    branch: async (
+      parent: { branchId?: string | null },
+      _: unknown,
+      ctx: TenantContext,
+    ) => {
+      if (!parent.branchId) return null;
+      const branch = await ctx.loaders.branch.load(parent.branchId);
+      if (!branch) return null;
+      return {
+        ...branch,
+        createdAt: branch.createdAt.toISOString(),
+        updatedAt: branch.updatedAt.toISOString(),
+        lastActivityAt: branch.lastActivityAt?.toISOString() ?? null,
+      };
+    },
   },
 
   CreditUsage: {

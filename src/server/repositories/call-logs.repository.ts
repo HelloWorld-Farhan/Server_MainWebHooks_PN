@@ -81,6 +81,7 @@ export class CallLogsRepository extends BaseRepository {
         aiAgentId: true,
         phoneNumberId: true,
         assignedUserId: true,
+        branchId: true,
         direction: true,
         status: true,
         outcome: true,

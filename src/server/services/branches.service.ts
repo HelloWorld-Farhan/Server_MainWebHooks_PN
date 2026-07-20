@@ -175,6 +175,15 @@ export class BranchesService {
     const name = input.name?.trim();
     if (!name) throw new ValidationError("Branch name is required");
 
+    const creator = await prisma.user.findUnique({
+      where: { id: ctx.userId },
+      select: { firstName: true, lastName: true, email: true },
+    });
+    const createdByName = creator
+      ? [creator.firstName, creator.lastName].filter(Boolean).join(" ") ||
+        creator.email
+      : undefined;
+
     const row = await this.repo.create(ctx.companyId, {
       name,
       status: input.status,
@@ -182,7 +191,10 @@ export class BranchesService {
       phone: input.phone ?? undefined,
       email: input.email ?? undefined,
       notes: input.notes ?? undefined,
-      customFields: input.customFields ?? {},
+      customFields: {
+        ...((input.customFields as Record<string, unknown>) ?? {}),
+        ...(createdByName ? { createdByName } : {}),
+      },
       aiEnabled: input.aiEnabled ?? false,
       systemPrompt: input.systemPrompt ?? undefined,
       aiConfig: input.aiConfig ?? {},
