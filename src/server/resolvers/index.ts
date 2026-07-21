@@ -620,6 +620,21 @@ export const resolvers = {
       parent.phoneNumberId
         ? ctx.loaders.phoneNumber.load(parent.phoneNumberId)
         : null,
+    campaign: async (
+      parent: { campaignId?: string | null },
+      _: unknown,
+      ctx: TenantContext,
+    ) => {
+      if (!parent.campaignId) return null;
+      const campaign = await ctx.loaders.campaign.load(parent.campaignId);
+      if (!campaign) return null;
+      return {
+        ...campaign,
+        createdAt: campaign.createdAt.toISOString(),
+        updatedAt: campaign.updatedAt.toISOString(),
+        lastActivityAt: campaign.lastActivityAt?.toISOString() ?? null,
+      };
+    },
   },
 
   CreditUsage: {

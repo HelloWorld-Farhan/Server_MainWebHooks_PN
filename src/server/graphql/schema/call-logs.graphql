@@ -57,6 +57,7 @@ type CallLog {
   lead: Lead
   aiAgent: AiAgent
   phoneNumber: PhoneNumber
+  campaign: Campaign
 }
 
 type CallLogDetail {
