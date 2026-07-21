@@ -124,7 +124,7 @@ type BulkCampaignUpdateResult {
 
 type CampaignsQueries {
   connection(first: Int, after: String, filter: CampaignFilter): CampaignConnection!
-  byId(id: ID!): Branch
+  byId(id: ID!): Campaign
   contacts(campaignId: ID!, first: Int, after: String): [CampaignContact!]!
   callLogs(campaignId: ID!, first: Int, after: String): [CampaignCallLog!]!
   documents(campaignId: ID!): [CampaignDocument!]!
