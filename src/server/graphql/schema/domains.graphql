@@ -68,7 +68,7 @@ type AiAgent {
   scorecards: JSON
   monitors: JSON
   demoAudioUrl: String
-  branchId: ID
+  campaignId: ID
   createdAt: String!
   updatedAt: String!
 }
@@ -90,7 +90,7 @@ input CreateAgentInput {
   monitors: JSON
   demoAudioUrl: String
   libraryEntryId: ID
-  branchId: ID
+  campaignId: ID
 }
 
 input UpdateAgentInput {
@@ -111,7 +111,7 @@ input UpdateAgentInput {
   scorecards: JSON
   monitors: JSON
   demoAudioUrl: String
-  branchId: ID
+  campaignId: ID
 }
 
 type AgentsMutations {
@@ -119,8 +119,72 @@ type AgentsMutations {
   update(id: ID!, input: UpdateAgentInput!): AiAgent!
 }
 
+enum PhoneNumberSortField {
+  CREATED_AT
+  UPDATED_AT
+  LAST_ACTIVITY_AT
+  NUMBER
+  INBOUND_CALLS_COUNT
+  OUTBOUND_CALLS_COUNT
+}
+
+enum SortDirection {
+  ASC
+  DESC
+}
+
+input PhoneNumberFilter {
+  """Exact match on stored number"""
+  number: String
+  """Substring match on number"""
+  numberContains: String
+  """Substring match on label"""
+  labelContains: String
+  """Free-text search across number + label"""
+  search: String
+  provider: String
+  status: String
+  inboundAgentId: ID
+  outboundAgentId: ID
+  """true = inbound agent assigned; false = unassigned"""
+  hasInboundAgent: Boolean
+  """true = outbound agent assigned; false = unassigned"""
+  hasOutboundAgent: Boolean
+  """Filter numbers assigned to a telephony channel index"""
+  channelIndex: Int
+  """Only numbers that have (or lack) a channel assignment"""
+  hasChannelAssignment: Boolean
+  createdFrom: String
+  createdTo: String
+  lastActivityFrom: String
+  lastActivityTo: String
+  ids: [ID!]
+}
+
+input PhoneNumberSort {
+  field: PhoneNumberSortField!
+  direction: SortDirection! = DESC
+}
+
+type PhoneNumberEdge {
+  node: PhoneNumber!
+  cursor: String!
+}
+
+type PhoneNumberConnection {
+  edges: [PhoneNumberEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
 type PhoneNumbersQueries {
-  list: [PhoneNumber!]!
+  list(filter: PhoneNumberFilter, sort: PhoneNumberSort): [PhoneNumber!]!
+  connection(
+    first: Int
+    after: String
+    filter: PhoneNumberFilter
+    sort: PhoneNumberSort
+  ): PhoneNumberConnection!
   byId(id: ID!): PhoneNumber
 }
 
@@ -167,8 +231,8 @@ type UploadedContact {
   name: String
   email: String
   address: String
-  branchIds: [ID!]!
-  branches: [Branch!]!
+  campaignIds: [ID!]!
+  campaigns: [Campaign!]!
   createdAt: String!
 }
 
@@ -177,7 +241,7 @@ input ImportedContactInput {
   name: String
   email: String
   address: String
-  branchNames: [String!]
+  campaignNames: [String!]
 }
 
 type UploadedContactsQueries {
@@ -188,7 +252,7 @@ type UploadedContactImportResult {
   created: Int!
   skipped: Int!
   invalid: Int!
-  unmatchedBranches: [String!]!
+  unmatchedCampaigns: [String!]!
 }
 
 type UploadedContactsMutations {
@@ -275,22 +339,22 @@ type LeadTemperatureBreakdown {
   total: Int!
 }
 
-type CampaignsQueries {
-  list: [Campaign!]!
+type OutboundCampaignsQueries {
+  list: [OutboundCampaign!]!
 }
 
-input CreateCampaignInput {
+input CreateOutboundCampaignInput {
   name: String!
   aiAgentId: ID
 }
 
-type CampaignsMutations {
-  create(input: CreateCampaignInput!): Campaign!
-  launch(id: ID!): Campaign!
-  pause(id: ID!): Campaign!
+type OutboundCampaignsMutations {
+  create(input: CreateCampaignInput!): OutboundCampaign!
+  launch(id: ID!): OutboundCampaign!
+  pause(id: ID!): OutboundCampaign!
 }
 
-type Campaign {
+type OutboundCampaign {
   id: ID!
   name: String!
   status: String!

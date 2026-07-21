@@ -103,13 +103,13 @@ export class CompanyController {
         const invitedMembership = await prisma.companyMember.findFirst({
           where: { userId: dbUser.id, status: "INVITED" },
         });
-        const pendingBranchInvite = await prisma.branchInvitation.findFirst({
+        const pendingCampaignInvite = await prisma.campaignInvitation.findFirst({
           where: {
             email: { equals: dbUser.email, mode: "insensitive" },
             status: "PENDING",
           },
         });
-        if (invitedMembership || pendingBranchInvite) {
+        if (invitedMembership || pendingCampaignInvite) {
           await reconcileInviteMembershipOnLogin(userId, orgId);
         }
       }

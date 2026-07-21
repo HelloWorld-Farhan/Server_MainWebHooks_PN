@@ -4,7 +4,7 @@ import {
   hasAnyPermission,
   hasPermission,
   PERMISSIONS,
-  type BranchAccessType,
+  type CampaignAccessType,
   type Permission,
   type UserRole,
 } from "@/lib/permissions";
@@ -14,8 +14,8 @@ export type AccessContext = {
   userId: string;
   role: UserRole;
   permissions: string[];
-  branchAccessType: BranchAccessType;
-  branchIds: string[];
+  campaignAccessType: CampaignAccessType;
+  campaignIds: string[];
 };
 
 export type EmployeeTarget = {
@@ -34,7 +34,7 @@ const ASSIGNABLE_BY_ROLE: Record<UserRole, UserRole[]> = {
 };
 
 export function ctxHasPermission(ctx: AccessContext, permission: Permission) {
-  if (ctx.branchAccessType === "SELECTED") {
+  if (ctx.campaignAccessType === "SELECTED") {
     const companyWidePermissions: Permission[] = [
       PERMISSIONS.BILLING_READ,
       PERMISSIONS.BILLING_WRITE,
@@ -63,18 +63,18 @@ export function ctxHasAllPermissions(
   return hasAllPermissions(ctx.permissions, permissions);
 }
 
-export function hasAllBranchAccess(ctx: AccessContext): boolean {
-  return ctx.role === "OWNER" || ctx.branchAccessType === "ALL";
+export function hasAllCampaignAccess(ctx: AccessContext): boolean {
+  return ctx.role === "OWNER" || ctx.campaignAccessType === "ALL";
 }
 
-export function canAccessBranch(ctx: AccessContext, branchId: string): boolean {
-  if (hasAllBranchAccess(ctx)) return true;
-  return ctx.branchIds.includes(branchId);
+export function canAccessCampaign(ctx: AccessContext, campaignId: string): boolean {
+  if (hasAllCampaignAccess(ctx)) return true;
+  return ctx.campaignIds.includes(campaignId);
 }
 
-export function getAccessibleBranchIds(ctx: AccessContext): string[] {
-  if (hasAllBranchAccess(ctx)) return [];
-  return ctx.branchIds;
+export function getAccessibleCampaignIds(ctx: AccessContext): string[] {
+  if (hasAllCampaignAccess(ctx)) return [];
+  return ctx.campaignIds;
 }
 
 export function getAssignableRoles(ctx: AccessContext): UserRole[] {

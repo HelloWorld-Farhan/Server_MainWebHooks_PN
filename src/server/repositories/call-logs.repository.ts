@@ -1,11 +1,7 @@
-import type {
-  CallDirection,
-  CallStatus,
-  Prisma,
-} from "@prisma/client";
+import type { CallDirection, CallStatus, Prisma } from '@prisma/client';
 
-import { BaseRepository } from "@/server/repositories/base.repository";
-import { decodeCursor } from "@/server/lib/pagination";
+import { BaseRepository } from '@/server/repositories/base.repository';
+import { decodeCursor } from '@/server/lib/pagination';
 
 export type CallLogFilter = {
   direction?: CallDirection;
@@ -41,10 +37,10 @@ export class CallLogsRepository extends BaseRepository {
     if (filter?.search) {
       const term = filter.search.trim();
       where.OR = [
-        { lead: { firstName: { contains: term, mode: "insensitive" } } },
-        { lead: { lastName: { contains: term, mode: "insensitive" } } },
+        { lead: { firstName: { contains: term, mode: 'insensitive' } } },
+        { lead: { lastName: { contains: term, mode: 'insensitive' } } },
         { lead: { phone: { contains: term } } },
-        { lead: { email: { contains: term, mode: "insensitive" } } },
+        { lead: { email: { contains: term, mode: 'insensitive' } } },
       ];
     }
 
@@ -66,7 +62,7 @@ export class CallLogsRepository extends BaseRepository {
 
     return this.prisma.callLog.findMany({
       where: this.buildWhere(companyId, filter, scopeWhere),
-      orderBy: [{ startedAt: "desc" }, { id: "desc" }],
+      orderBy: [{ startedAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
       ...(cursor
         ? {
@@ -99,14 +95,18 @@ export class CallLogsRepository extends BaseRepository {
     });
   }
 
-  findRecent(companyId: string, limit: number, scopeWhere?: Prisma.CallLogWhereInput) {
+  findRecent(
+    companyId: string,
+    limit: number,
+    scopeWhere?: Prisma.CallLogWhereInput,
+  ) {
     const where =
       scopeWhere && Object.keys(scopeWhere).length > 0
         ? { AND: [this.scope(companyId), scopeWhere] }
         : this.scope(companyId);
     return this.prisma.callLog.findMany({
       where,
-      orderBy: { startedAt: "desc" },
+      orderBy: { startedAt: 'desc' },
       take: limit,
       select: {
         id: true,
@@ -134,6 +134,34 @@ export class CallLogsRepository extends BaseRepository {
     });
   }
 
+  findForBilling(companyId: string, id: string) {
+    return this.prisma.callLog.findFirst({
+      where: { id, companyId },
+      select: {
+        id: true,
+        status: true,
+        durationSeconds: true,
+        creditsUsed: true,
+        cost: true,
+        campaignId: true,
+      },
+    });
+  }
+
+  updateBilling(
+    companyId: string,
+    id: string,
+    data: { creditsUsed: number; cost: number },
+  ) {
+    return this.prisma.callLog.updateMany({
+      where: { id, companyId },
+      data: {
+        creditsUsed: data.creditsUsed,
+        cost: data.cost,
+      },
+    });
+  }
+
   countSummary(
     companyId: string,
     dateFrom?: Date,
@@ -145,7 +173,7 @@ export class CallLogsRepository extends BaseRepository {
     return Promise.all([
       this.prisma.callLog.count({ where }),
       this.prisma.callLog.count({
-        where: { ...where, status: "COMPLETED" },
+        where: { ...where, status: 'COMPLETED' },
       }),
     ]).then(([totalCalls, connectedCalls]) => ({ totalCalls, connectedCalls }));
   }
@@ -156,11 +184,7 @@ export class CallLogsRepository extends BaseRepository {
     dateTo: Date,
     scopeWhere?: Prisma.CallLogWhereInput,
   ) {
-    const where = this.buildWhere(
-      companyId,
-      { dateFrom, dateTo },
-      scopeWhere,
-    );
+    const where = this.buildWhere(companyId, { dateFrom, dateTo }, scopeWhere);
 
     return this.prisma.callLog.findMany({
       where,
@@ -172,7 +196,7 @@ export class CallLogsRepository extends BaseRepository {
         outcome: true,
         aiAgentId: true,
       },
-      orderBy: { startedAt: "asc" },
+      orderBy: { startedAt: 'asc' },
     });
   }
 

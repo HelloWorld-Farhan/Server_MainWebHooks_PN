@@ -24,7 +24,7 @@ const tenantRepo = new TenantRepository(prisma);
 type MembershipWithRelations = CompanyMember & {
   user: User;
   customRole?: { permissions: string[] } | null;
-  branchAccess?: { branchId: string }[];
+  campaignAccess?: { campaignId: string }[];
   company?: Company;
 };
 
@@ -48,7 +48,7 @@ async function findActiveMembership(
       customRole: true,
       user: true,
       company: true,
-      branchAccess: true,
+      campaignAccess: true,
     },
     orderBy: { joinedAt: "desc" },
   });
@@ -79,7 +79,7 @@ async function findInvitedMembership(
       customRole: true,
       user: true,
       company: true,
-      branchAccess: true,
+      campaignAccess: true,
     },
     orderBy: { invitedAt: "desc" },
   });
@@ -165,13 +165,13 @@ async function scheduleBackgroundReconciliation(
   const user = await tenantRepo.findUserByClerkId(clerkUserId);
   if (user) {
     const invitedMembership = await findInvitedMembership(user.id, orgId);
-    const pendingBranchInvite = await prisma.branchInvitation.findFirst({
+    const pendingCampaignInvite = await prisma.campaignInvitation.findFirst({
       where: {
         email: { equals: user.email, mode: "insensitive" },
         status: "PENDING",
       },
     });
-    if (!invitedMembership && !pendingBranchInvite) {
+    if (!invitedMembership && !pendingCampaignInvite) {
       return;
     }
   }
@@ -239,8 +239,8 @@ async function recoverTenant(
     ? await findInvitedMembership(user.id, orgId)
     : null;
 
-  const pendingBranchInvite = user
-    ? await prisma.branchInvitation.findFirst({
+  const pendingCampaignInvite = user
+    ? await prisma.campaignInvitation.findFirst({
         where: {
           email: { equals: user.email, mode: "insensitive" },
           status: "PENDING",
@@ -248,7 +248,7 @@ async function recoverTenant(
       })
     : null;
 
-  if (options?.forceReconcile || invitedMembership || pendingBranchInvite) {
+  if (options?.forceReconcile || invitedMembership || pendingCampaignInvite) {
     await reconcileInviteMembershipOnLogin(clerkUserId, orgId);
   }
 

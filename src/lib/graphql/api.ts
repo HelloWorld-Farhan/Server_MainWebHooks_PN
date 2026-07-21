@@ -15,6 +15,7 @@ import {
   LEADS_REACTIVATION_QUERY,
   IMPORT_LEADS_MUTATION,
   PHONE_NUMBER_DETAIL_QUERY,
+  PHONE_NUMBERS_CONNECTION_QUERY,
   PHONE_NUMBERS_PAGE_QUERY,
   SETTINGS_PAGE_QUERY,
   SETUP_PAGE_QUERY,
@@ -39,11 +40,11 @@ import {
   type AgentLibraryBySlugResult,
   type AgentLibraryListResult,
   BRANCHES_PAGE_QUERY,
-  BRANCH_DETAIL_QUERY,
-  BRANCH_CONTACTS_QUERY,
-  BRANCH_CALL_LOGS_QUERY,
-  BRANCH_DOCUMENTS_QUERY,
-  BRANCH_AGENTS_QUERY,
+  CAMPAIGN_DETAIL_QUERY,
+  CAMPAIGN_CONTACTS_QUERY,
+  CAMPAIGN_CALL_LOGS_QUERY,
+  CAMPAIGN_DOCUMENTS_QUERY,
+  CAMPAIGN_AGENTS_QUERY,
   CREATE_BRANCH_MUTATION,
   UPDATE_BRANCH_MUTATION,
   UPDATE_BRANCH_AI_MUTATION,
@@ -52,17 +53,17 @@ import {
   RESEND_BRANCH_INVITATION_MUTATION,
   CANCEL_BRANCH_INVITATION_MUTATION,
   GENERATE_NEW_BRANCH_INVITATION_MUTATION,
-  type BranchesConnectionResult,
-  type BranchDetailResult,
-  type BranchContactNode,
-  type BranchCallLogNode,
-  type BranchDocumentNode,
-  type BranchAgentNode,
-  type BranchNode,
+  type CampaignsConnectionResult,
+  type CampaignDetailResult,
+  type CampaignContactNode,
+  type CampaignCallLogNode,
+  type CampaignDocumentNode,
+  type CampaignAgentNode,
+  type CampaignNode,
   VIEWER_ROLE_QUERY,
-  VIEWER_BRANCH_NAME_QUERY,
+  VIEWER_CAMPAIGN_NAME_QUERY,
   type ViewerRoleResult,
-  type ViewerBranchNameResult,
+  type ViewerCampaignNameResult,
   EMPLOYEES_PAGE_QUERY,
   EMPLOYEE_DETAIL_QUERY,
   INVITE_EMPLOYEE_MUTATION,
@@ -76,7 +77,7 @@ import {
   type EmployeeNode,
   type UserRole,
   type MemberStatus,
-  type BranchAccessType,
+  type CampaignAccessType,
 } from "@/lib/graphql/queries";
 
 export async function fetchCreditsSummary() {
@@ -152,10 +153,30 @@ export async function updateAgent(id: string, input: Record<string, unknown>) {
   }>(UPDATE_AGENT_MUTATION, { id, input });
 }
 
-export async function fetchPhoneNumbersPage() {
+export async function fetchPhoneNumbersPage(variables?: {
+  filter?: Record<string, unknown>;
+  sort?: Record<string, unknown>;
+}) {
   return gqlRequest<{
     phoneNumbers: { list: Record<string, unknown>[] };
-  }>(PHONE_NUMBERS_PAGE_QUERY);
+  }>(PHONE_NUMBERS_PAGE_QUERY, variables);
+}
+
+export async function fetchPhoneNumbersConnection(variables?: {
+  first?: number;
+  after?: string;
+  filter?: Record<string, unknown>;
+  sort?: Record<string, unknown>;
+}) {
+  return gqlRequest<{
+    phoneNumbers: {
+      connection: {
+        edges: { node: Record<string, unknown>; cursor: string }[];
+        pageInfo: { hasNextPage: boolean; endCursor: string | null };
+        totalCount: number;
+      };
+    };
+  }>(PHONE_NUMBERS_CONNECTION_QUERY, variables);
 }
 
 export async function fetchPhoneNumberDetail(id: string, after?: string) {
@@ -256,93 +277,93 @@ export async function fetchViewerRole() {
   return gqlRequest<ViewerRoleResult>(VIEWER_ROLE_QUERY);
 }
 
-export async function fetchViewerBranchName(branchId: string) {
-  return gqlRequest<ViewerBranchNameResult>(VIEWER_BRANCH_NAME_QUERY, { id: branchId });
+export async function fetchViewerCampaignName(campaignId: string) {
+  return gqlRequest<ViewerCampaignNameResult>(VIEWER_CAMPAIGN_NAME_QUERY, { id: campaignId });
 }
 
-export type BranchFilterInput = {
+export type CampaignFilterInput = {
   search?: string;
   status?: string;
   aiEnabled?: boolean;
 };
 
-export async function fetchBranchesPage(
+export async function fetchCampaignsPage(
   first = 25,
   after?: string,
-  filter?: BranchFilterInput,
+  filter?: CampaignFilterInput,
 ) {
-  return gqlRequest<BranchesConnectionResult>(BRANCHES_PAGE_QUERY, {
+  return gqlRequest<CampaignsConnectionResult>(BRANCHES_PAGE_QUERY, {
     first,
     after,
     filter,
   });
 }
 
-export async function fetchBranchDetail(id: string) {
-  return gqlRequest<BranchDetailResult>(BRANCH_DETAIL_QUERY, { id });
+export async function fetchCampaignDetail(id: string) {
+  return gqlRequest<CampaignDetailResult>(CAMPAIGN_DETAIL_QUERY, { id });
 }
 
-export async function fetchBranchContacts(
-  branchId: string,
+export async function fetchCampaignContacts(
+  campaignId: string,
   first = 50,
   after?: string,
 ) {
-  return gqlRequest<{ branches: { contacts: BranchContactNode[] } }>(
-    BRANCH_CONTACTS_QUERY,
-    { branchId, first, after },
+  return gqlRequest<{ campaigns: { contacts: CampaignContactNode[] } }>(
+    CAMPAIGN_CONTACTS_QUERY,
+    { campaignId, first, after },
   );
 }
 
-export async function fetchBranchCallLogs(
-  branchId: string,
+export async function fetchCampaignCallLogs(
+  campaignId: string,
   first = 50,
   after?: string,
 ) {
-  return gqlRequest<{ branches: { callLogs: BranchCallLogNode[] } }>(
-    BRANCH_CALL_LOGS_QUERY,
-    { branchId, first, after },
+  return gqlRequest<{ campaigns: { callLogs: CampaignCallLogNode[] } }>(
+    CAMPAIGN_CALL_LOGS_QUERY,
+    { campaignId, first, after },
   );
 }
 
-export async function fetchBranchDocuments(branchId: string) {
-  return gqlRequest<{ branches: { documents: BranchDocumentNode[] } }>(
-    BRANCH_DOCUMENTS_QUERY,
-    { branchId },
+export async function fetchCampaignDocuments(campaignId: string) {
+  return gqlRequest<{ campaigns: { documents: CampaignDocumentNode[] } }>(
+    CAMPAIGN_DOCUMENTS_QUERY,
+    { campaignId },
   );
 }
 
-export async function fetchBranchAgents(branchId: string) {
-  return gqlRequest<{ branches: { agents: BranchAgentNode[] } }>(
-    BRANCH_AGENTS_QUERY,
-    { branchId },
+export async function fetchCampaignAgents(campaignId: string) {
+  return gqlRequest<{ campaigns: { agents: CampaignAgentNode[] } }>(
+    CAMPAIGN_AGENTS_QUERY,
+    { campaignId },
   );
 }
 
-export async function createBranch(input: Record<string, unknown>) {
-  return gqlRequest<{ branches: { create: BranchNode } }>(
+export async function createCampaign(input: Record<string, unknown>) {
+  return gqlRequest<{ campaigns: { create: CampaignNode } }>(
     CREATE_BRANCH_MUTATION,
     { input },
   );
 }
 
-export async function updateBranch(id: string, input: Record<string, unknown>) {
-  return gqlRequest<{ branches: { update: BranchNode } }>(
+export async function updateCampaign(id: string, input: Record<string, unknown>) {
+  return gqlRequest<{ campaigns: { update: CampaignNode } }>(
     UPDATE_BRANCH_MUTATION,
     { id, input },
   );
 }
 
-export async function updateBranchAi(
+export async function updateCampaignAi(
   id: string,
   input: Record<string, unknown>,
 ) {
-  return gqlRequest<{ branches: { updateAi: BranchNode } }>(
+  return gqlRequest<{ campaigns: { updateAi: CampaignNode } }>(
     UPDATE_BRANCH_AI_MUTATION,
     { id, input },
   );
 }
 
-export async function bulkUpdateBranches(input: {
+export async function bulkUpdateCampaigns(input: {
   ids: string[];
   action:
     | "ENABLE_AI"
@@ -353,14 +374,14 @@ export async function bulkUpdateBranches(input: {
   systemPrompt?: string;
   status?: string;
 }) {
-  return gqlRequest<{ branches: { bulkUpdate: { updated: number } } }>(
+  return gqlRequest<{ campaigns: { bulkUpdate: { updated: number } } }>(
     BULK_UPDATE_BRANCHES_MUTATION,
     { input },
   );
 }
 
-export async function archiveBranch(id: string) {
-  return gqlRequest<{ branches: { archive: BranchNode } }>(
+export async function archiveCampaign(id: string) {
+  return gqlRequest<{ campaigns: { archive: CampaignNode } }>(
     ARCHIVE_BRANCH_MUTATION,
     { id },
   );
@@ -370,7 +391,7 @@ export type EmployeeFilterInput = {
   search?: string;
   role?: UserRole;
   status?: MemberStatus;
-  branchId?: string;
+  campaignId?: string;
 };
 
 export async function fetchEmployeesPage(
@@ -394,8 +415,8 @@ export async function inviteEmployee(input: {
   email: string;
   role: UserRole;
   jobTitle?: string;
-  branchAccessType: BranchAccessType;
-  branchIds?: string[];
+  campaignAccessType: CampaignAccessType;
+  campaignIds?: string[];
 }) {
   return gqlRequest<{ employees: { invite: EmployeeNode } }>(
     INVITE_EMPLOYEE_MUTATION,
@@ -447,36 +468,36 @@ export const fetchHomeDashboard = fetchHomePage;
 /** @deprecated Use fetchAgentsList */
 export const fetchAgentsPage = fetchAgentsList;
 
-export async function resendBranchInvitation(branchId: string) {
-  return gqlRequest<{ branches: { resendInvitation: BranchNode } }>(
+export async function resendCampaignInvitation(campaignId: string) {
+  return gqlRequest<{ campaigns: { resendInvitation: CampaignNode } }>(
     RESEND_BRANCH_INVITATION_MUTATION,
-    { branchId },
+    { campaignId },
   );
 }
 
-export async function cancelBranchInvitation(branchId: string) {
-  return gqlRequest<{ branches: { cancelInvitation: BranchNode } }>(
+export async function cancelCampaignInvitation(campaignId: string) {
+  return gqlRequest<{ campaigns: { cancelInvitation: CampaignNode } }>(
     CANCEL_BRANCH_INVITATION_MUTATION,
-    { branchId },
+    { campaignId },
   );
 }
 
-export async function generateNewBranchInvitation(branchId: string) {
-  return gqlRequest<{ branches: { generateNewInvitation: BranchNode } }>(
+export async function generateNewCampaignInvitation(campaignId: string) {
+  return gqlRequest<{ campaigns: { generateNewInvitation: CampaignNode } }>(
     GENERATE_NEW_BRANCH_INVITATION_MUTATION,
-    { branchId },
+    { campaignId },
   );
 }
 
-import { BRANCH_DASHBOARD_QUERY, type BranchDashboardResult } from "./queries/home";
+import { CAMPAIGN_DASHBOARD_QUERY, type CampaignDashboardResult } from "./queries/home";
 
-export async function fetchBranchDashboardPage(
-  branchId: string,
+export async function fetchCampaignDashboardPage(
+  campaignId: string,
   dateFrom?: string,
   dateTo?: string,
 ) {
-  return gqlRequest<BranchDashboardResult>(BRANCH_DASHBOARD_QUERY, {
-    branchId,
+  return gqlRequest<CampaignDashboardResult>(CAMPAIGN_DASHBOARD_QUERY, {
+    campaignId,
     dateFrom,
     dateTo,
   });

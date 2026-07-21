@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { branchAccessService } from "@/server/services/branch-access.service";
+import { campaignAccessService } from "@/server/services/campaign-access.service";
 import type { TenantContext } from "@/server/types/context";
 import { ForbiddenError } from "@/server/lib/errors";
 
@@ -14,7 +14,7 @@ function ctx(partial: Partial<TenantContext>): TenantContext {
     membershipId: "member-1",
     role: "SALES",
     permissions: [],
-    branchAccess: { type: "SELECTED", branchIds: ["branch-a", "branch-b"] },
+    campaignAccess: { type: "SELECTED", campaignIds: ["branch-a", "branch-b"] },
     loaders: {} as TenantContext["loaders"],
     ...partial,
   };
@@ -22,35 +22,35 @@ function ctx(partial: Partial<TenantContext>): TenantContext {
 
 describe("branch access", () => {
   it("allows owner to access any branch", () => {
-    const ownerCtx = ctx({ role: "OWNER", branchAccess: { type: "SELECTED", branchIds: [] } });
-    assert.equal(branchAccessService.hasAllBranchAccess(ownerCtx), true);
+    const ownerCtx = ctx({ role: "OWNER", campaignAccess: { type: "SELECTED", campaignIds: [] } });
+    assert.equal(campaignAccessService.hasAllCampaignAccess(ownerCtx), true);
     assert.doesNotThrow(() =>
-      branchAccessService.assertBranchAccess(ownerCtx, "branch-x"),
+      campaignAccessService.assertCampaignAccess(ownerCtx, "branch-x"),
     );
   });
 
-  it("restricts selected branch access", () => {
+  it("restricts selected campaign access", () => {
     const salesCtx = ctx({});
     assert.throws(
-      () => branchAccessService.assertBranchAccess(salesCtx, "branch-x"),
+      () => campaignAccessService.assertCampaignAccess(salesCtx, "branch-x"),
       ForbiddenError,
     );
     assert.doesNotThrow(() =>
-      branchAccessService.assertBranchAccess(salesCtx, "branch-a"),
+      campaignAccessService.assertCampaignAccess(salesCtx, "branch-a"),
     );
   });
 
-  it("blocks null branch records for selected access", () => {
+  it("blocks null campaign records for selected access", () => {
     const salesCtx = ctx({});
     assert.throws(
-      () => branchAccessService.assertLeadBranchAccess(salesCtx, null),
+      () => campaignAccessService.assertLeadCampaignAccess(salesCtx, null),
       ForbiddenError,
     );
   });
 
-  it("scopes branch list filter to allowed ids", () => {
+  it("scopes campaign list filter to allowed ids", () => {
     const salesCtx = ctx({});
-    assert.deepEqual(branchAccessService.branchIdScopeFilter(salesCtx), {
+    assert.deepEqual(campaignAccessService.campaignIdScopeFilter(salesCtx), {
       id: { in: ["branch-a", "branch-b"] },
     });
   });

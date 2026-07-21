@@ -23,7 +23,7 @@ mock.method(clerkOrgLib, "removeClerkOrganizationAccess", () => {
 });
 
 import prisma from "@/server/lib/prisma";
-import { branchesService } from "@/server/services/branches.service";
+import { campaignsService } from "@/server/services/campaigns.service";
 import type { TenantContext } from "@/server/types/context";
 
 function createMockCtx(companyId: string, userId: string): TenantContext {
@@ -34,17 +34,17 @@ function createMockCtx(companyId: string, userId: string): TenantContext {
     companyId,
     membershipId: "member-" + userId,
     role: "OWNER",
-    permissions: ["branches:read", "branches:write", "branches:bulk"],
-    branchAccess: { type: "ALL", branchIds: [] },
+    permissions: ["campaigns:read", "campaigns:write", "campaigns:bulk"],
+    campaignAccess: { type: "ALL", campaignIds: [] },
     loaders: {} as any,
   };
 }
 
-describe("Branch Invitation Flow", () => {
+describe("Campaign Invitation Flow", () => {
   let companyId: string;
   let userId: string;
   let ctx: TenantContext;
-  let createdBranchId: string;
+  let createdCampaignId: string;
 
   before(async () => {
     // Setup dummy company & user
@@ -60,8 +60,8 @@ describe("Branch Invitation Flow", () => {
 
     const company = await prisma.company.create({
       data: {
-        name: "Test Branch Inv Company",
-        slug: "test-branch-inv-company-" + Math.random().toString(36).slice(2, 8),
+        name: "Test Campaign Inv Company",
+        slug: "test-campaign-inv-company-" + Math.random().toString(36).slice(2, 8),
         contractId: "TX" + Math.random().toString(36).substring(2, 10).toUpperCase(),
         clerkOrganizationId: "org_mock_company",
         ownerUserId: user.clerkUserId,
@@ -75,7 +75,7 @@ describe("Branch Invitation Flow", () => {
         userId,
         role: "OWNER",
         status: "ACTIVE",
-        branchAccessType: "ALL",
+        campaignAccessType: "ALL",
         joinedAt: new Date(),
       },
     });
@@ -86,7 +86,7 @@ describe("Branch Invitation Flow", () => {
   after(async () => {
     // Cleanup
     if (companyId) {
-      // Cascade delete handles branch invitations
+      // Cascade delete handles campaign invitations
       await prisma.company.delete({ where: { id: companyId } });
     }
     if (userId) {
@@ -94,24 +94,24 @@ describe("Branch Invitation Flow", () => {
     }
   });
 
-  it("automatically creates a pending invitation when branch is created with an email", async () => {
-    const branchEmail = "invited-admin-" + Math.random().toString(36).slice(2, 8) + "@test.com";
-    const branch = await branchesService.create(ctx, {
-      name: "Downtown branch for tests",
-      email: branchEmail,
+  it("automatically creates a pending invitation when campaign is created with an email", async () => {
+    const campaignEmail = "invited-admin-" + Math.random().toString(36).slice(2, 8) + "@test.com";
+    const campaign = await campaignsService.create(ctx, {
+      name: "Downtown campaign for tests",
+      email: campaignEmail,
       status: "ACTIVE",
     });
-    createdBranchId = branch.id;
+    createdCampaignId = campaign.id;
 
-    assert.equal(branch.name, "Downtown branch for tests");
-    assert.equal(branch.email, branchEmail);
+    assert.equal(campaign.name, "Downtown campaign for tests");
+    assert.equal(campaign.email, campaignEmail);
 
     // Verify invitation exists
-    const invitation = await prisma.branchInvitation.findUnique({
-      where: { branchId: branch.id },
+    const invitation = await prisma.campaignInvitation.findUnique({
+      where: { campaignId: campaign.id },
     });
     assert.ok(invitation);
-    assert.equal(invitation.email, branchEmail);
+    assert.equal(invitation.email, campaignEmail);
     assert.equal(invitation.status, "PENDING");
     assert.ok(invitation.token);
     assert.equal(invitation.clerkInvitationId, "clerk_inv_mock_123");
@@ -119,32 +119,32 @@ describe("Branch Invitation Flow", () => {
   });
 
   it("can cancel an invitation", async () => {
-    assert.ok(createdBranchId);
-    const updatedBranch = await branchesService.cancelInvitation(ctx, createdBranchId);
-    assert.ok(updatedBranch.invitation);
-    assert.equal(updatedBranch.invitation.status, "CANCELLED");
+    assert.ok(createdCampaignId);
+    const updatedCampaign = await campaignsService.cancelInvitation(ctx, createdCampaignId);
+    assert.ok(updatedCampaign.invitation);
+    assert.equal(updatedCampaign.invitation.status, "CANCELLED");
 
-    const invitation = await prisma.branchInvitation.findUnique({
-      where: { branchId: createdBranchId },
+    const invitation = await prisma.campaignInvitation.findUnique({
+      where: { campaignId: createdCampaignId },
     });
     assert.equal(invitation?.status, "CANCELLED");
   });
 
   it("can generate a new invitation, invalidating the old one", async () => {
-    assert.ok(createdBranchId);
+    assert.ok(createdCampaignId);
     
-    const oldInvitation = await prisma.branchInvitation.findUnique({
-      where: { branchId: createdBranchId },
+    const oldInvitation = await prisma.campaignInvitation.findUnique({
+      where: { campaignId: createdCampaignId },
     });
     const oldToken = oldInvitation?.token;
 
-    const updatedBranch = await branchesService.generateNewInvitation(ctx, createdBranchId);
-    assert.ok(updatedBranch.invitation);
-    assert.equal(updatedBranch.invitation.status, "PENDING");
-    assert.notEqual(updatedBranch.invitation.token, oldToken);
+    const updatedCampaign = await campaignsService.generateNewInvitation(ctx, createdCampaignId);
+    assert.ok(updatedCampaign.invitation);
+    assert.equal(updatedCampaign.invitation.status, "PENDING");
+    assert.notEqual(updatedCampaign.invitation.token, oldToken);
 
     // Verify old token is no longer in active use (it's overwritten)
-    const checkedOld = await prisma.branchInvitation.findFirst({
+    const checkedOld = await prisma.campaignInvitation.findFirst({
       where: { token: oldToken },
     });
     assert.equal(checkedOld, null);

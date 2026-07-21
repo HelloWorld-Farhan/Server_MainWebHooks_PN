@@ -10,7 +10,7 @@ export type ParsedContactRecord = {
   name: string | null;
   email: string | null;
   address: string | null;
-  branchNames: string[];
+  campaignNames: string[];
 };
 
 export type ParsedPhoneImport = {
@@ -63,7 +63,7 @@ function getRowValue(row: string[], index: number): string | null {
   return value.length > 0 ? value : null;
 }
 
-function getBranchNames(row: string[], index: number): string[] {
+function getCampaignNames(row: string[], index: number): string[] {
   if (index === -1) return [];
   const raw = row[index] ?? "";
   return raw
@@ -108,7 +108,7 @@ export function parsePhonesFromStructuredRows(
     "addr",
     "street",
   );
-  const branchesIndex = findColumnIndex(headers, "branch", "branches");
+  const campaignsIndex = findColumnIndex(headers, "campaign", "campaigns");
 
   const seen = new Set<string>();
   const contacts: ParsedContactRecord[] = [];
@@ -145,7 +145,7 @@ export function parsePhonesFromStructuredRows(
       name: getRowValue(row, nameIndex),
       email: getRowValue(row, emailIndex),
       address: getRowValue(row, addressIndex),
-      branchNames: getBranchNames(row, branchesIndex),
+      campaignNames: getCampaignNames(row, campaignsIndex),
     });
   }
 
@@ -205,11 +205,11 @@ export async function parsePhonesFromUploadFile(
 
 export const CONTACT_PHONES_SAMPLE_FILENAME = "propnex-phone-contacts-sample.csv";
 
-export const CONTACT_PHONES_SAMPLE_CONTENT = `country,phone,name,email,address,branches
-IN,9876543210,John Doe,john.doe@example.com,"123 Main St, Mumbai","Downtown Branch"
-IN,9123456789,Jane Smith,jane.smith@example.com,"45 Park Ave, Delhi","Downtown Branch,North Branch"
+export const CONTACT_PHONES_SAMPLE_CONTENT = `country,phone,name,email,address,campaigns
+IN,9876543210,John Doe,john.doe@example.com,"123 Main St, Mumbai","Downtown Campaign"
+IN,9123456789,Jane Smith,jane.smith@example.com,"45 Park Ave, Delhi","Downtown Campaign,North Campaign"
 US,5551234567,Alex Rivera,alex.rivera@example.com,"10 Oak Lane, Austin",
-GB,7911123456,Maria Chen,maria.chen@example.com,"22 Baker Street, London","North Branch"
+GB,7911123456,Maria Chen,maria.chen@example.com,"22 Baker Street, London","North Campaign"
 AU,4123456789,Sam Wilson,sam.wilson@example.com,"8 Harbour Rd, Sydney",
 `;
 

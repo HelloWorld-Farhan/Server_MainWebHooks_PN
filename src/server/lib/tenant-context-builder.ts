@@ -1,14 +1,14 @@
 import type { CompanyMember, User } from "@prisma/client";
 
 import { createDataLoaders } from "@/server/graphql/dataloaders";
-import { buildBranchAccessFromMember } from "@/server/services/branch-access.service";
+import { buildCampaignAccessFromMember } from "@/server/services/campaign-access.service";
 import { tenantService } from "@/server/services/tenant.service";
 import type { TenantContext } from "@/server/types/context";
 
 type MembershipWithRelations = CompanyMember & {
   user: User;
   customRole?: { permissions: string[] } | null;
-  branchAccess?: { branchId: string }[];
+  campaignAccess?: { campaignId: string }[];
 };
 
 export async function buildTenantContext(
@@ -31,9 +31,9 @@ export async function buildTenantContext(
     membershipId: membership.id,
     role: membership.role,
     permissions,
-    branchAccess: buildBranchAccessFromMember({
-      branchAccessType: membership.branchAccessType,
-      branchAccess: membership.branchAccess,
+    campaignAccess: buildCampaignAccessFromMember({
+      campaignAccessType: membership.campaignAccessType,
+      campaignAccess: membership.campaignAccess,
       role: membership.role,
     }),
     loaders: createDataLoaders(companyId),

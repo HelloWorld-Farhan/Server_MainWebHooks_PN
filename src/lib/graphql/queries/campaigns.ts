@@ -1,4 +1,4 @@
-export type BranchStatus = "ACTIVE" | "INACTIVE" | "ARCHIVED";
+export type CampaignStatus = "ACTIVE" | "INACTIVE" | "ARCHIVED";
 
 export type ViewerRoleResult = {
   viewer: {
@@ -6,8 +6,8 @@ export type ViewerRoleResult = {
     membershipId: string;
     role: string;
     permissions: string[];
-    branchAccessType: "ALL" | "SELECTED";
-    branchIds: string[];
+    campaignAccessType: "ALL" | "SELECTED";
+    campaignIds: string[];
     company: {
       name: string;
     };
@@ -21,8 +21,8 @@ export const VIEWER_ROLE_QUERY = `
       membershipId
       role
       permissions
-      branchAccessType
-      branchIds
+      campaignAccessType
+      campaignIds
       company {
         name
       }
@@ -30,17 +30,17 @@ export const VIEWER_ROLE_QUERY = `
   }
 `;
 
-export type ViewerBranchNameResult = {
-  branches: {
+export type ViewerCampaignNameResult = {
+  campaigns: {
     byId: {
       name: string;
     } | null;
   };
 };
 
-export const VIEWER_BRANCH_NAME_QUERY = `
-  query ViewerBranchName($id: ID!) {
-    branches {
+export const VIEWER_CAMPAIGN_NAME_QUERY = `
+  query ViewerCampaignName($id: ID!) {
+    campaigns {
       byId(id: $id) {
         name
       }
@@ -48,7 +48,7 @@ export const VIEWER_BRANCH_NAME_QUERY = `
   }
 `;
 
-export type BranchInvitationNode = {
+export type CampaignInvitationNode = {
   id: string;
   email: string;
   token: string;
@@ -60,10 +60,10 @@ export type BranchInvitationNode = {
   expiresAt: string;
 };
 
-export type BranchNode = {
+export type CampaignNode = {
   id: string;
   name: string;
-  status: BranchStatus;
+  status: CampaignStatus;
   address: string | null;
   phone: string | null;
   email: string | null;
@@ -80,20 +80,20 @@ export type BranchNode = {
   createdAt: string;
   updatedAt: string;
   invitationEmailSent: boolean | null;
-  invitation: BranchInvitationNode | null;
+  invitation: CampaignInvitationNode | null;
 };
 
-export type BranchesConnectionResult = {
-  branches: {
+export type CampaignsConnectionResult = {
+  campaigns: {
     connection: {
-      edges: { node: BranchNode; cursor: string }[];
+      edges: { node: CampaignNode; cursor: string }[];
       pageInfo: { hasNextPage: boolean; endCursor: string | null };
       totalCount: number;
     };
   };
 };
 
-export type BranchContactNode = {
+export type CampaignContactNode = {
   id: string;
   firstName: string | null;
   lastName: string | null;
@@ -102,7 +102,7 @@ export type BranchContactNode = {
   createdAt: string | null;
 };
 
-export type BranchCallLogNode = {
+export type CampaignCallLogNode = {
   id: string;
   direction: string;
   status: string;
@@ -112,7 +112,7 @@ export type BranchCallLogNode = {
   leadName: string | null;
 };
 
-export type BranchDocumentNode = {
+export type CampaignDocumentNode = {
   id: string;
   name: string;
   url: string;
@@ -121,7 +121,7 @@ export type BranchDocumentNode = {
   createdAt: string;
 };
 
-export type BranchActivityNode = {
+export type CampaignActivityNode = {
   id: string;
   type: string;
   summary: string;
@@ -129,7 +129,7 @@ export type BranchActivityNode = {
   createdAt: string;
 };
 
-export type BranchAgentNode = {
+export type CampaignAgentNode = {
   id: string;
   name: string;
   type: string;
@@ -138,16 +138,16 @@ export type BranchAgentNode = {
   environment: string;
   enabled: boolean;
   demoAudioUrl: string | null;
-  branchId: string | null;
+  campaignId: string | null;
   systemPrompt: string | null;
   createdAt: string;
   updatedAt: string;
 };
 
-export type BranchDetailResult = {
-  branches: {
-    byId: BranchNode | null;
-    activities: BranchActivityNode[];
+export type CampaignDetailResult = {
+  campaigns: {
+    byId: CampaignNode | null;
+    activities: CampaignActivityNode[];
   };
 };
 
@@ -185,8 +185,8 @@ const BRANCH_FIELDS = `
 `;
 
 export const BRANCHES_PAGE_QUERY = `
-  query BranchesPage($first: Int, $after: String, $filter: BranchFilter) {
-    branches {
+  query CampaignsPage($first: Int, $after: String, $filter: CampaignFilter) {
+    campaigns {
       connection(first: $first, after: $after, filter: $filter) {
         edges {
           node {${BRANCH_FIELDS}}
@@ -202,11 +202,11 @@ export const BRANCHES_PAGE_QUERY = `
   }
 `;
 
-export const BRANCH_DETAIL_QUERY = `
-  query BranchDetail($id: ID!) {
-    branches {
+export const CAMPAIGN_DETAIL_QUERY = `
+  query CampaignDetail($id: ID!) {
+    campaigns {
       byId(id: $id) {${BRANCH_FIELDS}}
-      activities(branchId: $id, limit: 50) {
+      activities(campaignId: $id, limit: 50) {
         id
         type
         summary
@@ -217,10 +217,10 @@ export const BRANCH_DETAIL_QUERY = `
   }
 `;
 
-export const BRANCH_CONTACTS_QUERY = `
-  query BranchContacts($branchId: ID!, $first: Int, $after: String) {
-    branches {
-      contacts(branchId: $branchId, first: $first, after: $after) {
+export const CAMPAIGN_CONTACTS_QUERY = `
+  query CampaignContacts($campaignId: ID!, $first: Int, $after: String) {
+    campaigns {
+      contacts(campaignId: $campaignId, first: $first, after: $after) {
         id
         firstName
         lastName
@@ -232,10 +232,10 @@ export const BRANCH_CONTACTS_QUERY = `
   }
 `;
 
-export const BRANCH_CALL_LOGS_QUERY = `
-  query BranchCallLogs($branchId: ID!, $first: Int, $after: String) {
-    branches {
-      callLogs(branchId: $branchId, first: $first, after: $after) {
+export const CAMPAIGN_CALL_LOGS_QUERY = `
+  query CampaignCallLogs($campaignId: ID!, $first: Int, $after: String) {
+    campaigns {
+      callLogs(campaignId: $campaignId, first: $first, after: $after) {
         id
         direction
         status
@@ -248,10 +248,10 @@ export const BRANCH_CALL_LOGS_QUERY = `
   }
 `;
 
-export const BRANCH_DOCUMENTS_QUERY = `
-  query BranchDocuments($branchId: ID!) {
-    branches {
-      documents(branchId: $branchId) {
+export const CAMPAIGN_DOCUMENTS_QUERY = `
+  query CampaignDocuments($campaignId: ID!) {
+    campaigns {
+      documents(campaignId: $campaignId) {
         id
         name
         url
@@ -263,10 +263,10 @@ export const BRANCH_DOCUMENTS_QUERY = `
   }
 `;
 
-export const BRANCH_AGENTS_QUERY = `
-  query BranchAgents($branchId: ID!) {
-    branches {
-      agents(branchId: $branchId) {
+export const CAMPAIGN_AGENTS_QUERY = `
+  query CampaignAgents($campaignId: ID!) {
+    campaigns {
+      agents(campaignId: $campaignId) {
         id
         name
         type
@@ -275,7 +275,7 @@ export const BRANCH_AGENTS_QUERY = `
         environment
         enabled
         demoAudioUrl
-        branchId
+        campaignId
         systemPrompt
         createdAt
         updatedAt
@@ -285,32 +285,32 @@ export const BRANCH_AGENTS_QUERY = `
 `;
 
 export const CREATE_BRANCH_MUTATION = `
-  mutation CreateBranch($input: CreateBranchInput!) {
-    branches {
+  mutation CreateCampaign($input: CreateCampaignInput!) {
+    campaigns {
       create(input: $input) {${BRANCH_FIELDS}}
     }
   }
 `;
 
 export const UPDATE_BRANCH_MUTATION = `
-  mutation UpdateBranch($id: ID!, $input: UpdateBranchInput!) {
-    branches {
+  mutation UpdateCampaign($id: ID!, $input: UpdateCampaignInput!) {
+    campaigns {
       update(id: $id, input: $input) {${BRANCH_FIELDS}}
     }
   }
 `;
 
 export const UPDATE_BRANCH_AI_MUTATION = `
-  mutation UpdateBranchAi($id: ID!, $input: UpdateBranchAiInput!) {
-    branches {
+  mutation UpdateCampaignAi($id: ID!, $input: UpdateCampaignAiInput!) {
+    campaigns {
       updateAi(id: $id, input: $input) {${BRANCH_FIELDS}}
     }
   }
 `;
 
 export const BULK_UPDATE_BRANCHES_MUTATION = `
-  mutation BulkUpdateBranches($input: BulkBranchUpdateInput!) {
-    branches {
+  mutation BulkUpdateCampaigns($input: BulkCampaignUpdateInput!) {
+    campaigns {
       bulkUpdate(input: $input) {
         updated
       }
@@ -319,33 +319,33 @@ export const BULK_UPDATE_BRANCHES_MUTATION = `
 `;
 
 export const ARCHIVE_BRANCH_MUTATION = `
-  mutation ArchiveBranch($id: ID!) {
-    branches {
+  mutation ArchiveCampaign($id: ID!) {
+    campaigns {
       archive(id: $id) {${BRANCH_FIELDS}}
     }
   }
 `;
 
 export const RESEND_BRANCH_INVITATION_MUTATION = `
-  mutation ResendBranchInvitation($branchId: ID!) {
-    branches {
-      resendInvitation(branchId: $branchId) {${BRANCH_FIELDS}}
+  mutation ResendCampaignInvitation($campaignId: ID!) {
+    campaigns {
+      resendInvitation(campaignId: $campaignId) {${BRANCH_FIELDS}}
     }
   }
 `;
 
 export const CANCEL_BRANCH_INVITATION_MUTATION = `
-  mutation CancelBranchInvitation($branchId: ID!) {
-    branches {
-      cancelInvitation(branchId: $branchId) {${BRANCH_FIELDS}}
+  mutation CancelCampaignInvitation($campaignId: ID!) {
+    campaigns {
+      cancelInvitation(campaignId: $campaignId) {${BRANCH_FIELDS}}
     }
   }
 `;
 
 export const GENERATE_NEW_BRANCH_INVITATION_MUTATION = `
-  mutation GenerateNewBranchInvitation($branchId: ID!) {
-    branches {
-      generateNewInvitation(branchId: $branchId) {${BRANCH_FIELDS}}
+  mutation GenerateNewCampaignInvitation($campaignId: ID!) {
+    campaigns {
+      generateNewInvitation(campaignId: $campaignId) {${BRANCH_FIELDS}}
     }
   }
 `;

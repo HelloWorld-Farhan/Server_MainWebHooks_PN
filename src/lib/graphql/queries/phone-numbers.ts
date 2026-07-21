@@ -1,7 +1,7 @@
 export const PHONE_NUMBERS_PAGE_QUERY = `
-  query PhoneNumbersPage {
+  query PhoneNumbersPage($filter: PhoneNumberFilter, $sort: PhoneNumberSort) {
     phoneNumbers {
-      list {
+      list(filter: $filter, sort: $sort) {
         id
         number
         label
@@ -22,6 +22,50 @@ export const PHONE_NUMBERS_PAGE_QUERY = `
         lastActivityAt
         createdAt
         updatedAt
+      }
+    }
+  }
+`;
+
+export const PHONE_NUMBERS_CONNECTION_QUERY = `
+  query PhoneNumbersConnection(
+    $first: Int
+    $after: String
+    $filter: PhoneNumberFilter
+    $sort: PhoneNumberSort
+  ) {
+    phoneNumbers {
+      connection(first: $first, after: $after, filter: $filter, sort: $sort) {
+        edges {
+          node {
+            id
+            number
+            label
+            provider
+            status
+            inboundAgentId
+            outboundAgentId
+            inboundAgent {
+              id
+              name
+            }
+            outboundAgent {
+              id
+              name
+            }
+            inboundCallsCount
+            outboundCallsCount
+            lastActivityAt
+            createdAt
+            updatedAt
+          }
+          cursor
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+        totalCount
       }
     }
   }

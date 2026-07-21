@@ -136,9 +136,9 @@ export class TenantService {
       lastName: membership.user.lastName,
       role: membership.role,
       permissions: ctx.permissions,
-      branchAccessType: membership.branchAccessType,
-      branchIds:
-        ctx.branchAccess.type === "ALL" ? [] : ctx.branchAccess.branchIds,
+      campaignAccessType: membership.campaignAccessType,
+      campaignIds:
+        ctx.campaignAccess.type === "ALL" ? [] : ctx.campaignAccess.campaignIds,
       company: {
         id: membership.company.id,
         name: membership.company.name,

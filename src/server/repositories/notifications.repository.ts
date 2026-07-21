@@ -48,7 +48,7 @@ export class SchedulerRepository extends BaseRepository {
         startAt: { gte: new Date() },
         status: "SCHEDULED",
         ...(leadBranchIds?.length
-          ? { lead: { branchId: { in: leadBranchIds } } }
+          ? { lead: { campaignId: { in: leadBranchIds } } }
           : {}),
       },
       orderBy: { startAt: "asc" },

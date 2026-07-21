@@ -1,7 +1,7 @@
-type Branch {
+type Campaign {
   id: ID!
   name: String!
-  status: BranchStatus!
+  status: CampaignStatus!
   address: String
   phone: String
   email: String
@@ -18,21 +18,21 @@ type Branch {
   createdAt: String!
   updatedAt: String!
   invitationEmailSent: Boolean
-  invitation: BranchInvitation
+  invitation: CampaignInvitation
 }
 
-type BranchEdge {
-  node: Branch!
+type CampaignEdge {
+  node: Campaign!
   cursor: String!
 }
 
-type BranchConnection {
-  edges: [BranchEdge!]!
+type CampaignConnection {
+  edges: [CampaignEdge!]!
   pageInfo: PageInfo!
   totalCount: Int!
 }
 
-type BranchContact {
+type CampaignContact {
   id: ID!
   firstName: String
   lastName: String
@@ -41,7 +41,7 @@ type BranchContact {
   createdAt: String
 }
 
-type BranchCallLog {
+type CampaignCallLog {
   id: ID!
   direction: String!
   status: String!
@@ -51,7 +51,7 @@ type BranchCallLog {
   leadName: String
 }
 
-type BranchDocument {
+type CampaignDocument {
   id: ID!
   name: String!
   url: String!
@@ -60,7 +60,7 @@ type BranchDocument {
   createdAt: String!
 }
 
-type BranchActivity {
+type CampaignActivity {
   id: ID!
   type: String!
   summary: String!
@@ -68,15 +68,15 @@ type BranchActivity {
   createdAt: String!
 }
 
-input BranchFilter {
+input CampaignFilter {
   search: String
-  status: BranchStatus
+  status: CampaignStatus
   aiEnabled: Boolean
 }
 
-input CreateBranchInput {
+input CreateCampaignInput {
   name: String!
-  status: BranchStatus
+  status: CampaignStatus
   address: String
   phone: String
   email: String
@@ -87,9 +87,9 @@ input CreateBranchInput {
   aiConfig: JSON
 }
 
-input UpdateBranchInput {
+input UpdateCampaignInput {
   name: String
-  status: BranchStatus
+  status: CampaignStatus
   address: String
   phone: String
   email: String
@@ -97,13 +97,13 @@ input UpdateBranchInput {
   customFields: JSON
 }
 
-input UpdateBranchAiInput {
+input UpdateCampaignAiInput {
   aiEnabled: Boolean
   systemPrompt: String
   aiConfig: JSON
 }
 
-enum BranchBulkAction {
+enum CampaignBulkAction {
   ENABLE_AI
   DISABLE_AI
   UPDATE_PROMPT
@@ -111,50 +111,50 @@ enum BranchBulkAction {
   ARCHIVE
 }
 
-input BulkBranchUpdateInput {
+input BulkCampaignUpdateInput {
   ids: [ID!]!
-  action: BranchBulkAction!
+  action: CampaignBulkAction!
   systemPrompt: String
-  status: BranchStatus
+  status: CampaignStatus
 }
 
-type BulkBranchUpdateResult {
+type BulkCampaignUpdateResult {
   updated: Int!
 }
 
-type BranchesQueries {
-  connection(first: Int, after: String, filter: BranchFilter): BranchConnection!
+type CampaignsQueries {
+  connection(first: Int, after: String, filter: CampaignFilter): CampaignConnection!
   byId(id: ID!): Branch
-  contacts(branchId: ID!, first: Int, after: String): [BranchContact!]!
-  callLogs(branchId: ID!, first: Int, after: String): [BranchCallLog!]!
-  documents(branchId: ID!): [BranchDocument!]!
-  activities(branchId: ID!, limit: Int): [BranchActivity!]!
-  agents(branchId: ID!): [AiAgent!]!
+  contacts(campaignId: ID!, first: Int, after: String): [CampaignContact!]!
+  callLogs(campaignId: ID!, first: Int, after: String): [CampaignCallLog!]!
+  documents(campaignId: ID!): [CampaignDocument!]!
+  activities(campaignId: ID!, limit: Int): [CampaignActivity!]!
+  agents(campaignId: ID!): [AiAgent!]!
 }
 
-type BranchesMutations {
-  create(input: CreateBranchInput!): Branch!
-  update(id: ID!, input: UpdateBranchInput!): Branch!
-  updateAi(id: ID!, input: UpdateBranchAiInput!): Branch!
-  bulkUpdate(input: BulkBranchUpdateInput!): BulkBranchUpdateResult!
-  archive(id: ID!): Branch!
-  resendInvitation(branchId: ID!): Branch!
-  cancelInvitation(branchId: ID!): Branch!
-  generateNewInvitation(branchId: ID!): Branch!
+type CampaignsMutations {
+  create(input: CreateCampaignInput!): Campaign!
+  update(id: ID!, input: UpdateCampaignInput!): Campaign!
+  updateAi(id: ID!, input: UpdateCampaignAiInput!): Campaign!
+  bulkUpdate(input: BulkCampaignUpdateInput!): BulkCampaignUpdateResult!
+  archive(id: ID!): Campaign!
+  resendInvitation(campaignId: ID!): Campaign!
+  cancelInvitation(campaignId: ID!): Campaign!
+  generateNewInvitation(campaignId: ID!): Campaign!
 }
 
-enum BranchInvitationStatus {
+enum CampaignInvitationStatus {
   PENDING
   ACCEPTED
   EXPIRED
   CANCELLED
 }
 
-type BranchInvitation {
+type CampaignInvitation {
   id: ID!
   email: String!
   token: String!
-  status: BranchInvitationStatus!
+  status: CampaignInvitationStatus!
   createdAt: String!
   updatedAt: String!
   sentAt: String!

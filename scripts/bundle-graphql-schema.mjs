@@ -16,7 +16,7 @@ const files = [
   "call-logs.graphql",
   "domains.graphql",
   "agent-library.graphql",
-  "branches.graphql",
+  "campaigns.graphql",
   "employees.graphql",
   "api-keys.graphql",
 ];

@@ -1,6 +1,6 @@
 import type {
   ApiKeyEnvironment,
-  BranchAccessType,
+  CampaignAccessType,
 } from "@prisma/client";
 
 import {
@@ -10,7 +10,7 @@ import {
   PERMISSIONS,
 } from "@/lib/permissions";
 import {
-  assertBranchesAreSubset,
+  assertCampaignsAreSubset,
   assertScopesAreSubset,
   requireScope,
 } from "@/server/lib/authorization";
@@ -24,7 +24,7 @@ import {
 import {
   ApiKeyNotFoundError,
   DuplicateApiKeyNameError,
-  InvalidBranchError,
+  InvalidCampaignError,
   InvalidScopeError,
   ValidationError,
 } from "@/server/lib/errors";
@@ -42,8 +42,8 @@ export type CreateApiKeyInput = {
   description?: string | null;
   environment: ApiKeyEnvironment;
   scopes: string[];
-  branchAccessType?: BranchAccessType;
-  branchIds?: string[];
+  campaignAccessType?: CampaignAccessType;
+  campaignIds?: string[];
   expiresAt?: string | null;
 };
 
@@ -67,8 +67,8 @@ function mapApiKey(row: ApiKeyRecord) {
     environment: row.environment,
     status: row.status,
     scopes: row.scopes,
-    branchAccessType: row.branchAccessType,
-    branchIds: row.branchAccess.map((b) => b.branchId),
+    campaignAccessType: row.campaignAccessType,
+    campaignIds: row.campaignAccess.map((b) => b.campaignId),
     expiresAt: toIso(row.expiresAt),
     lastUsedAt: toIso(row.lastUsedAt),
     createdAt: row.createdAt.toISOString(),
@@ -122,24 +122,24 @@ export class ApiKeysService {
     return unique;
   }
 
-  private async validateBranches(
+  private async validateCampaigns(
     companyId: string,
-    branchAccessType: BranchAccessType,
-    branchIds: string[],
+    campaignAccessType: CampaignAccessType,
+    campaignIds: string[],
   ): Promise<string[]> {
-    if (branchAccessType === "ALL") {
+    if (campaignAccessType === "ALL") {
       return [];
     }
-    const unique = [...new Set(branchIds)];
+    const unique = [...new Set(campaignIds)];
     if (unique.length === 0) {
       throw new ValidationError(
-        "At least one branch is required when branch access is SELECTED",
+        "At least one campaign is required when campaign access is SELECTED",
       );
     }
-    const found = await this.repo.findBranchesByIds(companyId, unique);
+    const found = await this.repo.findCampaignsByIds(companyId, unique);
     if (found.length !== unique.length) {
-      throw new InvalidBranchError(
-        "One or more branches are invalid or do not belong to this company",
+      throw new InvalidCampaignError(
+        "One or more campaigns are invalid or do not belong to this company",
       );
     }
     return unique;
@@ -148,18 +148,18 @@ export class ApiKeysService {
   private enforcePrincipalSubset(
     ctx: TenantContext,
     scopes: string[],
-    branchAccessType: BranchAccessType,
-    branchIds: string[],
+    campaignAccessType: CampaignAccessType,
+    campaignIds: string[],
   ) {
     if (ctx.authType !== "api_key") return;
     assertScopesAreSubset(ctx.permissions, scopes);
-    if (branchAccessType === "ALL" && ctx.branchAccess.type !== "ALL") {
+    if (campaignAccessType === "ALL" && ctx.campaignAccess.type !== "ALL") {
       throw new ValidationError(
-        "Cannot grant ALL branch access beyond the current API key",
+        "Cannot grant ALL campaign access beyond the current API key",
       );
     }
-    if (branchAccessType === "SELECTED") {
-      assertBranchesAreSubset(ctx, branchIds);
+    if (campaignAccessType === "SELECTED") {
+      assertCampaignsAreSubset(ctx, campaignIds);
     }
   }
 
@@ -213,13 +213,13 @@ export class ApiKeysService {
     }));
   }
 
-  async listAccessibleBranches(ctx: TenantContext) {
+  async listAccessibleCampaigns(ctx: TenantContext) {
     requireScope(ctx, PERMISSIONS.API_KEYS_READ);
-    const branchIds =
-      ctx.branchAccess.type === "ALL" ? null : ctx.branchAccess.branchIds;
-    const rows = await this.repo.findAccessibleBranches(
+    const campaignIds =
+      ctx.campaignAccess.type === "ALL" ? null : ctx.campaignAccess.campaignIds;
+    const rows = await this.repo.findAccessibleCampaigns(
       ctx.companyId,
-      branchIds,
+      campaignIds,
     );
     return rows.map((row) => ({
       id: row.id,
@@ -238,13 +238,13 @@ export class ApiKeysService {
     if (existing) throw new DuplicateApiKeyNameError();
 
     const scopes = this.validateScopes(input.scopes);
-    const branchAccessType = input.branchAccessType ?? "SELECTED";
-    const branchIds = await this.validateBranches(
+    const campaignAccessType = input.campaignAccessType ?? "SELECTED";
+    const campaignIds = await this.validateCampaigns(
       ctx.companyId,
-      branchAccessType,
-      input.branchIds ?? [],
+      campaignAccessType,
+      input.campaignIds ?? [],
     );
-    this.enforcePrincipalSubset(ctx, scopes, branchAccessType, branchIds);
+    this.enforcePrincipalSubset(ctx, scopes, campaignAccessType, campaignIds);
 
     let expiresAt: Date | null = null;
     if (input.expiresAt) {
@@ -267,8 +267,8 @@ export class ApiKeysService {
       hashedSecret: generated.hashedSecret,
       environment: generated.environment,
       scopes,
-      branchAccessType,
-      branchIds,
+      campaignAccessType,
+      campaignIds,
       expiresAt,
       createdById: ctx.userId,
     });
@@ -277,8 +277,8 @@ export class ApiKeysService {
       name,
       environment: row.environment,
       scopes,
-      branchAccessType,
-      branchIds,
+      campaignAccessType,
+      campaignIds,
     });
 
     return withSecret(row, generated.plaintext);
@@ -387,8 +387,8 @@ export class ApiKeysService {
     this.enforcePrincipalSubset(
       ctx,
       validated,
-      existing.branchAccessType,
-      existing.branchAccess.map((b) => b.branchId),
+      existing.campaignAccessType,
+      existing.campaignAccess.map((b) => b.campaignId),
     );
 
     const row = await this.repo.update(ctx.companyId, id, {
@@ -399,37 +399,37 @@ export class ApiKeysService {
     return mapApiKey(row);
   }
 
-  async updateBranchAccess(
+  async updateCampaignAccess(
     ctx: TenantContext,
     id: string,
-    input: { branchAccessType: BranchAccessType; branchIds?: string[] },
+    input: { campaignAccessType: CampaignAccessType; campaignIds?: string[] },
   ) {
     requireScope(ctx, PERMISSIONS.API_KEYS_WRITE);
     const existing = await this.repo.findById(ctx.companyId, id);
     if (!existing) throw new ApiKeyNotFoundError();
 
-    const branchIds = await this.validateBranches(
+    const campaignIds = await this.validateCampaigns(
       ctx.companyId,
-      input.branchAccessType,
-      input.branchIds ?? [],
+      input.campaignAccessType,
+      input.campaignIds ?? [],
     );
     this.enforcePrincipalSubset(
       ctx,
       existing.scopes,
-      input.branchAccessType,
-      branchIds,
+      input.campaignAccessType,
+      campaignIds,
     );
 
     const row = await this.repo.replaceBranchAccess(
       ctx.companyId,
       id,
-      input.branchAccessType,
-      branchIds,
+      input.campaignAccessType,
+      campaignIds,
     );
     if (!row) throw new ApiKeyNotFoundError();
-    await this.audit(ctx, id, "BRANCH_ACCESS_UPDATED", {
-      branchAccessType: input.branchAccessType,
-      branchIds,
+    await this.audit(ctx, id, "CAMPAIGN_ACCESS_UPDATED", {
+      campaignAccessType: input.campaignAccessType,
+      campaignIds,
     });
     return mapApiKey(row);
   }

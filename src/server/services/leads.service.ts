@@ -15,7 +15,7 @@ import {
 import type { TenantContext } from "@/server/types/context";
 import { PERMISSIONS } from "@/server/types/permissions";
 import { eventsService } from "@/server/services/events.service";
-import { branchAccessService } from "@/server/services/branch-access.service";
+import { campaignAccessService } from "@/server/services/campaign-access.service";
 import { tenantService } from "@/server/services/tenant.service";
 
 const E164_REGEX = /^\+[1-9]\d{1,14}$/;
@@ -61,7 +61,7 @@ export class LeadsService {
     tenantService.requirePermission(ctx, PERMISSIONS.LEADS_READ);
 
     const limit = Math.min(args.first ?? 20, 100);
-    const scopeWhere = branchAccessService.branchRelationFilter(ctx);
+    const scopeWhere = campaignAccessService.campaignRelationFilter(ctx);
     const items = await this.repo.findConnection(
       ctx.companyId,
       limit,
@@ -90,7 +90,7 @@ export class LeadsService {
     if (!lead) {
       throw new NotFoundError("Lead not found");
     }
-    branchAccessService.assertLeadBranchAccess(ctx, lead.branchId);
+    campaignAccessService.assertLeadCampaignAccess(ctx, lead.campaignId);
 
     return {
       id: lead.id,
@@ -112,7 +112,7 @@ export class LeadsService {
 
     const groups = await this.repo.countByTemperature(
       ctx.companyId,
-      branchAccessService.branchRelationFilter(ctx),
+      campaignAccessService.campaignRelationFilter(ctx),
     );
     const breakdown = { hot: 0, warm: 0, cold: 0, total: 0 };
 

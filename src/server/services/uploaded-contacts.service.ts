@@ -1,7 +1,7 @@
 import { AppError, NotFoundError } from "@/server/lib/errors";
 import { cacheService } from "@/server/cache/cache.service";
 import prisma from "@/server/lib/prisma";
-import { BranchesRepository } from "@/server/repositories/branches.repository";
+import { CampaignsRepository } from "@/server/repositories/campaigns.repository";
 import {
   UploadedContactsRepository,
   type UploadedContactCreateInput,
@@ -18,7 +18,7 @@ function mapUploadedContact(row: {
   name: string | null;
   email: string | null;
   address: string | null;
-  branchIds: string[];
+  campaignIds: string[];
   createdAt: Date;
 }) {
   return {
@@ -27,18 +27,18 @@ function mapUploadedContact(row: {
     name: row.name,
     email: row.email,
     address: row.address,
-    branchIds: row.branchIds,
+    campaignIds: row.campaignIds,
     createdAt: row.createdAt.toISOString(),
   };
 }
 
 type ImportedContactRow = UploadedContactCreateInput & {
-  branchNames?: string[];
+  campaignNames?: string[];
 };
 
 function normalizeImportedContact(
   contact: ImportedContactRow,
-): (UploadedContactCreateInput & { branchNames: string[] }) | null {
+): (UploadedContactCreateInput & { campaignNames: string[] }) | null {
   const normalized = normalizeStoredContactPhone(contact.phone);
   if (!normalized) {
     return null;
@@ -49,7 +49,7 @@ function normalizeImportedContact(
     name: contact.name?.trim() || null,
     email: contact.email?.trim() || null,
     address: contact.address?.trim() || null,
-    branchNames: (contact.branchNames ?? [])
+    campaignNames: (contact.campaignNames ?? [])
       .map((name) => name.trim())
       .filter((name) => name.length > 0),
   };
@@ -57,7 +57,7 @@ function normalizeImportedContact(
 
 export class UploadedContactsService {
   private readonly repo = new UploadedContactsRepository(prisma);
-  private readonly branchesRepo = new BranchesRepository(prisma);
+  private readonly campaignsRepo = new CampaignsRepository(prisma);
 
   async list(ctx: TenantContext) {
     tenantService.requirePermission(ctx, PERMISSIONS.LEADS_READ);
@@ -90,7 +90,7 @@ export class UploadedContactsService {
     tenantService.requirePermission(ctx, PERMISSIONS.LEADS_WRITE);
 
     const normalizedRows: Array<
-      UploadedContactCreateInput & { branchNames: string[] }
+      UploadedContactCreateInput & { campaignNames: string[] }
     > = [];
     let invalid = 0;
     const seen = new Set<string>();
@@ -108,21 +108,21 @@ export class UploadedContactsService {
       normalizedRows.push(normalized);
     }
 
-    const branches = await this.branchesRepo.findAllNames(ctx.companyId);
+    const campaigns = await this.campaignsRepo.findAllNames(ctx.companyId);
     const branchByName = new Map(
-      branches.map((branch) => [branch.name.trim().toLowerCase(), branch.id]),
+      campaigns.map((campaign) => [campaign.name.trim().toLowerCase(), campaign.id]),
     );
-    const unmatchedBranches = new Set<string>();
+    const unmatchedCampaigns = new Set<string>();
 
     const validContacts: UploadedContactCreateInput[] = normalizedRows.map(
       (row) => {
-        const branchIds: string[] = [];
-        for (const name of row.branchNames) {
-          const branchId = branchByName.get(name.toLowerCase());
-          if (branchId) {
-            branchIds.push(branchId);
+        const campaignIds: string[] = [];
+        for (const name of row.campaignNames) {
+          const campaignId = branchByName.get(name.toLowerCase());
+          if (campaignId) {
+            campaignIds.push(campaignId);
           } else {
-            unmatchedBranches.add(name);
+            unmatchedCampaigns.add(name);
           }
         }
         return {
@@ -130,7 +130,7 @@ export class UploadedContactsService {
           name: row.name,
           email: row.email,
           address: row.address,
-          branchIds: [...new Set(branchIds)],
+          campaignIds: [...new Set(campaignIds)],
         };
       },
     );
@@ -148,7 +148,7 @@ export class UploadedContactsService {
       created,
       skipped,
       invalid,
-      unmatchedBranches: [...unmatchedBranches],
+      unmatchedCampaigns: [...unmatchedCampaigns],
     };
   }
 

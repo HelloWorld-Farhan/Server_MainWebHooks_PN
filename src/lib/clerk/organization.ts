@@ -27,8 +27,8 @@ type ClerkApiErrorShape = {
 
 export type ClerkInviteMetadata = {
   propnexRole: string;
-  branchAccessType: string;
-  branchIds: string[];
+  campaignAccessType: string;
+  campaignIds: string[];
   jobTitle: string | null;
   inviteName?: string;
 };

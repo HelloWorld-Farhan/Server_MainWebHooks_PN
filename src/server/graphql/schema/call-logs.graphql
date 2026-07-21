@@ -16,7 +16,7 @@ type CallLogsQueries {
 }
 
 type CallLogsMutations {
-  recordCallCompleted(callLogId: ID!, creditsUsed: Int!): Boolean!
+  recordCallCompleted(callLogId: ID!): Boolean!
   updateOutcome(id: ID!, outcome: String!, reactivationPlan: JSON): CallLogDetail
   addInternalNote(callLogId: ID!, content: String!): CallInternalNote!
   updateInternalNote(id: ID!, content: String!): CallInternalNote!

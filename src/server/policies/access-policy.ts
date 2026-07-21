@@ -5,7 +5,7 @@ import {
   PERMISSIONS,
 } from "@/lib/permissions";
 import {
-  canAccessBranch as policyCanAccessBranch,
+  canAccessCampaign as policyCanAccessCampaign,
   canAssignRole as policyCanAssignRole,
   canCancelInvitation as policyCanCancelInvitation,
   canDeactivateEmployee as policyCanDeactivateEmployee,
@@ -17,14 +17,14 @@ import {
   ctxHasAllPermissions,
   ctxHasAnyPermission,
   ctxHasPermission,
-  getAccessibleBranchIds as policyGetAccessibleBranchIds,
+  getAccessibleCampaignIds as policyGetAccessibleCampaignIds,
   getAssignableRoles as policyGetAssignableRoles,
-  hasAllBranchAccess as policyHasAllBranchAccess,
+  hasAllCampaignAccess as policyHasAllCampaignAccess,
   type AccessContext,
   type EmployeeTarget,
 } from "@/lib/permissions-policy";
 import { ForbiddenError } from "@/server/lib/errors";
-import { branchAccessService } from "@/server/services/branch-access.service";
+import { campaignAccessService } from "@/server/services/campaign-access.service";
 import type { TenantContext } from "@/server/types/context";
 
 export type { AccessContext, EmployeeTarget };
@@ -35,8 +35,8 @@ export function toAccessContext(ctx: TenantContext): AccessContext {
     userId: ctx.userId,
     role: ctx.role as AccessContext["role"],
     permissions: ctx.permissions,
-    branchAccessType: ctx.branchAccess.type,
-    branchIds: ctx.branchAccess.branchIds,
+    campaignAccessType: ctx.campaignAccess.type,
+    campaignIds: ctx.campaignAccess.campaignIds,
   };
 }
 
@@ -58,17 +58,17 @@ export function hasAllPermissions(
   return ctxHasAllPermissions(toAccessContext(ctx), permissions);
 }
 
-export function canAccessBranch(ctx: TenantContext, branchId: string) {
-  if (branchAccessService.hasAllBranchAccess(ctx)) return true;
-  return policyCanAccessBranch(toAccessContext(ctx), branchId);
+export function canAccessCampaign(ctx: TenantContext, campaignId: string) {
+  if (campaignAccessService.hasAllCampaignAccess(ctx)) return true;
+  return policyCanAccessCampaign(toAccessContext(ctx), campaignId);
 }
 
-export function getAccessibleBranchIds(ctx: TenantContext) {
-  return policyGetAccessibleBranchIds(toAccessContext(ctx));
+export function getAccessibleCampaignIds(ctx: TenantContext) {
+  return policyGetAccessibleCampaignIds(toAccessContext(ctx));
 }
 
-export function hasAllBranchAccess(ctx: TenantContext) {
-  return policyHasAllBranchAccess(toAccessContext(ctx));
+export function hasAllCampaignAccess(ctx: TenantContext) {
+  return policyHasAllCampaignAccess(toAccessContext(ctx));
 }
 
 export function getAssignableRoles(ctx: TenantContext): UserRole[] {

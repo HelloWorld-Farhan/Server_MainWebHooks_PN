@@ -1,5 +1,5 @@
 import type {
-  BranchAccessType,
+  CampaignAccessType,
   InvitationStatus,
   MemberStatus,
   Prisma,
@@ -13,14 +13,14 @@ export type EmployeeFilter = {
   search?: string;
   role?: UserRole;
   status?: MemberStatus;
-  branchId?: string;
+  campaignId?: string;
 };
 
 const memberInclude = {
   user: true,
   customRole: true,
-  branchAccess: {
-    include: { branch: true },
+  campaignAccess: {
+    include: { campaign: true },
   },
 } satisfies Prisma.CompanyMemberInclude;
 
@@ -54,12 +54,12 @@ export class EmployeesRepository extends BaseRepository {
       where.status = filter.status;
     }
 
-    if (filter?.branchId) {
+    if (filter?.campaignId) {
       where.OR = [
-        { branchAccessType: "ALL" },
+        { campaignAccessType: "ALL" },
         {
-          branchAccess: {
-            some: { branchId: filter.branchId },
+          campaignAccess: {
+            some: { campaignId: filter.campaignId },
           },
         },
       ];
@@ -188,15 +188,15 @@ export class EmployeesRepository extends BaseRepository {
     });
   }
 
-  async setBranchAccess(memberId: string, branchIds: string[]) {
-    await this.prisma.memberBranchAccess.deleteMany({
+  async setCampaignAccess(memberId: string, campaignIds: string[]) {
+    await this.prisma.memberCampaignAccess.deleteMany({
       where: { memberId },
     });
 
-    if (branchIds.length === 0) return;
+    if (campaignIds.length === 0) return;
 
-    await this.prisma.memberBranchAccess.createMany({
-      data: branchIds.map((branchId) => ({ memberId, branchId })),
+    await this.prisma.memberCampaignAccess.createMany({
+      data: campaignIds.map((campaignId) => ({ memberId, campaignId })),
     });
   }
 
@@ -225,8 +225,8 @@ export class EmployeesRepository extends BaseRepository {
     role: UserRole;
     roleId?: string | null;
     jobTitle?: string | null;
-    branchAccessType: BranchAccessType;
-    branchIds: string[];
+    campaignAccessType: CampaignAccessType;
+    campaignIds: string[];
     token: string;
     expiresAt: Date;
     invitedById: string;
@@ -296,10 +296,10 @@ export class EmployeesRepository extends BaseRepository {
     });
   }
 
-  validateBranchIds(companyId: string, branchIds: string[]) {
-    if (branchIds.length === 0) return Promise.resolve([]);
-    return this.prisma.branch.findMany({
-      where: { companyId, id: { in: branchIds } },
+  validateCampaignIds(companyId: string, campaignIds: string[]) {
+    if (campaignIds.length === 0) return Promise.resolve([]);
+    return this.prisma.campaign.findMany({
+      where: { companyId, id: { in: campaignIds } },
       select: { id: true },
     });
   }

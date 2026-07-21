@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { branchAccessService } from "@/server/services/branch-access.service";
+import { campaignAccessService } from "@/server/services/campaign-access.service";
 import type { TenantContext } from "@/server/types/context";
 
 function ctx(partial: Partial<TenantContext>): TenantContext {
@@ -13,25 +13,25 @@ function ctx(partial: Partial<TenantContext>): TenantContext {
     membershipId: "m1",
     role: "SALES",
     permissions: [],
-    branchAccess: { type: "SELECTED", branchIds: ["branch-a"] },
+    campaignAccess: { type: "SELECTED", campaignIds: ["branch-a"] },
     loaders: {} as TenantContext["loaders"],
     ...partial,
   } as TenantContext;
 }
 
-describe("employee branch scope", () => {
-  it("filters employees to overlapping branches", () => {
+describe("employee campaign scope", () => {
+  it("filters employees to overlapping campaigns", () => {
     const salesCtx = ctx({ role: "SALES" });
-    const filter = branchAccessService.employeeScopeFilter(salesCtx);
+    const filter = campaignAccessService.employeeScopeFilter(salesCtx);
     assert.ok(filter.OR);
   });
 
   it("owner bypasses employee scope filter", () => {
     const ownerCtx = ctx({
       role: "OWNER",
-      branchAccess: { type: "SELECTED", branchIds: [] },
+      campaignAccess: { type: "SELECTED", campaignIds: [] },
     });
-    const filter = branchAccessService.employeeScopeFilter(ownerCtx);
+    const filter = campaignAccessService.employeeScopeFilter(ownerCtx);
     assert.deepEqual(filter, {});
   });
 });

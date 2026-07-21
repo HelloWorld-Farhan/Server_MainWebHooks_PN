@@ -15,8 +15,8 @@ function ctx(partial: Partial<AccessContext> & Pick<AccessContext, "role">): Acc
     membershipId: "m1",
     userId: "u1",
     permissions: [],
-    branchAccessType: "ALL",
-    branchIds: [],
+    campaignAccessType: "ALL",
+    campaignIds: [],
     ...partial,
   };
 }
@@ -42,7 +42,7 @@ describe("access-policy", () => {
     const admin = ctx({
       role: "ADMIN",
       permissions: Object.values(PERMISSIONS).filter(
-        (p) => p !== PERMISSIONS.SETTINGS_WRITE && p !== PERMISSIONS.BRANCHES_BULK,
+        (p) => p !== PERMISSIONS.SETTINGS_WRITE && p !== PERMISSIONS.CAMPAIGNS_BULK,
       ),
     });
     assert.equal(canAssignRole(admin, "OWNER"), false);

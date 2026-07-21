@@ -4,9 +4,9 @@ import { agentLibraryService } from "@/server/services/agent-library.service";
 import { analyticsService } from "@/server/services/analytics.service";
 import { apiKeysService } from "@/server/services/api-keys.service";
 import { billingService } from "@/server/services/billing.service";
-import { branchesService } from "@/server/services/branches.service";
-import { callLogsService } from "@/server/services/call-logs.service";
 import { campaignsService } from "@/server/services/campaigns.service";
+import { callLogsService } from "@/server/services/call-logs.service";
+import { outboundCampaignsService } from "@/server/services/outbound-campaigns.service";
 import { creditsService } from "@/server/services/credits.service";
 import { employeesService } from "@/server/services/employees.service";
 import { eventsService } from "@/server/services/events.service";
@@ -43,6 +43,70 @@ function parseCallLogFilter(filter?: {
   };
 }
 
+function parsePhoneNumberFilter(filter?: {
+  number?: string;
+  numberContains?: string;
+  labelContains?: string;
+  search?: string;
+  provider?: string;
+  status?: string;
+  inboundAgentId?: string;
+  outboundAgentId?: string;
+  hasInboundAgent?: boolean;
+  hasOutboundAgent?: boolean;
+  channelIndex?: number;
+  hasChannelAssignment?: boolean;
+  createdFrom?: string;
+  createdTo?: string;
+  lastActivityFrom?: string;
+  lastActivityTo?: string;
+  ids?: string[];
+}) {
+  if (!filter) return undefined;
+  return {
+    number: filter.number,
+    numberContains: filter.numberContains,
+    labelContains: filter.labelContains,
+    search: filter.search,
+    provider: filter.provider as never,
+    status: filter.status as never,
+    inboundAgentId: filter.inboundAgentId,
+    outboundAgentId: filter.outboundAgentId,
+    hasInboundAgent: filter.hasInboundAgent,
+    hasOutboundAgent: filter.hasOutboundAgent,
+    channelIndex: filter.channelIndex,
+    hasChannelAssignment: filter.hasChannelAssignment,
+    createdFrom: filter.createdFrom
+      ? new Date(filter.createdFrom)
+      : undefined,
+    createdTo: filter.createdTo ? new Date(filter.createdTo) : undefined,
+    lastActivityFrom: filter.lastActivityFrom
+      ? new Date(filter.lastActivityFrom)
+      : undefined,
+    lastActivityTo: filter.lastActivityTo
+      ? new Date(filter.lastActivityTo)
+      : undefined,
+    ids: filter.ids,
+  };
+}
+
+function parsePhoneNumberSort(sort?: {
+  field?: string;
+  direction?: string;
+}) {
+  if (!sort?.field) return undefined;
+  return {
+    field: sort.field as
+      | "CREATED_AT"
+      | "UPDATED_AT"
+      | "LAST_ACTIVITY_AT"
+      | "NUMBER"
+      | "INBOUND_CALLS_COUNT"
+      | "OUTBOUND_CALLS_COUNT",
+    direction: (sort.direction === "ASC" ? "ASC" : "DESC") as "ASC" | "DESC",
+  };
+}
+
 function parseLeadFilter(filter?: {
   dormantOnly?: boolean;
   minDaysInactive?: number;
@@ -69,12 +133,12 @@ export const resolvers = {
     phoneNumbers: () => ({}),
     uploadedContacts: () => ({}),
     leads: () => ({}),
-    campaigns: () => ({}),
+    outboundCampaigns: () => ({}),
     notifications: () => ({}),
     integrations: () => ({}),
     scheduler: () => ({}),
     events: () => ({}),
-    branches: () => ({}),
+    campaigns: () => ({}),
     employees: () => ({}),
     apiKeys: () => ({}),
   },
@@ -86,8 +150,8 @@ export const resolvers = {
     phoneNumbers: () => ({}),
     uploadedContacts: () => ({}),
     leads: () => ({}),
+    outboundCampaigns: () => ({}),
     campaigns: () => ({}),
-    branches: () => ({}),
     employees: () => ({}),
     apiKeys: () => ({}),
   },
@@ -146,20 +210,9 @@ export const resolvers = {
   CallLogsMutations: {
     recordCallCompleted: async (
       _: unknown,
-      args: { callLogId: string; creditsUsed: number },
+      args: { callLogId: string },
       ctx: TenantContext,
-    ) => {
-      await creditsService.debitForCall(
-        ctx,
-        args.callLogId,
-        args.creditsUsed,
-      );
-      await callLogsService.onCallCompleted(ctx.companyId, {
-        totalCalls: 1,
-        connectedCalls: 1,
-      });
-      return true;
-    },
+    ) => callLogsService.recordCompletedWithBilling(ctx, args.callLogId),
     updateOutcome: (
       _: unknown,
       args: {
@@ -255,8 +308,35 @@ export const resolvers = {
   },
 
   PhoneNumbersQueries: {
-    list: (_: unknown, __: unknown, ctx: TenantContext) =>
-      phoneNumbersService.list(ctx),
+    list: (
+      _: unknown,
+      args: {
+        filter?: Parameters<typeof parsePhoneNumberFilter>[0];
+        sort?: Parameters<typeof parsePhoneNumberSort>[0];
+      },
+      ctx: TenantContext,
+    ) =>
+      phoneNumbersService.list(
+        ctx,
+        parsePhoneNumberFilter(args.filter),
+        parsePhoneNumberSort(args.sort),
+      ),
+    connection: (
+      _: unknown,
+      args: {
+        first?: number;
+        after?: string;
+        filter?: Parameters<typeof parsePhoneNumberFilter>[0];
+        sort?: Parameters<typeof parsePhoneNumberSort>[0];
+      },
+      ctx: TenantContext,
+    ) =>
+      phoneNumbersService.getConnection(ctx, {
+        first: args.first,
+        after: args.after,
+        filter: parsePhoneNumberFilter(args.filter),
+        sort: parsePhoneNumberSort(args.sort),
+      }),
     byId: (_: unknown, args: { id: string }, ctx: TenantContext) =>
       phoneNumbersService.getById(ctx, args.id),
   },
@@ -293,7 +373,7 @@ export const resolvers = {
           name?: string | null;
           email?: string | null;
           address?: string | null;
-          branchNames?: string[];
+          campaignNames?: string[];
         }>;
       },
       ctx: TenantContext,
@@ -347,21 +427,21 @@ export const resolvers = {
     ) => leadsService.importRows(ctx, args.rows),
   },
 
-  CampaignsQueries: {
+  OutboundCampaignsQueries: {
     list: (_: unknown, __: unknown, ctx: TenantContext) =>
-      campaignsService.list(ctx),
+      outboundCampaignsService.list(ctx),
   },
 
-  CampaignsMutations: {
+  OutboundCampaignsMutations: {
     create: (
       _: unknown,
       args: { input: { name: string; aiAgentId?: string | null } },
       ctx: TenantContext,
-    ) => campaignsService.create(ctx, args.input),
+    ) => outboundCampaignsService.create(ctx, args.input),
     launch: (_: unknown, args: { id: string }, ctx: TenantContext) =>
-      campaignsService.launch(ctx, args.id),
+      outboundCampaignsService.launch(ctx, args.id),
     pause: (_: unknown, args: { id: string }, ctx: TenantContext) =>
-      campaignsService.pause(ctx, args.id),
+      outboundCampaignsService.pause(ctx, args.id),
   },
 
   NotificationQueries: {
@@ -387,7 +467,7 @@ export const resolvers = {
       eventsService.listRecent(ctx, args.limit),
   },
 
-  BranchesQueries: {
+  CampaignsQueries: {
     connection: (
       _: unknown,
       args: {
@@ -397,7 +477,7 @@ export const resolvers = {
       },
       ctx: TenantContext,
     ) =>
-      branchesService.getConnection(ctx, {
+      campaignsService.getConnection(ctx, {
         first: args.first,
         after: args.after,
         filter: args.filter
@@ -409,72 +489,72 @@ export const resolvers = {
           : undefined,
       }),
     byId: (_: unknown, args: { id: string }, ctx: TenantContext) =>
-      branchesService.getById(ctx, args.id),
+      campaignsService.getById(ctx, args.id),
     contacts: (
       _: unknown,
-      args: { branchId: string; first?: number; after?: string },
+      args: { campaignId: string; first?: number; after?: string },
       ctx: TenantContext,
-    ) => branchesService.getContacts(ctx, args.branchId, args.first, args.after),
+    ) => campaignsService.getContacts(ctx, args.campaignId, args.first, args.after),
     callLogs: (
       _: unknown,
-      args: { branchId: string; first?: number; after?: string },
+      args: { campaignId: string; first?: number; after?: string },
       ctx: TenantContext,
-    ) => branchesService.getCallLogs(ctx, args.branchId, args.first, args.after),
+    ) => campaignsService.getCallLogs(ctx, args.campaignId, args.first, args.after),
     documents: (
       _: unknown,
-      args: { branchId: string },
+      args: { campaignId: string },
       ctx: TenantContext,
-    ) => branchesService.getDocuments(ctx, args.branchId),
+    ) => campaignsService.getDocuments(ctx, args.campaignId),
     activities: (
       _: unknown,
-      args: { branchId: string; limit?: number },
+      args: { campaignId: string; limit?: number },
       ctx: TenantContext,
-    ) => branchesService.getActivities(ctx, args.branchId, args.limit),
+    ) => campaignsService.getActivities(ctx, args.campaignId, args.limit),
     agents: (
       _: unknown,
-      args: { branchId: string },
+      args: { campaignId: string },
       ctx: TenantContext,
-    ) => branchesService.getAgents(ctx, args.branchId),
+    ) => campaignsService.getAgents(ctx, args.campaignId),
   },
 
-  BranchesMutations: {
+  CampaignsMutations: {
     create: (
       _: unknown,
       args: { input: Record<string, unknown> },
       ctx: TenantContext,
-    ) => branchesService.create(ctx, args.input as never),
+    ) => campaignsService.create(ctx, args.input as never),
     update: (
       _: unknown,
       args: { id: string; input: Record<string, unknown> },
       ctx: TenantContext,
-    ) => branchesService.update(ctx, args.id, args.input as never),
+    ) => campaignsService.update(ctx, args.id, args.input as never),
     updateAi: (
       _: unknown,
       args: { id: string; input: Record<string, unknown> },
       ctx: TenantContext,
-    ) => branchesService.updateAi(ctx, args.id, args.input as never),
+    ) => campaignsService.updateAi(ctx, args.id, args.input as never),
     bulkUpdate: (
       _: unknown,
       args: { input: Record<string, unknown> },
       ctx: TenantContext,
-    ) => branchesService.bulkUpdate(ctx, args.input as never),
+    ) => campaignsService.bulkUpdate(ctx, args.input as never),
     archive: (_: unknown, args: { id: string }, ctx: TenantContext) =>
-      branchesService.archive(ctx, args.id),
+      campaignsService.archive(ctx, args.id),
     resendInvitation: (
       _: unknown,
-      args: { branchId: string },
+      args: { campaignId: string },
       ctx: TenantContext,
-    ) => branchesService.resendInvitation(ctx, args.branchId),
+    ) => campaignsService.resendInvitation(ctx, args.campaignId),
     cancelInvitation: (
       _: unknown,
-      args: { branchId: string },
+      args: { campaignId: string },
       ctx: TenantContext,
-    ) => branchesService.cancelInvitation(ctx, args.branchId),
+    ) => campaignsService.cancelInvitation(ctx, args.campaignId),
     generateNewInvitation: (
       _: unknown,
-      args: { branchId: string },
+      args: { campaignId: string },
       ctx: TenantContext,
-    ) => branchesService.generateNewInvitation(ctx, args.branchId),
+    ) => campaignsService.generateNewInvitation(ctx, args.campaignId),
   },
 
   EmployeesQueries: {
@@ -514,14 +594,14 @@ export const resolvers = {
   },
 
   UploadedContact: {
-    branches: (
-      parent: { branchIds?: string[] | null },
+    campaigns: (
+      parent: { campaignIds?: string[] | null },
       _: unknown,
       ctx: TenantContext,
     ) =>
       Promise.all(
-        (parent.branchIds ?? []).map((id) => ctx.loaders.branch.load(id)),
-      ).then((branches) => branches.filter((branch) => branch !== null)),
+        (parent.campaignIds ?? []).map((id) => ctx.loaders.campaign.load(id)),
+      ).then((campaigns) => campaigns.filter((campaign) => campaign !== null)),
   },
 
   CallLog: {
@@ -602,8 +682,8 @@ export const resolvers = {
       apiKeysService.getById(ctx, args.id),
     availableScopes: (_: unknown, __: unknown, ctx: TenantContext) =>
       apiKeysService.listAvailableScopes(ctx),
-    accessibleBranches: (_: unknown, __: unknown, ctx: TenantContext) =>
-      apiKeysService.listAccessibleBranches(ctx),
+    accessibleCampaigns: (_: unknown, __: unknown, ctx: TenantContext) =>
+      apiKeysService.listAccessibleCampaigns(ctx),
   },
 
   ApiKeysMutations: {
@@ -632,14 +712,14 @@ export const resolvers = {
       args: { id: string; scopes: string[] },
       ctx: TenantContext,
     ) => apiKeysService.updateScopes(ctx, args.id, args.scopes),
-    updateBranchAccess: (
+    updateCampaignAccess: (
       _: unknown,
       args: {
         id: string;
-        input: { branchAccessType: string; branchIds?: string[] };
+        input: { campaignAccessType: string; campaignIds?: string[] };
       },
       ctx: TenantContext,
-    ) => apiKeysService.updateBranchAccess(ctx, args.id, args.input as never),
+    ) => apiKeysService.updateCampaignAccess(ctx, args.id, args.input as never),
     updateExpiration: (
       _: unknown,
       args: { id: string; expiresAt?: string | null },

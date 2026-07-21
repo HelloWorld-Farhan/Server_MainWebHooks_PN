@@ -3,18 +3,18 @@ import type { Request, Response } from "express";
 
 import { getAuthFromRequest } from "@/auth/clerk";
 import {
-  acceptBranchInvitation,
-  getBranchInvitationByToken,
-} from "@/modules/invitations/branch-invitation.service";
+  acceptCampaignInvitation,
+  getCampaignInvitationByToken,
+} from "@/modules/invitations/campaign-invitation.service";
 
-@Controller("api/invitations/branch")
+@Controller("api/invitations/campaign")
 export class InvitationsController {
   @Get(":token")
   async getInvitation(
     @Param("token") token: string,
     @Res() res: Response,
   ) {
-    const result = await getBranchInvitationByToken(token);
+    const result = await getCampaignInvitationByToken(token);
     return res.json(result);
   }
 
@@ -29,7 +29,7 @@ export class InvitationsController {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const result = await acceptBranchInvitation(token, userId);
+    const result = await acceptCampaignInvitation(token, userId);
     if (!result.success) {
       return res.status(result.statusCode).json({ error: result.error });
     }

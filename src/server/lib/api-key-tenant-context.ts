@@ -1,24 +1,24 @@
 import type {
   ApiKey,
-  ApiKeyBranchAccess,
-  BranchAccessType,
+  ApiKeyCampaignAccess,
+  CampaignAccessType,
 } from "@prisma/client";
 
 import { createDataLoaders } from "@/server/graphql/dataloaders";
 import type { TenantContext } from "@/server/types/context";
 
-type ApiKeyWithBranches = ApiKey & {
-  branchAccess: ApiKeyBranchAccess[];
+type ApiKeyWithCampaigns = ApiKey & {
+  campaignAccess: ApiKeyCampaignAccess[];
 };
 
 export function buildApiKeyTenantContext(
-  apiKey: ApiKeyWithBranches,
+  apiKey: ApiKeyWithCampaigns,
 ): TenantContext {
-  const branchAccessType: BranchAccessType = apiKey.branchAccessType;
-  const branchIds =
-    branchAccessType === "ALL"
+  const campaignAccessType: CampaignAccessType = apiKey.campaignAccessType;
+  const campaignIds =
+    campaignAccessType === "ALL"
       ? []
-      : apiKey.branchAccess.map((row) => row.branchId);
+      : apiKey.campaignAccess.map((row) => row.campaignId);
 
   return {
     authType: "api_key",
@@ -30,9 +30,9 @@ export function buildApiKeyTenantContext(
     // Non-OWNER so branch-access checks are never bypassed via role.
     role: "AGENT",
     permissions: apiKey.scopes,
-    branchAccess: {
-      type: branchAccessType,
-      branchIds,
+    campaignAccess: {
+      type: campaignAccessType,
+      campaignIds,
     },
     loaders: createDataLoaders(apiKey.companyId),
   };

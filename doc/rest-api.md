@@ -93,12 +93,12 @@ Source: `src/modules/company/company.controller.ts`
 }
 ```
 
-| Field | Type | Required |
-|---|---|---|
-| `name` | string | Yes |
-| `email` | string (email) | Yes |
-| `phone` | string | No |
-| `title` | string | No |
+| Field   | Type           | Required |
+| ------- | -------------- | -------- |
+| `name`  | string         | Yes      |
+| `email` | string (email) | Yes      |
+| `phone` | string         | No       |
+| `title` | string         | No       |
 
 **Response `200`:** Same shape as GET (`{ "contact": { ... } }`).
 
@@ -233,13 +233,13 @@ Source: `src/modules/company/company.controller.ts` (`ContactRequestsController`
 }
 ```
 
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `name` | string | Yes | Max 200 chars |
-| `email` | string | Yes | Valid email, max 320 |
-| `reason` | enum | Yes | See reason values below |
-| `planId` | enum | Yes | See plan IDs below |
-| `message` | string | Yes | Max 5000 chars |
+| Field     | Type   | Required | Notes                   |
+| --------- | ------ | -------- | ----------------------- |
+| `name`    | string | Yes      | Max 200 chars           |
+| `email`   | string | Yes      | Valid email, max 320    |
+| `reason`  | enum   | Yes      | See reason values below |
+| `planId`  | enum   | Yes      | See plan IDs below      |
+| `message` | string | Yes      | Max 5000 chars          |
 
 **`reason` values:** `GENERAL_INQUIRY`, `SALES_PRICING`, `TECHNICAL_SUPPORT`, `BILLING_CREDITS`, `BILLING_CHANNELS`, `ENTERPRISE_PLAN`, `ACCOUNT_ACCESS`, `OTHER`
 
@@ -309,14 +309,19 @@ Source: `src/modules/api/api.controllers.ts` (`AgentsController`)
   "status": "enabled",
   "health": "healthy",
   "config": { "confidenceThreshold": 0.8 },
-  "usage": { "totalExecutions": 5, "successRate": 1, "lastUsedAt": null, "errorCount": 0 }
+  "usage": {
+    "totalExecutions": 5,
+    "successRate": 1,
+    "lastUsedAt": null,
+    "errorCount": 0
+  }
 }
 ```
 
 **Response `200`:**
 
 ```json
-{ "tool": { /* full AgentToolAssignment */ } }
+{ "tool": {/* full AgentToolAssignment */} }
 ```
 
 ---
@@ -331,7 +336,7 @@ Runs a health check (no body). Simulates ~800ms delay and marks tool healthy.
 
 ```json
 {
-  "tool": { /* updated AgentToolAssignment */ },
+  "tool": {/* updated AgentToolAssignment */},
   "testResult": "passed"
 }
 ```
@@ -348,10 +353,10 @@ Source: `src/modules/api/api.controllers.ts` (`ContactPhonesController`)
 
 **Content-Type:** `multipart/form-data`
 
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `file` | file | Yes | `.xlsx`, `.xls`, `.pdf`, `.docx`; max 50 MB |
-| `defaultCountry` | string | No | ISO country code for unstructured files |
+| Field            | Type   | Required | Notes                                       |
+| ---------------- | ------ | -------- | ------------------------------------------- |
+| `file`           | file   | Yes      | `.xlsx`, `.xls`, `.pdf`, `.docx`; max 50 MB |
+| `defaultCountry` | string | No       | ISO country code for unstructured files     |
 
 **Response `200`:**
 
@@ -564,8 +569,8 @@ Prefix: `/api/integrations`
       "connectedAccount": "user@gmail.com",
       "lastSyncAt": "2026-07-16T07:00:00.000Z",
       "errorMessage": null,
-      "sheetsConfig": { /* GoogleSheetsConfig */ },
-      "calendarConfig": { /* GoogleCalendarConfig */ }
+      "sheetsConfig": {/* GoogleSheetsConfig */},
+      "calendarConfig": {/* GoogleCalendarConfig */}
     }
   ]
 }
@@ -579,9 +584,9 @@ Prefix: `/api/integrations`
 
 **Query params:**
 
-| Param | Required | Values |
-|---|---|---|
-| `integrationId` | Yes | `google-sheets` or `google-calendar` |
+| Param           | Required | Values                               |
+| --------------- | -------- | ------------------------------------ |
+| `integrationId` | Yes      | `google-sheets` or `google-calendar` |
 
 **Response `302`:** Redirect to Google OAuth URL.
 
@@ -613,7 +618,7 @@ Prefix: `/api/integrations`
 
 ```json
 {
-  "integration": { /* WorkspaceIntegration */ },
+  "integration": {/* WorkspaceIntegration */},
   "authSource": "clerk"
 }
 ```
@@ -677,7 +682,8 @@ Prefix: `/api/integrations`
 
 ---
 
-### `POST /api/integrations/google/sheets/spreadsheets`  
+### `POST /api/integrations/google/sheets/spreadsheets`
+
 ### `POST /api/integrations/google/sheets/spreadsheets/create`
 
 **Auth:** Tenant context + `integrations:write`
@@ -688,7 +694,11 @@ Prefix: `/api/integrations`
 {
   "name": "PropNex Leads",
   "columns": [
-    { "propnexField": "phoneNumber", "spreadsheetColumn": "Column A", "label": "Phone" }
+    {
+      "propnexField": "phoneNumber",
+      "spreadsheetColumn": "Column A",
+      "label": "Phone"
+    }
   ]
 }
 ```
@@ -707,8 +717,8 @@ Prefix: `/api/integrations`
 
 ```json
 {
-  "integration": { /* WorkspaceIntegration */ },
-  "spreadsheets": [ /* remaining spreadsheets */ ]
+  "integration": {/* WorkspaceIntegration */},
+  "spreadsheets": [/* remaining spreadsheets */]
 }
 ```
 
@@ -724,9 +734,7 @@ Prefix: `/api/integrations`
 
 ```json
 {
-  "worksheets": [
-    { "id": "0", "name": "Sheet1", "rowCount": 150 }
-  ]
+  "worksheets": [{ "id": "0", "name": "Sheet1", "rowCount": 150 }]
 }
 ```
 
@@ -738,10 +746,10 @@ Prefix: `/api/integrations`
 
 **Query:**
 
-| Param | Required | Default |
-|---|---|---|
-| `spreadsheetId` | Yes | — |
-| `worksheetName` | No | `Sheet1` |
+| Param           | Required | Default  |
+| --------------- | -------- | -------- |
+| `spreadsheetId` | Yes      | —        |
+| `worksheetName` | No       | `Sheet1` |
 
 **Response `200`:** `{ "headers": ["Name", "Phone", "Status"] }`
 
@@ -814,7 +822,12 @@ Prefix: `/api/integrations`
 ```json
 {
   "calendars": [
-    { "id": "primary", "name": "Work", "primary": true, "timezone": "Asia/Kolkata" }
+    {
+      "id": "primary",
+      "name": "Work",
+      "primary": true,
+      "timezone": "Asia/Kolkata"
+    }
   ]
 }
 ```
@@ -863,12 +876,12 @@ Source: `src/modules/page-cache/page-cache.controller.ts`
 
 **Query params:**
 
-| Param | Type | Notes |
-|---|---|---|
-| `id` | string | Entity ID (e.g. call, agent, phone) |
-| `slug` | string | Slug (e.g. agent template) |
-| `after` | string | Pagination cursor |
-| `filter` | JSON string | Page-specific filters |
+| Param    | Type        | Notes                               |
+| -------- | ----------- | ----------------------------------- |
+| `id`     | string      | Entity ID (e.g. call, agent, phone) |
+| `slug`   | string      | Slug (e.g. agent template)          |
+| `after`  | string      | Pagination cursor                   |
+| `filter` | JSON string | Page-specific filters               |
 
 **Response `200`:** Page-specific JSON from the matching loader (cached per company + params).
 

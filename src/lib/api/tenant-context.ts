@@ -85,8 +85,8 @@ function tenantToAccess(ctx: TenantContext): AccessContext {
     userId: ctx.userId,
     role: ctx.role as AccessContext["role"],
     permissions: ctx.permissions,
-    branchAccessType: ctx.branchAccess.type,
-    branchIds: ctx.branchAccess.branchIds,
+    campaignAccessType: ctx.campaignAccess.type,
+    campaignIds: ctx.campaignAccess.campaignIds,
   };
 }
 

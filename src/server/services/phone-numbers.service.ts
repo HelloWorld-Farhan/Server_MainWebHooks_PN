@@ -1,9 +1,17 @@
 import type { PhoneNumberStatus, TelephonyProvider } from "@prisma/client";
 
 import { NotFoundError } from "@/server/lib/errors";
+import {
+  buildConnection,
+  encodeIdCursor,
+} from "@/server/lib/pagination";
 import { cacheService } from "@/server/cache/cache.service";
 import prisma from "@/server/lib/prisma";
-import { PhoneNumbersRepository } from "@/server/repositories/phone-numbers.repository";
+import {
+  PhoneNumbersRepository,
+  type PhoneNumberFilter,
+  type PhoneNumberSort,
+} from "@/server/repositories/phone-numbers.repository";
 import type { TenantContext } from "@/server/types/context";
 import { PERMISSIONS } from "@/server/types/permissions";
 import { tenantService } from "@/server/services/tenant.service";
@@ -32,10 +40,51 @@ function mapPhoneNumber(row: Awaited<
 export class PhoneNumbersService {
   private readonly repo = new PhoneNumbersRepository(prisma);
 
-  async list(ctx: TenantContext) {
+  async list(
+    ctx: TenantContext,
+    filter?: PhoneNumberFilter,
+    sort?: PhoneNumberSort,
+  ) {
     tenantService.requirePermission(ctx, PERMISSIONS.AGENTS_READ);
-    const rows = await this.repo.findMany(ctx.companyId);
+    const rows = await this.repo.findMany(ctx.companyId, filter, sort);
     return rows.map(mapPhoneNumber);
+  }
+
+  async getConnection(
+    ctx: TenantContext,
+    args: {
+      first?: number;
+      after?: string;
+      filter?: PhoneNumberFilter;
+      sort?: PhoneNumberSort;
+    },
+  ) {
+    tenantService.requirePermission(ctx, PERMISSIONS.AGENTS_READ);
+
+    const limit = Math.min(Math.max(args.first ?? 25, 1), 200);
+    const [rows, totalCount] = await Promise.all([
+      this.repo.findConnection(
+        ctx.companyId,
+        limit,
+        args.after,
+        args.filter,
+        args.sort,
+      ),
+      this.repo.count(ctx.companyId, args.filter),
+    ]);
+
+    const connection = buildConnection(rows, limit, (row) =>
+      encodeIdCursor(row.id, row.createdAt),
+    );
+
+    return {
+      edges: connection.edges.map((edge) => ({
+        node: mapPhoneNumber(edge.node),
+        cursor: edge.cursor,
+      })),
+      pageInfo: connection.pageInfo,
+      totalCount,
+    };
   }
 
   async getById(ctx: TenantContext, id: string) {

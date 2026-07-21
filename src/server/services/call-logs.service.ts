@@ -1,21 +1,21 @@
-import { cacheService } from "@/server/cache/cache.service";
-import { CACHE_TTL, cacheKeys } from "@/server/cache/keys";
-import { NotFoundError } from "@/server/lib/errors";
-import {
-  buildConnection,
-  encodeCursor,
-} from "@/server/lib/pagination";
-import prisma from "@/server/lib/prisma";
+import { cacheService } from '@/server/cache/cache.service';
+import { CACHE_TTL, cacheKeys } from '@/server/cache/keys';
+import { NotFoundError, ValidationError } from '@/server/lib/errors';
+import { buildConnection, encodeCursor } from '@/server/lib/pagination';
+import prisma from '@/server/lib/prisma';
 import {
   CallLogsRepository,
   type CallLogFilter,
-} from "@/server/repositories/call-logs.repository";
-import { CallInternalNoteRepository } from "@/server/repositories/call-internal-note.repository";
-import type { TenantContext } from "@/server/types/context";
-import { PERMISSIONS } from "@/server/types/permissions";
-import { tenantService } from "@/server/services/tenant.service";
-import { branchAccessService } from "@/server/services/branch-access.service";
-import { analyticsService } from "@/server/services/analytics.service";
+} from '@/server/repositories/call-logs.repository';
+import { CallInternalNoteRepository } from '@/server/repositories/call-internal-note.repository';
+import type { TenantContext } from '@/server/types/context';
+import { PERMISSIONS } from '@/server/types/permissions';
+import { tenantService } from '@/server/services/tenant.service';
+import { campaignAccessService } from '@/server/services/campaign-access.service';
+import { analyticsService } from '@/server/services/analytics.service';
+import { billingService } from '@/server/services/billing.service';
+import { creditsService } from '@/server/services/credits.service';
+import { CreditsRepository } from '@/server/repositories/credits.repository';
 
 function mapNote(note: {
   id: string;
@@ -37,8 +37,9 @@ function mapNote(note: {
     author: {
       id: note.author.id,
       name:
-        [note.author.firstName, note.author.lastName].filter(Boolean).join(" ") ||
-        note.author.email,
+        [note.author.firstName, note.author.lastName]
+          .filter(Boolean)
+          .join(' ') || note.author.email,
       email: note.author.email,
     },
   };
@@ -60,7 +61,7 @@ export class CallLogsService {
         const logs = await this.repo.findRecent(
           ctx.companyId,
           capped,
-          branchAccessService.callLogBranchFilter(ctx),
+          campaignAccessService.callLogCampaignFilter(ctx),
         );
         return logs.map((log) => ({
           ...log,
@@ -86,7 +87,7 @@ export class CallLogsService {
       limit,
       args.after,
       args.filter,
-      branchAccessService.callLogBranchFilter(ctx),
+      campaignAccessService.callLogCampaignFilter(ctx),
     );
 
     const connection = buildConnection(items, limit, (item) =>
@@ -110,14 +111,11 @@ export class CallLogsService {
 
     const log = await this.repo.findById(ctx.companyId, id);
     if (!log) {
-      throw new NotFoundError("Call log not found");
+      throw new NotFoundError('Call log not found');
     }
-    branchAccessService.assertCallLogBranchAccess(ctx, log.branchId);
+    campaignAccessService.assertCallLogCampaignAccess(ctx, log.campaignId);
 
-    const internalNotes = await this.notesRepo.listByCallLog(
-      ctx.companyId,
-      id,
-    );
+    const internalNotes = await this.notesRepo.listByCallLog(ctx.companyId, id);
 
     return {
       ...log,
@@ -153,28 +151,27 @@ export class CallLogsService {
 
     const log = await this.repo.findById(ctx.companyId, id);
     if (!log) {
-      throw new NotFoundError("Call log not found");
+      throw new NotFoundError('Call log not found');
     }
-    branchAccessService.assertCallLogBranchAccess(ctx, log.branchId);
+    campaignAccessService.assertCallLogCampaignAccess(ctx, log.campaignId);
 
-    await this.repo.updateOutcome(
-      ctx.companyId,
-      id,
-      outcome,
-      reactivationPlan,
-    );
+    await this.repo.updateOutcome(ctx.companyId, id, outcome, reactivationPlan);
     await cacheService.invalidateCallRelated(ctx.companyId);
     return this.getDetail(ctx, id);
   }
 
-  async addInternalNote(ctx: TenantContext, callLogId: string, content: string) {
+  async addInternalNote(
+    ctx: TenantContext,
+    callLogId: string,
+    content: string,
+  ) {
     tenantService.requirePermission(ctx, PERMISSIONS.CALL_LOGS_WRITE);
 
     const log = await this.repo.findById(ctx.companyId, callLogId);
     if (!log) {
-      throw new NotFoundError("Call log not found");
+      throw new NotFoundError('Call log not found');
     }
-    branchAccessService.assertCallLogBranchAccess(ctx, log.branchId);
+    campaignAccessService.assertCallLogCampaignAccess(ctx, log.campaignId);
 
     const note = await this.notesRepo.create(
       ctx.companyId,
@@ -194,7 +191,7 @@ export class CallLogsService {
       content.trim(),
     );
     if (result.count === 0) {
-      throw new NotFoundError("Note not found");
+      throw new NotFoundError('Note not found');
     }
 
     const notes = await prisma.callInternalNote.findFirst({
@@ -211,7 +208,7 @@ export class CallLogsService {
       },
     });
     if (!notes) {
-      throw new NotFoundError("Note not found");
+      throw new NotFoundError('Note not found');
     }
     return mapNote(notes);
   }
@@ -221,7 +218,7 @@ export class CallLogsService {
 
     const result = await this.notesRepo.delete(ctx.companyId, id);
     if (result.count === 0) {
-      throw new NotFoundError("Note not found");
+      throw new NotFoundError('Note not found');
     }
     return true;
   }
@@ -232,6 +229,80 @@ export class CallLogsService {
   ) {
     await analyticsService.incrementDailyMetrics(companyId, delta);
     await cacheService.invalidateCallRelated(companyId);
+  }
+
+  /**
+   * After a call ends: compute credits from duration (pulse/delta),
+   * persist CallLog.creditsUsed/cost, debit balance, bump analytics.
+   * Idempotent when already billed. Bills COMPLETED only.
+   */
+  async recordCompletedWithBilling(ctx: TenantContext, callLogId: string) {
+    tenantService.requirePermission(ctx, PERMISSIONS.CREDITS_WRITE);
+
+    const log = await this.repo.findForBilling(ctx.companyId, callLogId);
+    if (!log) {
+      throw new NotFoundError('Call log not found');
+    }
+    campaignAccessService.assertCallLogCampaignAccess(ctx, log.campaignId);
+
+    const existingUsage = await prisma.creditUsage.findFirst({
+      where: { companyId: ctx.companyId, callLogId, reason: 'CALL' },
+      select: { id: true, amount: true },
+    });
+
+    // Already billed — ensure CallLog fields are set, then exit
+    if (existingUsage || (log.creditsUsed != null && log.creditsUsed > 0)) {
+      if (existingUsage && (log.creditsUsed == null || log.creditsUsed <= 0)) {
+        const config = await billingService.loadCompanyBillingConfig(
+          ctx.companyId,
+        );
+        await this.repo.updateBilling(ctx.companyId, callLogId, {
+          creditsUsed: existingUsage.amount,
+          cost: existingUsage.amount * config.costPerCredit,
+        });
+      }
+      return true;
+    }
+
+    const shouldBill = log.status === 'COMPLETED';
+    if (shouldBill) {
+      const config = await billingService.loadCompanyBillingConfig(
+        ctx.companyId,
+      );
+      const { credits, costInr } = billingService.calculateCallBilling(
+        log.durationSeconds,
+        config,
+      );
+
+      if (credits > 0) {
+        const creditsRepo = new CreditsRepository(prisma);
+        const balance = await creditsRepo.ensureBalance(ctx.companyId);
+        if (balance.creditsRemaining < credits) {
+          throw new ValidationError(
+            'Insufficient credits to complete call billing',
+          );
+        }
+
+        await creditsService.debitForCall(
+          ctx,
+          callLogId,
+          credits,
+          `Call billing: ${credits} credit(s), ₹${costInr.toFixed(2)}`,
+        );
+
+        await this.repo.updateBilling(ctx.companyId, callLogId, {
+          creditsUsed: credits,
+          cost: costInr,
+        });
+      }
+    }
+
+    await this.onCallCompleted(ctx.companyId, {
+      totalCalls: 1,
+      connectedCalls: shouldBill ? 1 : 0,
+    });
+
+    return true;
   }
 }
 

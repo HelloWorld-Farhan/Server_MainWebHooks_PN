@@ -9,5 +9,5 @@ export * from "./leads";
 export * from "./setup";
 export * from "./settings";
 export * from "./uploaded-contacts";
-export * from "./branches";
+export * from "./campaigns";
 export * from "./employees";

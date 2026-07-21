@@ -1,7 +1,7 @@
 import type {
   ApiKeyEnvironment,
   ApiKeyStatus,
-  BranchAccessType,
+  CampaignAccessType,
   Prisma,
 } from "@prisma/client";
 
@@ -15,7 +15,7 @@ export type ApiKeyFilter = {
 };
 
 const apiKeyInclude = {
-  branchAccess: true,
+  campaignAccess: true,
   createdBy: {
     select: {
       id: true,
@@ -103,7 +103,7 @@ export class ApiKeysRepository extends BaseRepository {
   findByKeyId(keyId: string) {
     return this.prisma.apiKey.findFirst({
       where: { keyId, ...this.notDeleted() },
-      include: { branchAccess: true },
+      include: { campaignAccess: true },
     });
   }
 
@@ -116,8 +116,8 @@ export class ApiKeysRepository extends BaseRepository {
     hashedSecret: string;
     environment: ApiKeyEnvironment;
     scopes: string[];
-    branchAccessType: BranchAccessType;
-    branchIds: string[];
+    campaignAccessType: CampaignAccessType;
+    campaignIds: string[];
     expiresAt?: Date | null;
     createdById: string;
   }) {
@@ -131,13 +131,13 @@ export class ApiKeysRepository extends BaseRepository {
         hashedSecret: data.hashedSecret,
         environment: data.environment,
         scopes: data.scopes,
-        branchAccessType: data.branchAccessType,
+        campaignAccessType: data.campaignAccessType,
         expiresAt: data.expiresAt ?? null,
         createdById: data.createdById,
-        branchAccess:
-          data.branchAccessType === "SELECTED" && data.branchIds.length > 0
+        campaignAccess:
+          data.campaignAccessType === "SELECTED" && data.campaignIds.length > 0
             ? {
-                create: data.branchIds.map((branchId) => ({ branchId })),
+                create: data.campaignIds.map((campaignId) => ({ campaignId })),
               }
             : undefined,
       },
@@ -163,23 +163,23 @@ export class ApiKeysRepository extends BaseRepository {
   async replaceBranchAccess(
     companyId: string,
     apiKeyId: string,
-    branchAccessType: BranchAccessType,
-    branchIds: string[],
+    campaignAccessType: CampaignAccessType,
+    campaignIds: string[],
   ): Promise<ApiKeyRecord | null> {
     const existing = await this.findById(companyId, apiKeyId);
     if (!existing) return null;
 
-    await this.prisma.apiKeyBranchAccess.deleteMany({ where: { apiKeyId } });
+    await this.prisma.apiKeyCampaignAccess.deleteMany({ where: { apiKeyId } });
 
-    if (branchAccessType === "SELECTED" && branchIds.length > 0) {
-      await this.prisma.apiKeyBranchAccess.createMany({
-        data: branchIds.map((branchId) => ({ apiKeyId, branchId })),
+    if (campaignAccessType === "SELECTED" && campaignIds.length > 0) {
+      await this.prisma.apiKeyCampaignAccess.createMany({
+        data: campaignIds.map((campaignId) => ({ apiKeyId, campaignId })),
       });
     }
 
     return this.prisma.apiKey.update({
       where: { id: apiKeyId },
-      data: { branchAccessType },
+      data: { campaignAccessType },
       include: apiKeyInclude,
     });
   }
@@ -211,9 +211,9 @@ export class ApiKeysRepository extends BaseRepository {
     });
   }
 
-  findBranchesByIds(companyId: string, ids: string[]) {
+  findCampaignsByIds(companyId: string, ids: string[]) {
     if (ids.length === 0) return Promise.resolve([]);
-    return this.prisma.branch.findMany({
+    return this.prisma.campaign.findMany({
       where: {
         companyId,
         id: { in: ids },
@@ -223,12 +223,12 @@ export class ApiKeysRepository extends BaseRepository {
     });
   }
 
-  findAccessibleBranches(companyId: string, branchIds: string[] | null) {
-    return this.prisma.branch.findMany({
+  findAccessibleCampaigns(companyId: string, campaignIds: string[] | null) {
+    return this.prisma.campaign.findMany({
       where: {
         companyId,
         status: { not: "ARCHIVED" },
-        ...(branchIds ? { id: { in: branchIds } } : {}),
+        ...(campaignIds ? { id: { in: campaignIds } } : {}),
       },
       orderBy: { name: "asc" },
       select: { id: true, name: true, status: true },

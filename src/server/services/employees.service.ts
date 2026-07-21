@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import type {
-  BranchAccessType,
+  CampaignAccessType,
   MemberStatus,
   UserRole,
 } from "@prisma/client";
@@ -28,7 +28,7 @@ import {
   type EmployeeFilter,
   type EmployeeRow,
 } from "@/server/repositories/employees.repository";
-import { branchAccessService } from "@/server/services/branch-access.service";
+import { campaignAccessService } from "@/server/services/campaign-access.service";
 import { tenantService } from "@/server/services/tenant.service";
 import {
   assertCanAssignRole,
@@ -92,14 +92,14 @@ function mapEmployee(row: EmployeeRow) {
           isSystem: row.customRole.isSystem,
         }
       : null,
-    branchAccessType: row.branchAccessType,
-    assignedBranches:
-      row.branchAccessType === "ALL"
+    campaignAccessType: row.campaignAccessType,
+    assignedCampaigns:
+      row.campaignAccessType === "ALL"
         ? []
-        : row.branchAccess.map((access) => ({
-            id: access.branch.id,
-            name: access.branch.name,
-            status: access.branch.status,
+        : row.campaignAccess.map((access) => ({
+            id: access.campaign.id,
+            name: access.campaign.name,
+            status: access.campaign.status,
           })),
     status: row.status,
     invitationStatus: computeInvitationStatus(row),
@@ -111,25 +111,25 @@ function mapEmployee(row: EmployeeRow) {
   };
 }
 
-async function validateBranchAccessInput(
+async function validateCampaignAccessInput(
   repo: EmployeesRepository,
   companyId: string,
-  branchAccessType: BranchAccessType,
-  branchIds: string[] | undefined,
+  campaignAccessType: CampaignAccessType,
+  campaignIds: string[] | undefined,
   ctx: TenantContext,
 ) {
-  if (branchAccessType === "ALL") return [];
+  if (campaignAccessType === "ALL") return [];
 
-  const ids = branchIds ?? [];
+  const ids = campaignIds ?? [];
   if (ids.length === 0) {
-    throw new ValidationError("Select at least one branch");
+    throw new ValidationError("Select at least one campaign");
   }
 
-  branchAccessService.assertBranchIdsAccess(ctx, ids);
+  campaignAccessService.assertCampaignIdsAccess(ctx, ids);
 
-  const valid = await repo.validateBranchIds(companyId, ids);
+  const valid = await repo.validateCampaignIds(companyId, ids);
   if (valid.length !== ids.length) {
-    throw new ValidationError("One or more branches are invalid");
+    throw new ValidationError("One or more campaigns are invalid");
   }
 
   return ids;
@@ -160,7 +160,7 @@ export class EmployeesService {
     tenantService.requirePermission(ctx, PERMISSIONS.EMPLOYEES_READ);
     const limit = Math.min(Math.max(args.first ?? 25, 1), 200);
 
-    const scope = branchAccessService.employeeScopeFilter(ctx);
+    const scope = campaignAccessService.employeeScopeFilter(ctx);
 
     const [rows, totalCount] = await Promise.all([
       this.repo.findConnection(ctx.companyId, limit, args.after, args.filter, scope),
@@ -185,7 +185,7 @@ export class EmployeesService {
     tenantService.requirePermission(ctx, PERMISSIONS.EMPLOYEES_READ);
     const row = await this.repo.findById(ctx.companyId, id);
     if (!row) throw new NotFoundError("Employee not found");
-    branchAccessService.assertEmployeeVisible(ctx, row);
+    campaignAccessService.assertEmployeeVisible(ctx, row);
     return mapEmployee(row);
   }
 
@@ -201,8 +201,8 @@ export class EmployeesService {
       email: string;
       role: UserRole;
       jobTitle?: string | null;
-      branchAccessType: BranchAccessType;
-      branchIds?: string[] | null;
+      campaignAccessType: CampaignAccessType;
+      campaignIds?: string[] | null;
     },
   ) {
     tenantService.requirePermission(ctx, PERMISSIONS.EMPLOYEES_INVITE);
@@ -220,11 +220,11 @@ export class EmployeesService {
       throw new ValidationError("An employee with this email already exists");
     }
 
-    const branchIds = await validateBranchAccessInput(
+    const campaignIds = await validateCampaignAccessInput(
       this.repo,
       ctx.companyId,
-      input.branchAccessType,
-      input.branchIds ?? undefined,
+      input.campaignAccessType,
+      input.campaignIds ?? undefined,
       ctx,
     );
 
@@ -262,8 +262,8 @@ export class EmployeesService {
       inviterUserId: ctx.clerkUserId,
       metadata: {
         propnexRole: input.role,
-        branchAccessType: input.branchAccessType,
-        branchIds,
+        campaignAccessType: input.campaignAccessType,
+        campaignIds,
         jobTitle,
         inviteName: input.name.trim(),
       },
@@ -277,8 +277,8 @@ export class EmployeesService {
       email,
       role: input.role,
       jobTitle,
-      branchAccessType: input.branchAccessType,
-      branchIds,
+      campaignAccessType: input.campaignAccessType,
+      campaignIds,
       token,
       expiresAt,
       invitedById: ctx.userId,
@@ -317,27 +317,27 @@ export class EmployeesService {
         role: input.role,
         status: "INVITED",
         jobTitle,
-        branchAccessType: input.branchAccessType,
+        campaignAccessType: input.campaignAccessType,
         invitedAt: new Date(),
       },
       update: {
         role: input.role,
         status: "INVITED",
         jobTitle,
-        branchAccessType: input.branchAccessType,
+        campaignAccessType: input.campaignAccessType,
         invitedAt: new Date(),
       },
       include: {
         user: true,
         customRole: true,
-        branchAccess: { include: { branch: true } },
+        campaignAccess: { include: { campaign: true } },
       },
     });
 
-    if (input.branchAccessType === "SELECTED") {
-      await this.repo.setBranchAccess(member.id, branchIds);
+    if (input.campaignAccessType === "SELECTED") {
+      await this.repo.setCampaignAccess(member.id, campaignIds);
     } else {
-      await this.repo.setBranchAccess(member.id, []);
+      await this.repo.setCampaignAccess(member.id, []);
     }
 
     const refreshed = await this.repo.findById(ctx.companyId, member.id);
@@ -350,8 +350,8 @@ export class EmployeesService {
     input: {
       jobTitle?: string | null;
       role?: UserRole;
-      branchAccessType?: BranchAccessType;
-      branchIds?: string[] | null;
+      campaignAccessType?: CampaignAccessType;
+      campaignIds?: string[] | null;
       status?: MemberStatus;
       firstName?: string | null;
       lastName?: string | null;
@@ -376,12 +376,12 @@ export class EmployeesService {
       }
     }
 
-    const branchAccessType = input.branchAccessType ?? existing.branchAccessType;
-    const branchIds = await validateBranchAccessInput(
+    const campaignAccessType = input.campaignAccessType ?? existing.campaignAccessType;
+    const campaignIds = await validateCampaignAccessInput(
       this.repo,
       ctx.companyId,
-      branchAccessType,
-      input.branchIds ?? existing.branchAccess.map((b) => b.branchId),
+      campaignAccessType,
+      input.campaignIds ?? existing.campaignAccess.map((b) => b.campaignId),
       ctx,
     );
 
@@ -400,16 +400,16 @@ export class EmployeesService {
       ...(input.jobTitle !== undefined ? { jobTitle: input.jobTitle } : {}),
       ...(input.role ? { role: input.role } : {}),
       ...(input.status ? { status: input.status } : {}),
-      branchAccessType,
+      campaignAccessType,
       ...(input.status === "ACTIVE" && !existing.joinedAt
         ? { joinedAt: new Date() }
         : {}),
     });
 
-    if (branchAccessType === "SELECTED") {
-      await this.repo.setBranchAccess(id, branchIds);
+    if (campaignAccessType === "SELECTED") {
+      await this.repo.setCampaignAccess(id, campaignIds);
     } else {
-      await this.repo.setBranchAccess(id, []);
+      await this.repo.setCampaignAccess(id, []);
     }
 
     await cacheService.del(cacheKeys.userPermissions(existing.userId));
@@ -475,7 +475,7 @@ export class EmployeesService {
     }
 
     await this.repo.updateMember(ctx.companyId, id, { status: "REMOVED" });
-    await this.repo.setBranchAccess(id, []);
+    await this.repo.setCampaignAccess(id, []);
     await cacheService.del(cacheKeys.userPermissions(existing.userId));
 
     const company = await prisma.company.findUnique({
@@ -523,10 +523,10 @@ export class EmployeesService {
       existing.user.email,
     );
 
-    const branchIds =
-      existing.branchAccessType === "SELECTED"
-        ? existing.branchAccess.map((b) => b.branchId)
-        : invitation?.branchIds ?? [];
+    const campaignIds =
+      existing.campaignAccessType === "SELECTED"
+        ? existing.campaignAccess.map((b) => b.campaignId)
+        : invitation?.campaignIds ?? [];
 
     await revokeAllClerkPendingInvitationsForEmail({
       organizationId: clerkOrganizationId,
@@ -542,8 +542,8 @@ export class EmployeesService {
       inviterUserId: ctx.clerkUserId,
       metadata: {
         propnexRole: existing.role,
-        branchAccessType: existing.branchAccessType,
-        branchIds,
+        campaignAccessType: existing.campaignAccessType,
+        campaignIds,
         jobTitle: existing.jobTitle,
         inviteName: displayNameValue,
       },
@@ -566,8 +566,8 @@ export class EmployeesService {
         email: existing.user.email,
         role: existing.role,
         jobTitle: existing.jobTitle,
-        branchAccessType: existing.branchAccessType,
-        branchIds,
+        campaignAccessType: existing.campaignAccessType,
+        campaignIds,
         token,
         expiresAt,
         invitedById: ctx.userId,
@@ -615,7 +615,7 @@ export class EmployeesService {
 
     await this.repo.revokePendingInvitation(ctx.companyId, existing.user.email);
     await this.repo.updateMember(ctx.companyId, id, { status: "REMOVED" });
-    await this.repo.setBranchAccess(id, []);
+    await this.repo.setCampaignAccess(id, []);
     await cacheService.del(cacheKeys.userPermissions(existing.userId));
 
     if (existing.user.clerkUserId) {

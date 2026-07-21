@@ -50,7 +50,7 @@ enum MemberStatus {
   REMOVED
 }
 
-enum BranchAccessType {
+enum CampaignAccessType {
   ALL
   SELECTED
 }
@@ -60,7 +60,7 @@ enum AgentStatus {
   INACTIVE
 }
 
-enum BranchStatus {
+enum CampaignStatus {
   ACTIVE
   INACTIVE
   ARCHIVED
@@ -95,8 +95,8 @@ type Viewer {
   lastName: String
   role: UserRole!
   permissions: [String!]!
-  branchAccessType: BranchAccessType!
-  branchIds: [ID!]!
+  campaignAccessType: CampaignAccessType!
+  campaignIds: [ID!]!
   company: Company!
 }
 
@@ -124,12 +124,12 @@ type Query {
   phoneNumbers: PhoneNumbersQueries!
   uploadedContacts: UploadedContactsQueries!
   leads: LeadsQueries!
-  campaigns: CampaignsQueries!
+  outboundCampaigns: OutboundCampaignsQueries!
   notifications: NotificationQueries!
   integrations: IntegrationQueries!
   scheduler: SchedulerQueries!
   events: EventQueries!
-  branches: BranchesQueries!
+  campaigns: CampaignsQueries!
   employees: EmployeesQueries!
   apiKeys: ApiKeysQueries!
 }
@@ -141,8 +141,8 @@ type Mutation {
   phoneNumbers: PhoneNumbersMutations!
   uploadedContacts: UploadedContactsMutations!
   leads: LeadsMutations!
+  outboundCampaigns: OutboundCampaignsMutations!
   campaigns: CampaignsMutations!
-  branches: BranchesMutations!
   employees: EmployeesMutations!
   apiKeys: ApiKeysMutations!
 }

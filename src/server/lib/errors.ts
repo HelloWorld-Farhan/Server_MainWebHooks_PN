@@ -93,10 +93,10 @@ export class MissingScopeError extends AppError {
   }
 }
 
-export class MissingBranchAccessError extends AppError {
-  constructor(message = "Missing branch access") {
-    super(message, "MISSING_BRANCH_ACCESS", 403);
-    this.name = "MissingBranchAccessError";
+export class MissingCampaignAccessError extends AppError {
+  constructor(message = "Missing campaign access") {
+    super(message, "MISSING_CAMPAIGN_ACCESS", 403);
+    this.name = "MissingCampaignAccessError";
   }
 }
 
@@ -107,10 +107,10 @@ export class InvalidScopeError extends AppError {
   }
 }
 
-export class InvalidBranchError extends AppError {
+export class InvalidCampaignError extends AppError {
   constructor(message = "Invalid branch") {
-    super(message, "INVALID_BRANCH", 400);
-    this.name = "InvalidBranchError";
+    super(message, "INVALID_CAMPAIGN", 400);
+    this.name = "InvalidCampaignError";
   }
 }
 

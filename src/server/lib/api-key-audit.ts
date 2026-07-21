@@ -9,7 +9,7 @@ export type ApiKeyAuditAction =
   | "ROTATED"
   | "DELETED"
   | "SCOPES_UPDATED"
-  | "BRANCH_ACCESS_UPDATED"
+  | "CAMPAIGN_ACCESS_UPDATED"
   | "EXPIRATION_UPDATED";
 
 type AuditDeps = {

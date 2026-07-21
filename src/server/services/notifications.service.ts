@@ -10,7 +10,7 @@ import {
 } from "@/server/repositories/notifications.repository";
 import type { TenantContext } from "@/server/types/context";
 import { PERMISSIONS } from "@/server/types/permissions";
-import { branchAccessService } from "@/server/services/branch-access.service";
+import { campaignAccessService } from "@/server/services/campaign-access.service";
 import { tenantService } from "@/server/services/tenant.service";
 
 export class NotificationsService {
@@ -40,7 +40,7 @@ export class IntegrationsService {
   private readonly repo = new IntegrationsRepository(prisma);
 
   async list(ctx: TenantContext) {
-    if (ctx.branchAccess.type === "SELECTED") {
+    if (ctx.campaignAccess.type === "SELECTED") {
       return [];
     }
     tenantService.requirePermission(ctx, PERMISSIONS.INTEGRATIONS_READ);
@@ -53,9 +53,9 @@ export class SchedulerService {
 
   async listUpcoming(ctx: TenantContext, limit = 20) {
     tenantService.requirePermission(ctx, PERMISSIONS.SCHEDULER_READ);
-    const leadBranchIds = branchAccessService.hasAllBranchAccess(ctx)
+    const leadBranchIds = campaignAccessService.hasAllCampaignAccess(ctx)
       ? undefined
-      : ctx.branchAccess.branchIds;
+      : ctx.campaignAccess.campaignIds;
     return this.repo.listUpcoming(
       ctx.companyId,
       Math.min(limit, 50),

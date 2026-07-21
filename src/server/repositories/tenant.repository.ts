@@ -55,7 +55,7 @@ export class TenantRepository extends BaseRepository {
         customRole: true,
         user: true,
         company: true,
-        branchAccess: true,
+        campaignAccess: true,
       },
     });
   }

@@ -18,9 +18,9 @@ export const PERMISSIONS = {
   SCHEDULER_READ: "scheduler:read",
   SCHEDULER_WRITE: "scheduler:write",
   SETTINGS_WRITE: "settings:write",
-  BRANCHES_READ: "branches:read",
-  BRANCHES_WRITE: "branches:write",
-  BRANCHES_BULK: "branches:bulk",
+  CAMPAIGNS_READ: "campaigns:read",
+  CAMPAIGNS_WRITE: "campaigns:write",
+  CAMPAIGNS_BULK: "campaigns:bulk",
   DOCUMENTS_READ: "documents:read",
   DOCUMENTS_WRITE: "documents:write",
   EMPLOYEES_READ: "employees:read",
@@ -47,8 +47,8 @@ export const API_KEY_SCOPE_CATALOG: Permission[] = [
   PERMISSIONS.ANALYTICS_READ,
   PERMISSIONS.LEADS_READ,
   PERMISSIONS.LEADS_WRITE,
-  PERMISSIONS.BRANCHES_READ,
-  PERMISSIONS.BRANCHES_WRITE,
+  PERMISSIONS.CAMPAIGNS_READ,
+  PERMISSIONS.CAMPAIGNS_WRITE,
   PERMISSIONS.DOCUMENTS_READ,
   PERMISSIONS.DOCUMENTS_WRITE,
   PERMISSIONS.PHONE_NUMBERS_READ,
@@ -74,7 +74,7 @@ export type UserRole =
   | "SALES"
   | "SUPPORT";
 
-export type BranchAccessType = "ALL" | "SELECTED";
+export type CampaignAccessType = "ALL" | "SELECTED";
 
 export const ROLE_LABELS: Record<UserRole, string> = {
   OWNER: "Owner",
@@ -143,9 +143,9 @@ export function getPermissionLabels(): Record<Permission, string> {
     [PERMISSIONS.SCHEDULER_READ]: "View Scheduler",
     [PERMISSIONS.SCHEDULER_WRITE]: "Manage Scheduler",
     [PERMISSIONS.SETTINGS_WRITE]: "Manage Settings",
-    [PERMISSIONS.BRANCHES_READ]: "View Branches",
-    [PERMISSIONS.BRANCHES_WRITE]: "Manage Branches",
-    [PERMISSIONS.BRANCHES_BULK]: "Bulk Branch Actions",
+    [PERMISSIONS.CAMPAIGNS_READ]: "View Campaigns",
+    [PERMISSIONS.CAMPAIGNS_WRITE]: "Manage Campaigns",
+    [PERMISSIONS.CAMPAIGNS_BULK]: "Bulk Branch Actions",
     [PERMISSIONS.DOCUMENTS_READ]: "View Documents",
     [PERMISSIONS.DOCUMENTS_WRITE]: "Manage Documents",
     [PERMISSIONS.EMPLOYEES_READ]: "View Employees",

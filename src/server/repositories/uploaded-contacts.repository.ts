@@ -5,7 +5,7 @@ export type UploadedContactCreateInput = {
   name?: string | null;
   email?: string | null;
   address?: string | null;
-  branchIds?: string[];
+  campaignIds?: string[];
 };
 
 export class UploadedContactsRepository extends BaseRepository {
@@ -39,7 +39,7 @@ export class UploadedContactsRepository extends BaseRepository {
         name: contact.name ?? null,
         email: contact.email ?? null,
         address: contact.address ?? null,
-        branchIds: contact.branchIds ?? [],
+        campaignIds: contact.campaignIds ?? [],
         company: { connect: { id: companyId } },
       },
     });
@@ -82,7 +82,7 @@ export class UploadedContactsRepository extends BaseRepository {
           name: contact.name ?? null,
           email: contact.email ?? null,
           address: contact.address ?? null,
-          branchIds: contact.branchIds ?? [],
+          campaignIds: contact.campaignIds ?? [],
         })),
       });
     }

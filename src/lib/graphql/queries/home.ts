@@ -107,10 +107,10 @@ export type HomePageResult = {
   };
 };
 
-export const BRANCH_DASHBOARD_QUERY = `
-  query BranchDashboard($branchId: ID!, $dateFrom: String, $dateTo: String) {
-    branches {
-      byId(id: $branchId) {
+export const CAMPAIGN_DASHBOARD_QUERY = `
+  query CampaignDashboard($campaignId: ID!, $dateFrom: String, $dateTo: String) {
+    campaigns {
+      byId(id: $campaignId) {
         id
         name
         status
@@ -149,8 +149,8 @@ export const BRANCH_DASHBOARD_QUERY = `
   }
 `;
 
-export type BranchDashboardResult = {
-  branches: {
+export type CampaignDashboardResult = {
+  campaigns: {
     byId: {
       id: string;
       name: string;

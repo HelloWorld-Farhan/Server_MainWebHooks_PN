@@ -11,15 +11,15 @@ import {
   verifyApiKeySecret,
 } from "@/server/lib/api-key-crypto";
 import {
-  assertBranchesAreSubset,
+  assertCampaignsAreSubset,
   assertScopesAreSubset,
   requireAnyScope,
-  requireBranchAccess,
+  requireCampaignAccess,
   requireScope,
 } from "@/server/lib/authorization";
 import {
   InvalidApiKeyFormatError,
-  MissingBranchAccessError,
+  MissingCampaignAccessError,
   MissingScopeError,
 } from "@/server/lib/errors";
 import type { TenantContext } from "@/server/types/context";
@@ -33,7 +33,7 @@ function ctx(partial: Partial<TenantContext> = {}): TenantContext {
     membershipId: "member-1",
     role: "ADMIN",
     permissions: ["agents:read", "call_logs:read"],
-    branchAccess: { type: "SELECTED", branchIds: ["branch-a", "branch-b"] },
+    campaignAccess: { type: "SELECTED", campaignIds: ["branch-a", "branch-b"] },
     loaders: {} as TenantContext["loaders"],
     ...partial,
   };
@@ -107,12 +107,12 @@ describe("api-key authorization", () => {
     );
   });
 
-  it("requires branch access", () => {
+  it("requires campaign access", () => {
     const userCtx = ctx();
-    assert.doesNotThrow(() => requireBranchAccess(userCtx, "branch-a"));
+    assert.doesNotThrow(() => requireCampaignAccess(userCtx, "branch-a"));
     assert.throws(
-      () => requireBranchAccess(userCtx, "branch-x"),
-      MissingBranchAccessError,
+      () => requireCampaignAccess(userCtx, "branch-x"),
+      MissingCampaignAccessError,
     );
   });
 
@@ -127,16 +127,16 @@ describe("api-key authorization", () => {
     );
   });
 
-  it("enforces branch subset for API-key principals", () => {
+  it("enforces campaign subset for API-key principals", () => {
     const apiCtx = ctx({
       authType: "api_key",
       apiKeyId: "key-1",
-      branchAccess: { type: "SELECTED", branchIds: ["branch-a"] },
+      campaignAccess: { type: "SELECTED", campaignIds: ["branch-a"] },
     });
-    assert.doesNotThrow(() => assertBranchesAreSubset(apiCtx, ["branch-a"]));
+    assert.doesNotThrow(() => assertCampaignsAreSubset(apiCtx, ["branch-a"]));
     assert.throws(
-      () => assertBranchesAreSubset(apiCtx, ["branch-a", "branch-b"]),
-      MissingBranchAccessError,
+      () => assertCampaignsAreSubset(apiCtx, ["branch-a", "branch-b"]),
+      MissingCampaignAccessError,
     );
   });
 });

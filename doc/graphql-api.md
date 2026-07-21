@@ -279,7 +279,7 @@ query CallLogs {
 
 | Field | Arguments | Returns |
 |---|---|---|
-| `callLogs.recordCallCompleted` | `callLogId: ID!`, `creditsUsed: Int!` | `Boolean!` |
+| `callLogs.recordCallCompleted` | `callLogId: ID!` | `Boolean!` |
 
 ---
 

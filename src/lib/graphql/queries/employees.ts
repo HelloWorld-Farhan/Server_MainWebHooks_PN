@@ -8,9 +8,9 @@ export type UserRole =
 
 export type MemberStatus = "ACTIVE" | "INVITED" | "DEACTIVATED" | "REMOVED";
 
-export type BranchAccessType = "ALL" | "SELECTED";
+export type CampaignAccessType = "ALL" | "SELECTED";
 
-export type EmployeeBranchNode = {
+export type EmployeeCampaignNode = {
   id: string;
   name: string;
   status: string;
@@ -27,8 +27,8 @@ export type EmployeeNode = {
   imageUrl: string | null;
   jobTitle: string | null;
   role: UserRole;
-  branchAccessType: BranchAccessType;
-  assignedBranches: EmployeeBranchNode[];
+  campaignAccessType: CampaignAccessType;
+  assignedCampaigns: EmployeeCampaignNode[];
   status: MemberStatus;
   invitationStatus: InvitationDisplayStatus;
   lastActiveAt: string | null;
@@ -64,8 +64,8 @@ const EMPLOYEE_FIELDS = `
   imageUrl
   jobTitle
   role
-  branchAccessType
-  assignedBranches {
+  campaignAccessType
+  assignedCampaigns {
     id
     name
     status

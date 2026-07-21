@@ -1,38 +1,38 @@
 import { clerkClient } from "@/auth/clerk";
 import prisma from "@/server/lib/prisma";
 
-export type BranchInvitationErrorCode =
+export type CampaignInvitationErrorCode =
   | "not_found"
   | "accepted"
   | "cancelled"
   | "expired"
   | "not_pending";
 
-export type BranchInvitationView = {
+export type CampaignInvitationView = {
   id: string;
   email: string;
   status: string;
   expiresAt: string;
-  branch: { id: string; name: string };
+  campaign: { id: string; name: string };
   company: { id: string; name: string; clerkOrganizationId: string | null };
 };
 
-export type GetBranchInvitationResult =
-  | { valid: true; invitation: BranchInvitationView }
+export type GetCampaignInvitationResult =
+  | { valid: true; invitation: CampaignInvitationView }
   | {
       valid: false;
-      error: BranchInvitationErrorCode;
+      error: CampaignInvitationErrorCode;
       message: string;
       expiresAt?: string;
     };
 
-export async function getBranchInvitationByToken(
+export async function getCampaignInvitationByToken(
   token: string,
-): Promise<GetBranchInvitationResult> {
-  const invitation = await prisma.branchInvitation.findUnique({
+): Promise<GetCampaignInvitationResult> {
+  const invitation = await prisma.campaignInvitation.findUnique({
     where: { token },
     include: {
-      branch: true,
+      campaign: true,
       company: true,
     },
   });
@@ -91,9 +91,9 @@ export async function getBranchInvitationByToken(
       email: invitation.email,
       status: invitation.status,
       expiresAt: invitation.expiresAt.toISOString(),
-      branch: {
-        id: invitation.branch.id,
-        name: invitation.branch.name,
+      campaign: {
+        id: invitation.campaign.id,
+        name: invitation.campaign.name,
       },
       company: {
         id: invitation.company.id,
@@ -104,18 +104,18 @@ export async function getBranchInvitationByToken(
   };
 }
 
-export type AcceptBranchInvitationResult =
+export type AcceptCampaignInvitationResult =
   | { success: true }
   | { success: false; error: string; statusCode: number };
 
-export async function acceptBranchInvitation(
+export async function acceptCampaignInvitation(
   token: string,
   clerkUserId: string,
-): Promise<AcceptBranchInvitationResult> {
-  const invitation = await prisma.branchInvitation.findUnique({
+): Promise<AcceptCampaignInvitationResult> {
+  const invitation = await prisma.campaignInvitation.findUnique({
     where: { token },
     include: {
-      branch: true,
+      campaign: true,
       company: true,
     },
   });
@@ -159,14 +159,14 @@ export async function acceptBranchInvitation(
   }
 
   await prisma.$transaction(async (tx) => {
-    const current = await tx.branchInvitation.findUnique({
+    const current = await tx.campaignInvitation.findUnique({
       where: { id: invitation.id },
     });
     if (!current || current.status !== "PENDING") {
       throw new Error("Invitation is no longer pending");
     }
 
-    await tx.branchInvitation.update({
+    await tx.campaignInvitation.update({
       where: { id: invitation.id },
       data: {
         status: "ACCEPTED",
@@ -209,28 +209,28 @@ export async function acceptBranchInvitation(
         companyId: invitation.companyId,
         userId: dbUser.id,
         role: "ADMIN",
-        branchAccessType: "SELECTED",
+        campaignAccessType: "SELECTED",
         status: "ACTIVE",
         joinedAt: new Date(),
       },
       update: {
         role: "ADMIN",
-        branchAccessType: "SELECTED",
+        campaignAccessType: "SELECTED",
         status: "ACTIVE",
         joinedAt: new Date(),
       },
     });
 
-    await tx.memberBranchAccess.upsert({
+    await tx.memberCampaignAccess.upsert({
       where: {
-        memberId_branchId: {
+        memberId_campaignId: {
           memberId: member.id,
-          branchId: invitation.branchId,
+          campaignId: invitation.campaignId,
         },
       },
       create: {
         memberId: member.id,
-        branchId: invitation.branchId,
+        campaignId: invitation.campaignId,
       },
       update: {},
     });

@@ -1,13 +1,75 @@
+import type { CampaignStatus, Prisma } from "@prisma/client";
+
 import { BaseRepository } from "@/server/repositories/base.repository";
+import { decodeIdCursor } from "@/server/lib/pagination";
+
+export type CampaignFilter = {
+  search?: string;
+  status?: CampaignStatus;
+  aiEnabled?: boolean;
+};
 
 export class CampaignsRepository extends BaseRepository {
-  findMany(companyId: string) {
+  private buildWhere(
+    companyId: string,
+    filter?: CampaignFilter,
+    scopeWhere?: Prisma.CampaignWhereInput,
+  ): Prisma.CampaignWhereInput {
+    const where: Prisma.CampaignWhereInput = this.scope(companyId);
+
+    if (filter?.status) {
+      where.status = filter.status;
+    }
+
+    if (typeof filter?.aiEnabled === "boolean") {
+      where.aiEnabled = filter.aiEnabled;
+    }
+
+    const search = filter?.search?.trim();
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: "insensitive" } },
+        { address: { contains: search, mode: "insensitive" } },
+        { phone: { contains: search, mode: "insensitive" } },
+        { email: { contains: search, mode: "insensitive" } },
+      ];
+    }
+
+    if (scopeWhere && Object.keys(scopeWhere).length > 0) {
+      return { AND: [where, scopeWhere] };
+    }
+
+    return where;
+  }
+
+  findConnection(
+    companyId: string,
+    limit: number,
+    after?: string,
+    filter?: CampaignFilter,
+    scopeWhere?: Prisma.CampaignWhereInput,
+  ) {
+    const cursor = after ? decodeIdCursor(after) : undefined;
+
     return this.prisma.campaign.findMany({
-      where: this.scope(companyId),
+      where: this.buildWhere(companyId, filter, scopeWhere),
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: limit + 1,
       include: {
-        aiAgent: { select: { id: true, name: true } },
+        invitation: true,
       },
-      orderBy: { createdAt: "desc" },
+      ...(cursor
+        ? {
+            cursor: { id: cursor.id },
+            skip: 1,
+          }
+        : {}),
+    });
+  }
+
+  count(companyId: string, filter?: CampaignFilter, scopeWhere?: Prisma.CampaignWhereInput) {
+    return this.prisma.campaign.count({
+      where: this.buildWhere(companyId, filter, scopeWhere),
     });
   }
 
@@ -15,32 +77,156 @@ export class CampaignsRepository extends BaseRepository {
     return this.prisma.campaign.findFirst({
       where: { id, companyId },
       include: {
-        aiAgent: { select: { id: true, name: true } },
+        invitation: true,
       },
     });
   }
 
-  create(
-    companyId: string,
-    data: { name: string; aiAgentId?: string | null },
-  ) {
+  findByIds(companyId: string, ids: string[]) {
+    if (ids.length === 0) {
+      return Promise.resolve([]);
+    }
+    return this.prisma.campaign.findMany({
+      where: { companyId, id: { in: ids } },
+    });
+  }
+
+  findAllNames(companyId: string) {
+    return this.prisma.campaign.findMany({
+      where: this.scope(companyId),
+      select: { id: true, name: true },
+    });
+  }
+
+  async countRelations(companyId: string, campaignId: string) {
+    const [contactsCount, callLogsCount, documentsCount, agentsCount] =
+      await Promise.all([
+        this.prisma.uploadedContact.count({
+          where: { companyId, campaignIds: { has: campaignId } },
+        }),
+        this.prisma.callLog.count({ where: { companyId, campaignId } }),
+        this.prisma.campaignDocument.count({ where: { companyId, campaignId } }),
+        this.prisma.aiAgent.count({ where: { companyId, campaignId } }),
+      ]);
+    return { contactsCount, callLogsCount, documentsCount, agentsCount };
+  }
+
+  findAgents(companyId: string, campaignId: string) {
+    return this.prisma.aiAgent.findMany({
+      where: { companyId, campaignId },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  create(companyId: string, data: Prisma.CampaignCreateWithoutCompanyInput) {
     return this.prisma.campaign.create({
       data: {
-        companyId,
-        name: data.name,
-        aiAgentId: data.aiAgentId ?? null,
-        status: "DRAFT",
+        ...data,
+        company: { connect: { id: companyId } },
       },
       include: {
-        aiAgent: { select: { id: true, name: true } },
+        invitation: true,
       },
     });
   }
 
-  updateStatus(companyId: string, id: string, status: "ACTIVE" | "PAUSED" | "DRAFT" | "COMPLETED") {
+  update(companyId: string, id: string, data: Prisma.CampaignUpdateInput) {
     return this.prisma.campaign.updateMany({
       where: { id, companyId },
-      data: { status },
+      data,
+    });
+  }
+
+  async bulkUpdate(
+    companyId: string,
+    ids: string[],
+    data: Prisma.CampaignUpdateManyMutationInput,
+  ) {
+    const result = await this.prisma.campaign.updateMany({
+      where: { companyId, id: { in: ids } },
+      data,
+    });
+    return result.count;
+  }
+
+  findContacts(
+    companyId: string,
+    campaignId: string,
+    limit: number,
+    after?: string,
+  ) {
+    const cursor = after ? decodeIdCursor(after) : undefined;
+    return this.prisma.uploadedContact.findMany({
+      where: { companyId, campaignIds: { has: campaignId } },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: limit,
+      ...(cursor ? { cursor: { id: cursor.id }, skip: 1 } : {}),
+    });
+  }
+
+  findCallLogs(
+    companyId: string,
+    campaignId: string,
+    limit: number,
+    after?: string,
+  ) {
+    const cursor = after ? decodeIdCursor(after) : undefined;
+    return this.prisma.callLog.findMany({
+      where: { companyId, campaignId },
+      orderBy: [{ startedAt: "desc" }, { id: "desc" }],
+      take: limit,
+      include: {
+        lead: { select: { firstName: true, lastName: true, phone: true } },
+      },
+      ...(cursor ? { cursor: { id: cursor.id }, skip: 1 } : {}),
+    });
+  }
+
+  findDocuments(companyId: string, campaignId: string) {
+    return this.prisma.campaignDocument.findMany({
+      where: { companyId, campaignId },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  findActivities(companyId: string, campaignId: string, limit: number) {
+    return this.prisma.campaignActivity.findMany({
+      where: { companyId, campaignId },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+    });
+  }
+
+  createActivity(
+    companyId: string,
+    campaignId: string,
+    data: { type: string; summary: string; actorId?: string; metadata?: Prisma.InputJsonValue },
+  ) {
+    return this.prisma.campaignActivity.create({
+      data: {
+        companyId,
+        campaignId,
+        type: data.type,
+        summary: data.summary,
+        actorId: data.actorId,
+        metadata: data.metadata ?? {},
+      },
+    });
+  }
+
+  createActivitiesForMany(
+    companyId: string,
+    campaignIds: string[],
+    data: { type: string; summary: string; actorId?: string },
+  ) {
+    return this.prisma.campaignActivity.createMany({
+      data: campaignIds.map((campaignId) => ({
+        companyId,
+        campaignId,
+        type: data.type,
+        summary: data.summary,
+        actorId: data.actorId,
+      })),
     });
   }
 }

@@ -8,7 +8,7 @@ import { CallLogsRepository } from "@/server/repositories/call-logs.repository";
 import type { TenantContext } from "@/server/types/context";
 import { PERMISSIONS } from "@/server/types/permissions";
 import { tenantService } from "@/server/services/tenant.service";
-import { branchAccessService } from "@/server/services/branch-access.service";
+import { campaignAccessService } from "@/server/services/campaign-access.service";
 
 type MetricsJson = Record<string, number>;
 
@@ -70,7 +70,7 @@ export class AnalyticsService {
           ctx.companyId,
           period.start,
           period.end,
-          branchAccessService.callLogBranchFilter(ctx),
+          campaignAccessService.callLogCampaignFilter(ctx),
         );
 
       const conversionRate =
@@ -108,7 +108,7 @@ export class AnalyticsService {
       ctx.companyId,
       period.start,
       period.end,
-      branchAccessService.callLogBranchFilter(ctx),
+      campaignAccessService.callLogCampaignFilter(ctx),
     );
 
     const buckets = new Map<

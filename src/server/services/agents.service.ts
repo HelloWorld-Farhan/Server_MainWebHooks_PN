@@ -15,7 +15,7 @@ import {
 } from "@/server/repositories/agents.repository";
 import type { TenantContext } from "@/server/types/context";
 import { PERMISSIONS } from "@/server/types/permissions";
-import { branchAccessService } from "@/server/services/branch-access.service";
+import { campaignAccessService } from "@/server/services/campaign-access.service";
 import { tenantService } from "@/server/services/tenant.service";
 
 function mapAgent(agent: Awaited<ReturnType<AgentsRepository["findById"]>>) {
@@ -39,7 +39,7 @@ function mapAgent(agent: Awaited<ReturnType<AgentsRepository["findById"]>>) {
     scorecards: agent.scorecards,
     monitors: agent.monitors,
     demoAudioUrl: agent.demoAudioUrl,
-    branchId: agent.branchId,
+    campaignId: agent.campaignId,
     createdAt: agent.createdAt.toISOString(),
     updatedAt: agent.updatedAt.toISOString(),
   };
@@ -48,13 +48,13 @@ function mapAgent(agent: Awaited<ReturnType<AgentsRepository["findById"]>>) {
 export class AgentsService {
   private readonly repo = new AgentsRepository(prisma);
 
-  private async assertBranchInCompany(ctx: TenantContext, branchId: string) {
-    const branch = await prisma.branch.findFirst({
-      where: { id: branchId, companyId: ctx.companyId },
+  private async assertBranchInCompany(ctx: TenantContext, campaignId: string) {
+    const campaign = await prisma.campaign.findFirst({
+      where: { id: campaignId, companyId: ctx.companyId },
       select: { id: true },
     });
-    if (!branch) throw new ValidationError("Branch not found");
-    branchAccessService.assertBranchAccess(ctx, branchId);
+    if (!campaign) throw new ValidationError("Campaign not found");
+    campaignAccessService.assertCampaignAccess(ctx, campaignId);
   }
 
   async getStatusSummary(ctx: TenantContext) {
@@ -103,8 +103,8 @@ export class AgentsService {
   async create(ctx: TenantContext, input: CreateAgentData) {
     tenantService.requirePermission(ctx, PERMISSIONS.AGENTS_WRITE);
 
-    if (input.branchId) {
-      await this.assertBranchInCompany(ctx, input.branchId);
+    if (input.campaignId) {
+      await this.assertBranchInCompany(ctx, input.campaignId);
     }
 
     const agent = await this.repo.create(ctx.companyId, {
@@ -128,8 +128,8 @@ export class AgentsService {
       ...(input.libraryEntryId
         ? { libraryEntry: { connect: { id: input.libraryEntryId } } }
         : {}),
-      ...(input.branchId
-        ? { branch: { connect: { id: input.branchId } } }
+      ...(input.campaignId
+        ? { campaign: { connect: { id: input.campaignId } } }
         : {}),
     });
 
@@ -144,7 +144,7 @@ export class AgentsService {
     input: Partial<CreateAgentData> & {
       status?: AgentStatus;
       enabled?: boolean;
-      branchId?: string | null;
+      campaignId?: string | null;
     },
   ) {
     tenantService.requirePermission(ctx, PERMISSIONS.AGENTS_WRITE);
@@ -152,8 +152,8 @@ export class AgentsService {
     const existing = await this.repo.findById(ctx.companyId, id);
     if (!existing) throw new NotFoundError("Agent not found");
 
-    if (input.branchId) {
-      await this.assertBranchInCompany(ctx, input.branchId);
+    if (input.campaignId) {
+      await this.assertBranchInCompany(ctx, input.campaignId);
     }
 
     const data: Prisma.AiAgentUpdateInput = {};
@@ -180,9 +180,9 @@ export class AgentsService {
     if (input.scorecards !== undefined) data.scorecards = input.scorecards;
     if (input.monitors !== undefined) data.monitors = input.monitors;
     if (input.demoAudioUrl !== undefined) data.demoAudioUrl = input.demoAudioUrl;
-    if (input.branchId !== undefined) {
-      data.branch = input.branchId
-        ? { connect: { id: input.branchId } }
+    if (input.campaignId !== undefined) {
+      data.campaign = input.campaignId
+        ? { connect: { id: input.campaignId } }
         : { disconnect: true };
     }
 

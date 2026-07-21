@@ -65,7 +65,7 @@ export async function authenticateApiKey(
       deletedAt: null,
     },
     include: {
-      branchAccess: true,
+      campaignAccess: true,
     },
   });
 

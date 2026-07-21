@@ -2,6 +2,7 @@ import {
   buildConnection,
   encodeIdCursor,
 } from "@/server/lib/pagination";
+import { creditsForDuration } from "@/server/lib/credits.util";
 import prisma from "@/server/lib/prisma";
 import { BillingRepository } from "@/server/repositories/billing.repository";
 import { BillingQuoteRepository } from "@/server/repositories/billing-quote.repository";
@@ -16,6 +17,20 @@ const GST_RATE = 0.18;
 const MIN_CHANNEL_QTY = 3;
 const CHANNEL_COST = 650;
 const VIRTUAL_NUMBER_COST = 370;
+const DEFAULT_PULSE_SECONDS = 60;
+const DEFAULT_DELTA_SECONDS = 2;
+const DEFAULT_COST_PER_CREDIT = 0.31;
+
+export type CompanyBillingConfig = {
+  pulseTimeSeconds: number;
+  deltaSeconds: number;
+  costPerCredit: number;
+};
+
+export type CallBillingResult = {
+  credits: number;
+  costInr: number;
+};
 
 function getCallTierRate(monthlyCalls: number): number {
   if (monthlyCalls >= 5001) return 3;
@@ -112,14 +127,46 @@ export class BillingService {
     const rates = await this.setupRepo.getBillingRates(ctx.companyId);
     return {
       costPerChannel: rates?.costPerChannel ?? CHANNEL_COST,
-      costPerCredit: rates?.costPerCredit ?? 0.31,
-      pulseTimeSeconds: rates?.pulseTimeSeconds ?? 60,
+      costPerCredit: rates?.costPerCredit ?? DEFAULT_COST_PER_CREDIT,
+      pulseTimeSeconds: rates?.pulseTimeSeconds ?? DEFAULT_PULSE_SECONDS,
       setupOneTimeCost: rates?.setupOneTimeCost ?? 0,
       currency: rates?.currency ?? "INR",
       minChannelPurchase: MIN_CHANNEL_QTY,
       virtualNumberCost: VIRTUAL_NUMBER_COST,
       gstRate: GST_RATE,
     };
+  }
+
+  async loadCompanyBillingConfig(
+    companyId: string,
+  ): Promise<CompanyBillingConfig> {
+    const [setupConfig, billingRates] = await Promise.all([
+      this.setupRepo.getSetupConfig(companyId),
+      this.setupRepo.getBillingRates(companyId),
+    ]);
+
+    return {
+      pulseTimeSeconds:
+        billingRates?.pulseTimeSeconds ??
+        setupConfig?.pulseTimeSeconds ??
+        DEFAULT_PULSE_SECONDS,
+      deltaSeconds: setupConfig?.deltaSeconds ?? DEFAULT_DELTA_SECONDS,
+      costPerCredit:
+        billingRates?.costPerCredit ?? DEFAULT_COST_PER_CREDIT,
+    };
+  }
+
+  calculateCallBilling(
+    durationSeconds: number,
+    config: CompanyBillingConfig,
+  ): CallBillingResult {
+    const credits = creditsForDuration(
+      durationSeconds,
+      config.pulseTimeSeconds,
+      config.deltaSeconds,
+    );
+    const costInr = credits * config.costPerCredit;
+    return { credits, costInr };
   }
 
   async createQuote(

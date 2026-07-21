@@ -25,8 +25,8 @@ type ApiKey {
   environment: ApiKeyEnvironment!
   status: ApiKeyStatus!
   scopes: [String!]!
-  branchAccessType: BranchAccessType!
-  branchIds: [ID!]!
+  campaignAccessType: CampaignAccessType!
+  campaignIds: [ID!]!
   expiresAt: String
   lastUsedAt: String
   createdAt: String!
@@ -45,8 +45,8 @@ type ApiKeyWithSecret {
   environment: ApiKeyEnvironment!
   status: ApiKeyStatus!
   scopes: [String!]!
-  branchAccessType: BranchAccessType!
-  branchIds: [ID!]!
+  campaignAccessType: CampaignAccessType!
+  campaignIds: [ID!]!
   expiresAt: String
   lastUsedAt: String
   createdAt: String!
@@ -71,10 +71,10 @@ type ApiKeyScopeInfo {
   label: String!
 }
 
-type ApiKeyAccessibleBranch {
+type ApiKeyAccessibleCampaign {
   id: ID!
   name: String!
-  status: BranchStatus!
+  status: CampaignStatus!
 }
 
 type DeleteApiKeyResult {
@@ -93,8 +93,8 @@ input CreateApiKeyInput {
   description: String
   environment: ApiKeyEnvironment!
   scopes: [String!]!
-  branchAccessType: BranchAccessType
-  branchIds: [ID!]
+  campaignAccessType: CampaignAccessType
+  campaignIds: [ID!]
   expiresAt: String
 }
 
@@ -103,16 +103,16 @@ input UpdateApiKeyInput {
   description: String
 }
 
-input UpdateApiKeyBranchAccessInput {
-  branchAccessType: BranchAccessType!
-  branchIds: [ID!]
+input UpdateApiKeyCampaignAccessInput {
+  campaignAccessType: CampaignAccessType!
+  campaignIds: [ID!]
 }
 
 type ApiKeysQueries {
   connection(first: Int, after: String, filter: ApiKeyFilter): ApiKeyConnection!
   byId(id: ID!): ApiKey
   availableScopes: [ApiKeyScopeInfo!]!
-  accessibleBranches: [ApiKeyAccessibleBranch!]!
+  accessibleCampaigns: [ApiKeyAccessibleCampaign!]!
 }
 
 type ApiKeysMutations {
@@ -124,6 +124,6 @@ type ApiKeysMutations {
   regenerate(id: ID!): ApiKeyWithSecret!
   rotateSecret(id: ID!): ApiKeyWithSecret!
   updateScopes(id: ID!, scopes: [String!]!): ApiKey!
-  updateBranchAccess(id: ID!, input: UpdateApiKeyBranchAccessInput!): ApiKey!
+  updateCampaignAccess(id: ID!, input: UpdateApiKeyCampaignAccessInput!): ApiKey!
   updateExpiration(id: ID!, expiresAt: String): ApiKey!
 }

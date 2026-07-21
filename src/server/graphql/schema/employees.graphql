@@ -6,10 +6,10 @@ type EmployeeRole {
   isSystem: Boolean!
 }
 
-type EmployeeBranch {
+type EmployeeCampaign {
   id: ID!
   name: String!
-  status: BranchStatus!
+  status: CampaignStatus!
 }
 
 type Employee {
@@ -22,8 +22,8 @@ type Employee {
   jobTitle: String
   role: UserRole!
   customRole: EmployeeRole
-  branchAccessType: BranchAccessType!
-  assignedBranches: [EmployeeBranch!]!
+  campaignAccessType: CampaignAccessType!
+  assignedCampaigns: [EmployeeCampaign!]!
   status: MemberStatus!
   invitationStatus: InvitationDisplayStatus!
   lastActiveAt: String
@@ -54,7 +54,7 @@ input EmployeeFilter {
   search: String
   role: UserRole
   status: MemberStatus
-  branchId: ID
+  campaignId: ID
 }
 
 input InviteEmployeeInput {
@@ -62,15 +62,15 @@ input InviteEmployeeInput {
   email: String!
   role: UserRole!
   jobTitle: String
-  branchAccessType: BranchAccessType!
-  branchIds: [ID!]
+  campaignAccessType: CampaignAccessType!
+  campaignIds: [ID!]
 }
 
 input UpdateEmployeeInput {
   jobTitle: String
   role: UserRole
-  branchAccessType: BranchAccessType
-  branchIds: [ID!]
+  campaignAccessType: CampaignAccessType
+  campaignIds: [ID!]
   status: MemberStatus
   firstName: String
   lastName: String

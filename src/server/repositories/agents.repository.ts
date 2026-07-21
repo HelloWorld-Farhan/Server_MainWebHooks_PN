@@ -35,15 +35,15 @@ export class AgentsRepository extends BaseRepository {
     });
   }
 
-  findByBranch(companyId: string, branchId: string) {
+  findByCampaign(companyId: string, campaignId: string) {
     return this.prisma.aiAgent.findMany({
-      where: { companyId, branchId },
+      where: { companyId, campaignId },
       orderBy: { createdAt: "desc" },
     });
   }
 
-  countByBranch(companyId: string, branchId: string) {
-    return this.prisma.aiAgent.count({ where: { companyId, branchId } });
+  countByCampaign(companyId: string, campaignId: string) {
+    return this.prisma.aiAgent.count({ where: { companyId, campaignId } });
   }
 
   create(companyId: string, data: Prisma.AiAgentCreateWithoutCompanyInput) {
@@ -86,5 +86,5 @@ export type CreateAgentData = {
   monitors?: Prisma.InputJsonValue;
   demoAudioUrl?: string;
   libraryEntryId?: string;
-  branchId?: string;
+  campaignId?: string;
 };

@@ -7,7 +7,7 @@ export const UPLOADED_CONTACTS_LIST_QUERY = `
         name
         email
         address
-        branches {
+        campaigns {
           id
           name
         }
@@ -39,7 +39,7 @@ export const IMPORT_UPLOADED_CONTACTS_MUTATION = `
         created
         skipped
         invalid
-        unmatchedBranches
+        unmatchedCampaigns
       }
     }
   }
@@ -67,7 +67,7 @@ export type UploadedContactResult = {
   name: string | null;
   email: string | null;
   address: string | null;
-  branches: { id: string; name: string }[];
+  campaigns: { id: string; name: string }[];
   createdAt: string;
 };
 
@@ -76,7 +76,7 @@ export type ImportedContactInput = {
   name?: string | null;
   email?: string | null;
   address?: string | null;
-  branchNames?: string[];
+  campaignNames?: string[];
 };
 
 export type UploadedContactsListResult = {
@@ -91,7 +91,7 @@ export type UploadedContactImportResult = {
       created: number;
       skipped: number;
       invalid: number;
-      unmatchedBranches: string[];
+      unmatchedCampaigns: string[];
     };
   };
 };

@@ -6,10 +6,10 @@ import {
 } from "@/lib/permissions";
 import {
   ForbiddenError,
-  MissingBranchAccessError,
+  MissingCampaignAccessError,
   MissingScopeError,
 } from "@/server/lib/errors";
-import { branchAccessService } from "@/server/services/branch-access.service";
+import { campaignAccessService } from "@/server/services/campaign-access.service";
 import type { TenantContext } from "@/server/types/context";
 
 export function requireScope(ctx: TenantContext, scope: Permission): void {
@@ -37,15 +37,15 @@ export function requireAnyScope(
   }
 }
 
-export function requireBranchAccess(
+export function requireCampaignAccess(
   ctx: TenantContext,
-  branchId: string,
+  campaignId: string,
 ): void {
   try {
-    branchAccessService.assertBranchAccess(ctx, branchId);
+    campaignAccessService.assertCampaignAccess(ctx, campaignId);
   } catch (error) {
     if (error instanceof ForbiddenError) {
-      throw new MissingBranchAccessError(error.message);
+      throw new MissingCampaignAccessError(error.message);
     }
     throw error;
   }
@@ -63,7 +63,7 @@ export function assertResourceAccess(
   resource: ResourceRestriction,
 ): void {
   if (resource.type === "branch") {
-    requireBranchAccess(ctx, resource.id);
+    requireCampaignAccess(ctx, resource.id);
     return;
   }
 
@@ -85,18 +85,18 @@ export function assertScopesAreSubset(
   }
 }
 
-/** Ensures granted branch ids are a subset when principal has SELECTED access. */
-export function assertBranchesAreSubset(
+/** Ensures granted campaign ids are a subset when principal has SELECTED access. */
+export function assertCampaignsAreSubset(
   ctx: TenantContext,
-  branchIds: string[],
+  campaignIds: string[],
 ): void {
   if (ctx.authType !== "api_key") return;
-  if (ctx.branchAccess.type === "ALL") return;
-  const allowed = new Set(ctx.branchAccess.branchIds);
-  for (const id of branchIds) {
+  if (ctx.campaignAccess.type === "ALL") return;
+  const allowed = new Set(ctx.campaignAccess.campaignIds);
+  for (const id of campaignIds) {
     if (!allowed.has(id)) {
-      throw new MissingBranchAccessError(
-        "Cannot grant branch access beyond the current API key",
+      throw new MissingCampaignAccessError(
+        "Cannot grant campaign access beyond the current API key",
       );
     }
   }
