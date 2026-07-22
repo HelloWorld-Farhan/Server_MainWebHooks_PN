@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import type { CallStatus } from "@prisma/client";
 
 import { channelService } from "@/server/channels/channel.service";
@@ -15,12 +15,8 @@ const ACTIVE_CHANNEL_STATUSES: CallStatus[] = [
 ];
 
 @Injectable()
-export class ChannelReconciliationService implements OnModuleInit {
+export class ChannelReconciliationService {
   private readonly callLogsRepo = new CallLogsRepository(prisma);
-
-  async onModuleInit(): Promise<void> {
-    await this.reconcileAll();
-  }
 
   async reconcileAll(): Promise<void> {
     const companies = await prisma.company.findMany({
