@@ -26,42 +26,16 @@ export type ObdConfig = {
   scheduleDate: string | null;
 };
 
-function parseServiceNumbers(raw: string | undefined): string[] {
-  if (!raw?.trim()) {
-    return [];
-  }
-
-  return [
-    ...new Set(
-      raw
-        .split(",")
-        .map((value) => value.trim())
-        .filter(Boolean),
-    ),
-  ];
-}
-
 export function getObdServiceNumbers(): string[] {
-  const configured = parseServiceNumbers(process.env.OBD_SERVICE_NUMBERS);
-  if (configured.length > 0) {
-    return configured;
-  }
-
-  const legacy = (process.env.OBD_SERVICE_NO ?? "").trim();
-  if (legacy) {
-    return [legacy];
-  }
-
   return [...DEFAULT_OBD_SERVICE_NUMBERS];
 }
 
-function resolveDefaultServiceNo(): string {
-  const configured = (process.env.OBD_SERVICE_NO ?? "").trim();
-  if (configured) {
-    return configured;
-  }
-
+export function getDefaultObdServiceNo(): string {
   return getObdServiceNumbers()[0] ?? "";
+}
+
+function resolveDefaultServiceNo(): string {
+  return getDefaultObdServiceNo();
 }
 
 function parsePositiveInt(value: string | undefined, fallback: number): number {
@@ -101,7 +75,7 @@ export function assertObdDispatchConfig(config: ObdConfig): void {
     throw new Error("OBD_API_KEY is not configured");
   }
   if (!config.serviceNo) {
-    throw new Error("OBD_SERVICE_NO is not configured");
+    throw new Error("No OBD service number is configured");
   }
   if (!config.voiceFile) {
     throw new Error("OBD_VOICE_FILE is not configured");

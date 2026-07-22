@@ -1,7 +1,7 @@
 import { Controller, Get } from "@nestjs/common";
 
 import {
-  getObdConfig,
+  getDefaultObdServiceNo,
   getObdServiceNumbers,
 } from "@/server/telephony/obd-config";
 
@@ -10,11 +10,10 @@ export class ObdController {
   @Get("service-numbers")
   getServiceNumbers() {
     const numbers = getObdServiceNumbers();
-    const config = getObdConfig();
 
     return {
       numbers,
-      defaultNumber: config.serviceNo || numbers[0] || null,
+      defaultNumber: getDefaultObdServiceNo() || numbers[0] || null,
     };
   }
 }

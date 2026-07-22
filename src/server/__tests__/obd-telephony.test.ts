@@ -12,6 +12,8 @@ import { channelService } from "@/server/channels/channel.service";
 import { ObdWebhookService } from "@/server/telephony/webhook.service";
 import {
   DEFAULT_OBD_SERVICE_NUMBERS,
+  getDefaultObdServiceNo,
+  getObdConfig,
   getObdServiceNumbers,
 } from "@/server/telephony/obd-config";
 
@@ -53,26 +55,10 @@ function randomCompanyCode() {
 
 describe("OBD telephony", () => {
   describe("obd-config", () => {
-    it("returns configured service numbers with defaults", () => {
-      const original = process.env.OBD_SERVICE_NUMBERS;
-      delete process.env.OBD_SERVICE_NUMBERS;
-      delete process.env.OBD_SERVICE_NO;
-
+    it("returns default service numbers and default service number", () => {
       assert.deepEqual(getObdServiceNumbers(), [...DEFAULT_OBD_SERVICE_NUMBERS]);
-
-      process.env.OBD_SERVICE_NUMBERS =
-        "7971502709,7971501524,7971502635";
-      assert.deepEqual(getObdServiceNumbers(), [
-        "7971502709",
-        "7971501524",
-        "7971502635",
-      ]);
-
-      if (original === undefined) {
-        delete process.env.OBD_SERVICE_NUMBERS;
-      } else {
-        process.env.OBD_SERVICE_NUMBERS = original;
-      }
+      assert.equal(getDefaultObdServiceNo(), DEFAULT_OBD_SERVICE_NUMBERS[0]);
+      assert.equal(getObdConfig().serviceNo, DEFAULT_OBD_SERVICE_NUMBERS[0]);
     });
   });
 
@@ -250,7 +236,6 @@ describe("OBD telephony", () => {
     before(async () => {
       process.env.OBD_API_KEY = OBD_TEST_CONFIG.apiKey;
       process.env.OBD_BASE_URL = OBD_TEST_CONFIG.baseUrl;
-      process.env.OBD_SERVICE_NO = OBD_TEST_CONFIG.serviceNo;
       process.env.OBD_VOICE_FILE = OBD_TEST_CONFIG.voiceFile;
 
       const suffix = Math.random().toString(36).slice(2, 8);
