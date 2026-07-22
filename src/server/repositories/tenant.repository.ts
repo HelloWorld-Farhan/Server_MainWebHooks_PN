@@ -107,9 +107,19 @@ export class TenantRepository extends BaseRepository {
 
     const existing = await this.findCompanyByClerkOrgId(data.clerkOrganizationId);
     if (existing) {
+      const legacyIds =
+        !existing.cli || !existing.companyCode
+          ? {
+              ...(existing.cli ? {} : { cli: await generateUniqueCliFromSlug(this.prisma, data.slug) }),
+              ...(existing.companyCode
+                ? {}
+                : { companyCode: await generateUniqueCompanyCode(this.prisma) }),
+            }
+          : {};
+
       return this.prisma.company.update({
         where: { id: existing.id },
-        data: updateData,
+        data: { ...updateData, ...legacyIds },
       });
     }
 
@@ -137,9 +147,19 @@ export class TenantRepository extends BaseRepository {
       ) {
         const raced = await this.findCompanyByClerkOrgId(data.clerkOrganizationId);
         if (raced) {
+          const legacyIds =
+            !raced.cli || !raced.companyCode
+              ? {
+                  ...(raced.cli ? {} : { cli: await generateUniqueCliFromSlug(this.prisma, data.slug) }),
+                  ...(raced.companyCode
+                    ? {}
+                    : { companyCode: await generateUniqueCompanyCode(this.prisma) }),
+                }
+              : {};
+
           return this.prisma.company.update({
             where: { id: raced.id },
-            data: updateData,
+            data: { ...updateData, ...legacyIds },
           });
         }
       }

@@ -1,3 +1,5 @@
+import type { PrismaClient } from "@prisma/client";
+
 const CLI_PATTERN = /^[A-Z]{2,5}$/;
 
 export function normalizeCli(input: string): string | null {
@@ -14,7 +16,7 @@ export function deriveCliFromSlug(slug: string): string {
 }
 
 export async function generateUniqueCliFromSlug(
-  prisma: { company: { findFirst: (args: unknown) => Promise<{ id: string } | null> } },
+  prisma: PrismaClient,
   slug: string,
 ): Promise<string> {
   const base = deriveCliFromSlug(slug);

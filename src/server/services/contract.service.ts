@@ -44,6 +44,15 @@ async function ensureCreditBalance(companyId: string) {
   });
 }
 
+function toPublicClerkOrganizationId(
+  clerkOrganizationId: string | null | undefined,
+): string | null {
+  if (!clerkOrganizationId?.startsWith("org_")) {
+    return null;
+  }
+  return clerkOrganizationId;
+}
+
 async function resolveClerkOrganizationId(
   clerkUserId: string,
   companyName: string,
@@ -76,6 +85,9 @@ export class ContractService {
         linked: true as const,
         contractId: ownedCompany.contractId,
         claimedAt: ownedCompany.claimedAt?.toISOString() ?? null,
+        clerkOrganizationId: toPublicClerkOrganizationId(
+          ownedCompany.clerkOrganizationId,
+        ),
       };
     }
 
@@ -91,6 +103,9 @@ export class ContractService {
           linked: true as const,
           contractId: activeMembership.company.contractId,
           claimedAt: activeMembership.company.claimedAt?.toISOString() ?? null,
+          clerkOrganizationId: toPublicClerkOrganizationId(
+            activeMembership.company.clerkOrganizationId,
+          ),
         };
       }
 
@@ -104,6 +119,9 @@ export class ContractService {
           linked: true as const,
           contractId: invitedMembership.company.contractId,
           claimedAt: invitedMembership.company.claimedAt?.toISOString() ?? null,
+          clerkOrganizationId: toPublicClerkOrganizationId(
+            invitedMembership.company.clerkOrganizationId,
+          ),
         };
       }
     }
@@ -272,10 +290,16 @@ export class ContractService {
       where: { id: company.id },
     });
 
+  const resolvedClerkOrganizationId =
+      linkedCompany?.clerkOrganizationId ?? clerkOrganizationId;
+
     return {
       linked: true as const,
       contractId: linkedCompany?.contractId ?? company.contractId,
       claimedAt: (linkedCompany?.claimedAt ?? claimedAt).toISOString(),
+      clerkOrganizationId: toPublicClerkOrganizationId(
+        resolvedClerkOrganizationId,
+      ),
     };
   }
 }

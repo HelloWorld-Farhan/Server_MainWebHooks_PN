@@ -149,6 +149,7 @@ describe("ContractService.linkContractId", () => {
       linked: true,
       contractId: CONTRACT_ID,
       claimedAt: expect.any(String),
+      clerkOrganizationId: "org_mock",
     });
 
     // Company claimed via compare-and-set on unclaimed ownerUserId.
