@@ -116,10 +116,19 @@ enum CallDirection {
 }
 
 enum CallStatus {
+  PENDING
+  QUEUED
+  DISPATCHING
+  QUEUED_AT_PROVIDER
+  RINGING
+  ANSWERED
   COMPLETED
+  FAILED
+  BUSY
+  NO_ANSWER
+  CANCELLED
   MISSED
   VOICEMAIL
-  FAILED
 }
 
 enum CallOutcome {
@@ -195,6 +204,25 @@ enum OutboundCampaignStatus {
   PAUSED
   DRAFT
   COMPLETED
+}
+
+enum CampaignExecutionStatus {
+  DRAFT
+  SCHEDULED
+  RUNNING
+  PAUSED
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum ContactRetryJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  SKIPPED
+  CANCELLED
+  FAILED
 }
 
 enum BillingQuoteStatus {
@@ -375,10 +403,15 @@ model Company {
   settings            Json             @default("{}")
   /// Demo tenant for client trials; hidden from admin panel and reusable contract ID.
   isDemo              Boolean          @default(false)
+  /// Human-readable company label used in public IDs (e.g. PNX, TPO). Set at creation; treat as immutable.
+  cli                 String           @unique
+  /// Auto-generated immutable internal company code (admin use only; not used in campaign public IDs).
+  companyCode         String           @unique
   createdAt           DateTime         @default(now())
   updatedAt           DateTime         @updatedAt
 
   members                    CompanyMember[]
+  resourceSequences          CompanyResourceSequence[]
   invitations                Invitation[]
   leadSources                LeadSource[]
   pipelineStages             LeadPipelineStage[]
@@ -411,6 +444,7 @@ model Company {
   dialerChannels             Channel[]
   dialerCalls                DialerCall[]
   campaigns                  Campaign[]
+  campaignExecutions         CampaignExecution[]
   agentCommunicationChannels AgentCommunicationChannel[]
   campaignInvitations        CampaignInvitation[]
   supportRequests            SupportRequest[]
@@ -420,6 +454,18 @@ model Company {
   @@index([status])
   @@index([clerkOrganizationId])
   @@index([isDemo])
+}
+
+model CompanyResourceSequence {
+  id           String @id @default(auto()) @map("_id") @db.ObjectId
+  companyId    String @db.ObjectId
+  resourceType String
+  lastSequence Int    @default(0)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, resourceType])
+  @@index([companyId])
 }
 
 model User {
@@ -656,9 +702,14 @@ model LeadActivity {
 model PhoneNumber {
   id                 String            @id @default(auto()) @map("_id") @db.ObjectId
   companyId          String            @db.ObjectId
+  /// Entity ID segment for public IDs (e.g. PH000001). Formerly resourceKey.
+  phoneNumberId     String
+  /// Full external ID (e.g. v1.PNX.CP000001.PH000001).
+  publicId           String
   number             String
   label              String?
   provider           TelephonyProvider
+  campaignId         String?           @db.ObjectId
   inboundAgentId     String?           @db.ObjectId
   outboundAgentId    String?           @db.ObjectId
   status             PhoneNumberStatus @default(ACTIVE)
@@ -669,18 +720,24 @@ model PhoneNumber {
   updatedAt          DateTime          @updatedAt
 
   company            Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  campaign           Campaign?        @relation(fields: [campaignId], references: [id])
   inboundAgent       AiAgent?         @relation("InboundAgent", fields: [inboundAgentId], references: [id])
   outboundAgent      AiAgent?         @relation("OutboundAgent", fields: [outboundAgentId], references: [id])
   callLogs           CallLog[]
   channelAssignments CompanyChannel[]
 
-  @@unique([companyId, number])
+  @@unique([companyId, campaignId, number])
+  @@unique([companyId, phoneNumberId])
+  @@unique([companyId, publicId])
   @@index([companyId, status])
+  @@index([publicId])
 }
 
 model UploadedContact {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   companyId String   @db.ObjectId
+  /// Public ID resource segment (e.g. CT000001).
+  resourceKey String
   phone     String
   name      String?
   email     String?
@@ -692,12 +749,17 @@ model UploadedContact {
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@unique([companyId, phone])
+  @@unique([companyId, resourceKey])
   @@index([companyId, createdAt])
 }
 
 model CallLog {
   id              String        @id @default(auto()) @map("_id") @db.ObjectId
   companyId       String        @db.ObjectId
+  /// Entity ID segment for public IDs (e.g. CL00000001). Formerly resourceKey.
+  callLogId       String
+  /// Full external ID (e.g. v1.PNX.CP000001.CL00000001).
+  publicId        String
   leadId          String?       @db.ObjectId
   phoneNumberId   String?       @db.ObjectId
   aiAgentId       String?       @db.ObjectId
@@ -717,6 +779,23 @@ model CallLog {
   cost             Float?
   creditsUsed      Int?
   provider         String?
+  providerStatus   String?
+  providerCallId   String?
+  correlationId    String?
+  providerRequestedAt DateTime?
+  providerAcceptedAt  DateTime?
+  providerCompletedAt DateTime?
+  answeredAt       DateTime?
+  endedAt          DateTime?
+  disconnectReason String?
+  providerRequest  Json?
+  providerResponse Json?
+  providerWebhook  Json?
+  providerMetadata Json?
+  retryNumber      Int           @default(0)
+  parentCallLogId  String?       @db.ObjectId
+  isRetry          Boolean       @default(false)
+  retryReason      CallStatus?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
@@ -726,8 +805,11 @@ model CallLog {
   aiAgent       AiAgent?           @relation(fields: [aiAgentId], references: [id])
   assignedUser  User?              @relation("CallHumanAgent", fields: [assignedUserId], references: [id])
   campaign      Campaign?          @relation(fields: [campaignId], references: [id])
+  parentCallLog CallLog?           @relation("CallLogRetries", fields: [parentCallLogId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  childRetries  CallLog[]          @relation("CallLogRetries")
   transcript    CallTranscript?
   internalNotes CallInternalNote[]
+  providerEvents CallLogProviderEvent[]
 
   @@index([companyId, startedAt])
   @@index([companyId, status, startedAt])
@@ -735,6 +817,24 @@ model CallLog {
   @@index([companyId, aiAgentId])
   @@index([companyId, assignedUserId])
   @@index([companyId, campaignId])
+  @@index([parentCallLogId])
+  @@index([campaignId, phoneNumberId, isRetry])
+  @@unique([companyId, callLogId])
+  @@unique([companyId, publicId])
+  @@index([publicId])
+}
+
+model CallLogProviderEvent {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  callLogId       String   @db.ObjectId
+  providerEventId String
+  correlationId   String?
+  createdAt       DateTime @default(now())
+
+  callLog CallLog @relation(fields: [callLogId], references: [id], onDelete: Cascade)
+
+  @@unique([callLogId, providerEventId])
+  @@index([callLogId])
 }
 
 model CallTranscript {
@@ -821,6 +921,8 @@ model AgentLibraryEntry {
 model AiAgent {
   id                String           @id @default(auto()) @map("_id") @db.ObjectId
   companyId         String           @db.ObjectId
+  /// Public ID resource segment (e.g. AG000023).
+  resourceKey       String
   libraryEntryId    String?          @db.ObjectId
   campaignId          String?          @db.ObjectId
   name              String
@@ -864,6 +966,7 @@ model AiAgent {
   @@index([companyId, enabled, status])
   @@index([libraryEntryId])
   @@index([companyId, campaignId])
+  @@unique([companyId, resourceKey])
 }
 
 model AgentCommunicationChannel {
@@ -1298,6 +1401,7 @@ model CompanySetupConfig {
   id               String   @id @default(auto()) @map("_id") @db.ObjectId
   companyId        String   @unique @db.ObjectId
   totalChannels    Int      @default(0)
+  serviceNumber    String?
   pulseTimeSeconds Int      @default(60)
   deltaSeconds     Int      @default(2)
   agentsAllocated  Int      @default(0)
@@ -1464,6 +1568,8 @@ model DialerIntegrationLog {
 model Campaign {
   id             String         @id @default(auto()) @map("_id") @db.ObjectId
   companyId      String         @db.ObjectId
+  /// Public ID resource segment (e.g. CP000001).
+  resourceKey    String
   name           String
   status         CampaignStatus @default(ACTIVE)
   address        String?
@@ -1484,17 +1590,93 @@ model Campaign {
   company      Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
   leads        Lead[]
   callLogs     CallLog[]
+  phoneNumbers PhoneNumber[]
   documents    CampaignDocument[]
   activities   CampaignActivity[]
   memberAccess MemberCampaignAccess[]
   agents       AiAgent[]
   invitation   CampaignInvitation?
   apiKeyAccess ApiKeyCampaignAccess[]
+  execution    CampaignExecution?
 
   @@index([companyId, status])
   @@index([companyId, name])
   @@index([companyId, lastActivityAt])
   @@index([companyId, aiEnabled])
+  @@unique([companyId, resourceKey])
+}
+
+model CampaignExecution {
+  id                     String                  @id @default(auto()) @map("_id") @db.ObjectId
+  companyId              String                  @db.ObjectId
+  campaignId             String                  @unique @db.ObjectId
+  status                 CampaignExecutionStatus @default(DRAFT)
+  scheduledAt            DateTime?
+  startedAt              DateTime?
+  pausedAt               DateTime?
+  completedAt            DateTime?
+  failedAt               DateTime?
+  cancelledAt            DateTime?
+  lastProcessedContactId String?                 @db.ObjectId
+  processedCount         Int                     @default(0)
+  totalContacts          Int                     @default(0)
+  workerId               String?
+  lockExpiresAt          DateTime?
+  correlationId          String?
+  failureReason          String?
+  statsQueued            Int                     @default(0)
+  statsDialing           Int                     @default(0)
+  statsAnswered          Int                     @default(0)
+  statsBusy              Int                     @default(0)
+  statsNoAnswer          Int                     @default(0)
+  statsFailed            Int                     @default(0)
+  statsCompleted         Int                     @default(0)
+  estimatedCompletionAt  DateTime?
+  retryEnabled           Boolean                 @default(true)
+  maxRetries             Int                     @default(3)
+  retryDelaySeconds      Int                     @default(300)
+  retryOnBusy            Boolean                 @default(true)
+  retryOnNoAnswer        Boolean                 @default(true)
+  retryOnFailed          Boolean                 @default(true)
+  retryOnCancelled       Boolean                 @default(false)
+  retryOnVoicemail       Boolean                 @default(false)
+  retryOnMissed          Boolean                 @default(true)
+  completedContactsCount Int                     @default(0)
+  totalRetries           Int                     @default(0)
+  pendingRetries         Int                     @default(0)
+  completedRetries       Int                     @default(0)
+  failedRetries          Int                     @default(0)
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, status])
+  @@index([status, scheduledAt])
+}
+
+model ContactRetryJob {
+  id               String                @id @default(auto()) @map("_id") @db.ObjectId
+  companyId        String                @db.ObjectId
+  campaignId       String                @db.ObjectId
+  parentCallLogId  String                @db.ObjectId
+  phoneNumber      String
+  retryNumber      Int
+  retryReason      CallStatus
+  correlationId    String?
+  scheduledAt      DateTime
+  status           ContactRetryJobStatus   @default(PENDING)
+  createdCallLogId String?               @db.ObjectId
+  skipReason       String?
+  processedAt      DateTime?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  @@unique([parentCallLogId])
+  @@index([status, scheduledAt])
+  @@index([campaignId, status])
+  @@index([companyId, campaignId])
 }
 
 model CampaignDocument {
