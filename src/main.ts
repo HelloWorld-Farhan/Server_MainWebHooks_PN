@@ -19,6 +19,23 @@ async function bootstrap() {
   );
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
+  app.use(
+    (
+      err: unknown,
+      _req: express.Request,
+      res: express.Response,
+      next: express.NextFunction,
+    ) => {
+      if (
+        err instanceof SyntaxError &&
+        "status" in err &&
+        (err as { status?: number }).status === 400
+      ) {
+        return res.status(400).json({ error: "Invalid JSON body" });
+      }
+      next(err);
+    },
+  );
 
   app.enableCors({
     origin: getClerkAuthorizedParties(),

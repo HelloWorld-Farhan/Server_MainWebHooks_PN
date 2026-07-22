@@ -52,31 +52,46 @@ export async function requireTenantContext(req: Request) {
     };
   }
 
-  const { userId, orgId } = await getAuthFromRequest(req);
-  if (!userId) {
+  try {
+    const { userId, orgId } = await getAuthFromRequest(req);
+    if (!userId) {
+      return {
+        error: { status: 401, body: { error: "Unauthorized" } } satisfies ApiErrorBody,
+        ctx: null,
+      };
+    }
+
+    const tenant = await resolveAuthenticatedTenant(userId, orgId);
+    if (!tenant) {
+      return {
+        error: {
+          status: 403,
+          body: { error: "Tenant not provisioned" },
+        } satisfies ApiErrorBody,
+        ctx: null,
+      };
+    }
+
+    const ctx = await buildTenantContext(
+      userId,
+      tenant.company.id,
+      tenant.membership,
+    );
+    return { error: null, ctx };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unauthorized";
+    const status =
+      error instanceof Error &&
+      "statusCode" in error &&
+      typeof (error as { statusCode?: unknown }).statusCode === "number"
+        ? (error as { statusCode: number }).statusCode
+        : 401;
     return {
-      error: { status: 401, body: { error: "Unauthorized" } } satisfies ApiErrorBody,
+      error: { status, body: { error: message } } satisfies ApiErrorBody,
       ctx: null,
     };
   }
-
-  const tenant = await resolveAuthenticatedTenant(userId, orgId);
-  if (!tenant) {
-    return {
-      error: {
-        status: 403,
-        body: { error: "Tenant not provisioned" },
-      } satisfies ApiErrorBody,
-      ctx: null,
-    };
-  }
-
-  const ctx = await buildTenantContext(
-    userId,
-    tenant.company.id,
-    tenant.membership,
-  );
-  return { error: null, ctx };
 }
 
 function tenantToAccess(ctx: TenantContext): AccessContext {

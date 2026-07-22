@@ -1,5 +1,6 @@
 import {
   Controller,
+  Get,
   Post,
   Req,
   Res,
@@ -20,6 +21,13 @@ const createOutboundCallSchema = z.object({
 
 @Controller("api/calls")
 export class CallsController {
+  @Get("outbound")
+  methodNotAllowed(@Res() res: Response) {
+    return res.status(405).json({
+      error: "Method not allowed. Use POST /api/calls/outbound.",
+    });
+  }
+
   @Post("outbound")
   async createOutbound(@Req() req: Request, @Res() res: Response) {
     const result = await requireTenantPermission(

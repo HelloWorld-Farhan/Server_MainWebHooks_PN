@@ -5,18 +5,22 @@ import {
   ContactPhonesController,
   ToolsController,
 } from './api.controllers';
+import { BillingController } from '../billing/billing.controller';
+import { CallsController } from '../calls/calls.controller';
+import { CampaignExecutionController } from '../campaigns/campaign-execution.controller';
 import {
   CompanyController,
   ContactRequestsController,
 } from '../company/company.controller';
-import { BillingController } from '../billing/billing.controller';
 import { GraphQLModule } from '../graphql/graphql.module';
 import { IntegrationsController } from '../integrations/integrations.controller';
+import { ChannelsInternalController } from '../internal/channels-internal.controller';
 import { InternalController } from '../internal/internal.controller';
-import { PageCacheController } from '../page-cache/page-cache.controller';
 import { InvitationsController } from '../invitations/invitations.controller';
 import { ObdController } from '../obd/obd.controller';
+import { PageCacheController } from '../page-cache/page-cache.controller';
 import { TelephonyController } from '../telephony/telephony.controller';
+import { ObdWebhooksController } from '../webhooks/obd-webhooks.controller';
 import { WebhooksController } from '../webhooks/webhooks.controller';
 
 @Module({
@@ -28,13 +32,17 @@ import { WebhooksController } from '../webhooks/webhooks.controller';
     TelephonyController,
     ObdController,
     WebhooksController,
+    ObdWebhooksController,
     InternalController,
+    ChannelsInternalController,
     IntegrationsController,
     InvitationsController,
     AgentsController,
     ToolsController,
     ContactPhonesController,
     PageCacheController,
+    CallsController,
+    CampaignExecutionController,
   ],
 })
 export class ApiModule {}
