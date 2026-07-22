@@ -1,0 +1,141 @@
+enum CampaignExecutionStatus {
+  DRAFT
+  SCHEDULED
+  RUNNING
+  PAUSED
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+type CampaignExecution {
+  id: ID!
+  campaignId: ID!
+  status: CampaignExecutionStatus!
+  scheduledAt: String
+  startedAt: String
+  pausedAt: String
+  completedAt: String
+  failedAt: String
+  cancelledAt: String
+  processedCount: Int!
+  totalContacts: Int!
+  correlationId: String
+  failureReason: String
+  estimatedCompletionAt: String
+  createdAt: String!
+  updatedAt: String!
+}
+
+type CampaignExecutionStatistics {
+  totalContacts: Int!
+  processed: Int!
+  pending: Int!
+  queued: Int!
+  dialing: Int!
+  answered: Int!
+  busy: Int!
+  noAnswer: Int!
+  failed: Int!
+  completed: Int!
+  completedContacts: Int!
+  initialCalls: Int!
+  retryCalls: Int!
+  pendingRetries: Int!
+  totalRetries: Int!
+  retrySuccessRate: Float!
+  averageRetryCount: Float!
+}
+
+type CampaignRetryPolicy {
+  retryEnabled: Boolean!
+  maxRetries: Int!
+  retryDelaySeconds: Int!
+  retryOnBusy: Boolean!
+  retryOnNoAnswer: Boolean!
+  retryOnFailed: Boolean!
+  retryOnCancelled: Boolean!
+  retryOnVoicemail: Boolean!
+  retryOnMissed: Boolean!
+}
+
+input CampaignRetryPolicyInput {
+  retryEnabled: Boolean
+  maxRetries: Int
+  retryDelaySeconds: Int
+  retryOnBusy: Boolean
+  retryOnNoAnswer: Boolean
+  retryOnFailed: Boolean
+  retryOnCancelled: Boolean
+  retryOnVoicemail: Boolean
+  retryOnMissed: Boolean
+}
+
+type ContactRetryHistoryEntry {
+  retryNumber: Int!
+  createdAt: String!
+  reason: String!
+  callLogId: String
+  status: String!
+  jobStatus: String!
+}
+
+type PendingRetry {
+  id: ID!
+  phoneNumber: String!
+  retryNumber: Int!
+  retryReason: String!
+  scheduledAt: String!
+  status: String!
+  correlationId: String
+}
+
+type CampaignRetryStatistics {
+  totalCalls: Int!
+  initialCalls: Int!
+  retryCalls: Int!
+  retrySuccessRate: Float!
+  averageRetryCount: Float!
+  busy: Int!
+  noAnswer: Int!
+  failed: Int!
+  answered: Int!
+  completed: Int!
+  pendingRetries: Int!
+}
+
+type CampaignRetrySummary {
+  policy: CampaignRetryPolicy!
+  statistics: CampaignRetryStatistics!
+  pendingRetries: Int!
+  totalRetries: Int!
+  completedRetries: Int!
+  failedRetries: Int!
+}
+
+type CampaignExecutionProgress {
+  processedCount: Int!
+  totalContacts: Int!
+  percentComplete: Int!
+  estimatedCompletionAt: String
+}
+
+type CampaignExecutionQueries {
+  status(campaignId: ID!): CampaignExecution!
+  statistics(campaignId: ID!): CampaignExecutionStatistics!
+  progress(campaignId: ID!): CampaignExecutionProgress!
+  retryPolicy(campaignId: ID!): CampaignRetryPolicy!
+  retryHistory(campaignId: ID!, phoneNumber: String): [ContactRetryHistoryEntry!]!
+  pendingRetries(campaignId: ID!): [PendingRetry!]!
+  retryStatistics(campaignId: ID!): CampaignRetryStatistics!
+  campaignRetrySummary(campaignId: ID!): CampaignRetrySummary!
+}
+
+type CampaignExecutionMutations {
+  schedule(campaignId: ID!, scheduledAt: String!): CampaignExecution!
+  start(campaignId: ID!, scheduledAt: String): CampaignExecution!
+  pause(campaignId: ID!): CampaignExecution!
+  resume(campaignId: ID!): CampaignExecution!
+  cancel(campaignId: ID!): CampaignExecution!
+  updateRetryPolicy(campaignId: ID!, input: CampaignRetryPolicyInput!): CampaignRetryPolicy!
+}

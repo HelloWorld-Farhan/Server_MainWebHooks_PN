@@ -6,6 +6,8 @@
     "test",
     "dist",
     "**/*spec.ts",
+    "**/*.test.ts",
+    "**/__tests__/**",
     "src/lib/graphql/api.ts",
     "src/lib/graphql/client.ts",
     "src/lib/graphql/auth-error.ts"

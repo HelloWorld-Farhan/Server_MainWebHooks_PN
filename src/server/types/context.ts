@@ -2,6 +2,7 @@ import type { CampaignAccessType, UserRole } from "@prisma/client";
 import type DataLoader from "dataloader";
 
 import type { createDataLoaders } from "@/server/graphql/dataloaders";
+import type { CompanyPublicIdentity } from "@/server/lib/public-id/types";
 
 export type CampaignAccessContext = {
   type: CampaignAccessType;
@@ -20,6 +21,7 @@ export type TenantContext = {
   permissions: string[];
   campaignAccess: CampaignAccessContext;
   loaders: ReturnType<typeof createDataLoaders>;
+  companyPublicIdentity?: CompanyPublicIdentity;
   /** Present when authType === "api_key" */
   apiKeyId?: string;
 };

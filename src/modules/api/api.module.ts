@@ -15,6 +15,7 @@ import { IntegrationsController } from '../integrations/integrations.controller'
 import { InternalController } from '../internal/internal.controller';
 import { PageCacheController } from '../page-cache/page-cache.controller';
 import { InvitationsController } from '../invitations/invitations.controller';
+import { ObdController } from '../obd/obd.controller';
 import { TelephonyController } from '../telephony/telephony.controller';
 import { WebhooksController } from '../webhooks/webhooks.controller';
 
@@ -25,6 +26,7 @@ import { WebhooksController } from '../webhooks/webhooks.controller';
     ContactRequestsController,
     BillingController,
     TelephonyController,
+    ObdController,
     WebhooksController,
     InternalController,
     IntegrationsController,

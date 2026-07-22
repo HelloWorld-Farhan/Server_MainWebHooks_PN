@@ -1,0 +1,197 @@
+import { campaignExecutionConfig } from "@/server/campaign-execution/campaign-execution.config";
+import { campaignExecutionRepository } from "@/server/campaign-execution/campaign-execution.repository";
+import { campaignExecutionService } from "@/server/campaign-execution/campaign-execution.service";
+import { logCampaignExecutionEvent } from "@/server/campaign-execution/lib/campaign-execution-logger";
+import { createSystemTenantContext } from "@/server/campaign-execution/lib/system-tenant-context";
+import { toCampaignPublicId } from "@/server/lib/public-id/mapper";
+import prisma from "@/server/lib/prisma";
+import { CampaignsRepository } from "@/server/repositories/campaigns.repository";
+import { outboundCallsService } from "@/server/services/outbound-calls.service";
+import { campaignExecutionLockService } from "@/server/campaign-execution/campaign-execution-lock.service";
+import { contactCompletionService } from "@/server/campaign-execution/retry/contact-completion.service";
+
+export class CampaignRunnerService {
+  private readonly campaignsRepo = new CampaignsRepository(prisma);
+  private readonly activeCampaignIds = new Set<string>();
+
+  getActiveCount(): number {
+    return this.activeCampaignIds.size;
+  }
+
+  resetActiveForTests(): void {
+    this.activeCampaignIds.clear();
+  }
+
+  async processRunnableCampaigns(): Promise<number> {
+    const running = await campaignExecutionRepository.findRunningExecutions(
+      campaignExecutionConfig.maxConcurrentCampaigns * 2,
+    );
+
+    let processed = 0;
+    for (const execution of running) {
+      if (
+        this.activeCampaignIds.size >=
+        campaignExecutionConfig.maxConcurrentCampaigns
+      ) {
+        break;
+      }
+      if (this.activeCampaignIds.has(execution.campaignId)) {
+        continue;
+      }
+
+      const didProcess = await this.processCampaign(execution);
+      if (didProcess) {
+        processed += 1;
+      }
+    }
+
+    return processed;
+  }
+
+  private async processCampaign(execution: {
+    id: string;
+    companyId: string;
+    campaignId: string;
+    lastProcessedContactId: string | null;
+    processedCount: number;
+    totalContacts: number;
+    correlationId: string | null;
+    campaign: { resourceKey: string };
+  }): Promise<boolean> {
+    const acquired = await campaignExecutionLockService.acquire(
+      execution.campaignId,
+      campaignExecutionConfig.workerId,
+    );
+    if (!acquired) {
+      return false;
+    }
+
+    this.activeCampaignIds.add(execution.campaignId);
+
+    try {
+      const stillRunning = await campaignExecutionService.isRunning(
+        execution.companyId,
+        execution.campaignId,
+      );
+      if (!stillRunning) {
+        return false;
+      }
+
+      const ctx = await createSystemTenantContext(execution.companyId);
+      const campaignPublicId = await toCampaignPublicId(
+        ctx,
+        execution.campaign.resourceKey,
+      );
+
+      const contacts = await this.campaignsRepo.findContactsForExecution(
+        execution.companyId,
+        execution.campaignId,
+        campaignExecutionConfig.batchSize,
+        execution.lastProcessedContactId ?? undefined,
+      );
+
+      if (contacts.length === 0) {
+        await contactCompletionService.checkCampaignCompletion(
+          execution.companyId,
+          execution.campaignId,
+        );
+        return true;
+      }
+
+      logCampaignExecutionEvent("batch:started", {
+        campaignPublicId,
+        correlationId: execution.correlationId ?? undefined,
+        batchSize: contacts.length,
+      });
+
+      let processedCount = execution.processedCount;
+
+      for (const contact of contacts) {
+        const running = await campaignExecutionService.isRunning(
+          execution.companyId,
+          execution.campaignId,
+        );
+        if (!running) {
+          break;
+        }
+
+        const existingCall = await prisma.callLog.findFirst({
+          where: {
+            companyId: execution.companyId,
+            campaignId: execution.campaignId,
+            phoneNumber: { number: contact.phone },
+          },
+          select: { id: true },
+        });
+
+        if (!existingCall) {
+          await outboundCallsService.createOutboundCall(ctx, {
+            campaignId: campaignPublicId,
+            phoneNumber: contact.phone,
+          });
+        }
+
+        processedCount += 1;
+        await campaignExecutionRepository.updateCursor(
+          execution.companyId,
+          execution.campaignId,
+          contact.id,
+          processedCount,
+        );
+
+        await campaignExecutionLockService.renew(
+          execution.campaignId,
+          campaignExecutionConfig.workerId,
+        );
+
+        const lockExpiresAt = new Date(
+          Date.now() + campaignExecutionConfig.lockTtlMs,
+        );
+        await campaignExecutionRepository.updateLock(
+          execution.companyId,
+          execution.campaignId,
+          campaignExecutionConfig.workerId,
+          lockExpiresAt,
+        );
+      }
+
+      logCampaignExecutionEvent("batch:completed", {
+        campaignPublicId,
+        correlationId: execution.correlationId ?? undefined,
+        processedCount,
+      });
+
+      if (contacts.length < campaignExecutionConfig.batchSize) {
+        await contactCompletionService.checkCampaignCompletion(
+          execution.companyId,
+          execution.campaignId,
+        );
+      }
+
+      return true;
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unknown runner error";
+      await campaignExecutionService.markFailed(
+        execution.companyId,
+        execution.campaignId,
+        message,
+      );
+      return true;
+    } finally {
+      this.activeCampaignIds.delete(execution.campaignId);
+      const stillRunning = await campaignExecutionService.isRunning(
+        execution.companyId,
+        execution.campaignId,
+      );
+      if (!stillRunning) {
+        await campaignExecutionLockService.release(
+          execution.campaignId,
+          campaignExecutionConfig.workerId,
+        );
+      }
+    }
+  }
+}
+
+export const campaignRunnerService = new CampaignRunnerService();

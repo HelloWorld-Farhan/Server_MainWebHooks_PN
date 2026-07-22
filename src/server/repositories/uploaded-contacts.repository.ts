@@ -1,3 +1,5 @@
+import { allocateResourceKey } from "@/server/lib/resource-key";
+import { PublicResourceType } from "@/server/lib/public-id/types";
 import { BaseRepository } from "@/server/repositories/base.repository";
 
 export type UploadedContactCreateInput = {
@@ -33,15 +35,24 @@ export class UploadedContactsRepository extends BaseRepository {
   }
 
   create(companyId: string, contact: UploadedContactCreateInput) {
-    return this.prisma.uploadedContact.create({
-      data: {
-        phone: contact.phone,
-        name: contact.name ?? null,
-        email: contact.email ?? null,
-        address: contact.address ?? null,
-        campaignIds: contact.campaignIds ?? [],
-        company: { connect: { id: companyId } },
-      },
+    return this.prisma.$transaction(async (tx) => {
+      const resourceKey = await allocateResourceKey(
+        tx,
+        companyId,
+        PublicResourceType.CONTACT,
+      );
+
+      return tx.uploadedContact.create({
+        data: {
+          phone: contact.phone,
+          name: contact.name ?? null,
+          email: contact.email ?? null,
+          address: contact.address ?? null,
+          campaignIds: contact.campaignIds ?? [],
+          resourceKey,
+          company: { connect: { id: companyId } },
+        },
+      });
     });
   }
 
@@ -75,15 +86,25 @@ export class UploadedContactsRepository extends BaseRepository {
     const skipped = uniqueContacts.length - toCreate.length;
 
     if (toCreate.length > 0) {
-      await this.prisma.uploadedContact.createMany({
-        data: toCreate.map((contact) => ({
-          companyId,
-          phone: contact.phone,
-          name: contact.name ?? null,
-          email: contact.email ?? null,
-          address: contact.address ?? null,
-          campaignIds: contact.campaignIds ?? [],
-        })),
+      await this.prisma.$transaction(async (tx) => {
+        for (const contact of toCreate) {
+          const resourceKey = await allocateResourceKey(
+            tx,
+            companyId,
+            PublicResourceType.CONTACT,
+          );
+          await tx.uploadedContact.create({
+            data: {
+              companyId,
+              phone: contact.phone,
+              name: contact.name ?? null,
+              email: contact.email ?? null,
+              address: contact.address ?? null,
+              campaignIds: contact.campaignIds ?? [],
+              resourceKey,
+            },
+          });
+        }
       });
     }
 

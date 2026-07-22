@@ -7,6 +7,8 @@ import type {
 import { Prisma } from "@prisma/client";
 
 import { BaseRepository } from "@/server/repositories/base.repository";
+import { generateUniqueCliFromSlug } from "@/server/lib/cli";
+import { generateUniqueCompanyCode } from "@/server/lib/company-code";
 import { generateUniqueContractId } from "@/server/lib/contract-id";
 
 export class TenantRepository extends BaseRepository {
@@ -112,6 +114,8 @@ export class TenantRepository extends BaseRepository {
     }
 
     const contractId = await generateUniqueContractId(this.prisma);
+    const cli = await generateUniqueCliFromSlug(this.prisma, data.slug);
+    const companyCode = await generateUniqueCompanyCode(this.prisma);
     try {
       return await this.prisma.company.create({
         data: {
@@ -119,6 +123,8 @@ export class TenantRepository extends BaseRepository {
           name: data.name,
           slug: data.slug,
           contractId,
+          cli,
+          companyCode,
           ownerUserId: null,
           primaryUseCase: data.primaryUseCase ?? undefined,
           callVolume: data.callVolume ?? undefined,

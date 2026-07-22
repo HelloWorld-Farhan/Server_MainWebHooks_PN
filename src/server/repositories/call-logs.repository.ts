@@ -1,7 +1,28 @@
-import type { CallDirection, CallStatus, Prisma } from '@prisma/client';
+import type { CallDirection, CallStatus, Prisma, PrismaClient } from '@prisma/client';
 
+import { generatePublicId } from '@/server/lib/public-id';
+import { PublicResourceType } from '@/server/lib/public-id/types';
 import { BaseRepository } from '@/server/repositories/base.repository';
 import { decodeCursor } from '@/server/lib/pagination';
+import { allocateResourceKey } from '@/server/lib/resource-key';
+
+type TransactionClient = Omit<
+  PrismaClient,
+  '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
+>;
+
+export type CreateOutboundPendingInput = {
+  companyId: string;
+  campaignId: string;
+  phoneNumberId: string;
+  campaignResourceKey: string;
+  companyCli: string;
+  retryNumber?: number;
+  parentCallLogId?: string;
+  isRetry?: boolean;
+  retryReason?: CallStatus;
+  correlationId?: string;
+};
 
 export type CallLogFilter = {
   direction?: CallDirection;
@@ -227,6 +248,208 @@ export class CallLogsRepository extends BaseRepository {
   findAgentsByIds(companyId: string, ids: string[]) {
     return this.prisma.aiAgent.findMany({
       where: { companyId, id: { in: ids } },
+    });
+  }
+
+  async createOutboundPending(
+    tx: TransactionClient,
+    input: CreateOutboundPendingInput,
+  ) {
+    const callLogId = await allocateResourceKey(
+      tx,
+      input.companyId,
+      PublicResourceType.CALL_LOG,
+    );
+    const publicId = generatePublicId({
+      cli: input.companyCli,
+      campaignId: input.campaignResourceKey,
+      entityId: callLogId,
+    });
+
+    return tx.callLog.create({
+      data: {
+        companyId: input.companyId,
+        campaignId: input.campaignId,
+        phoneNumberId: input.phoneNumberId,
+        callLogId,
+        publicId,
+        direction: 'OUTBOUND',
+        status: 'PENDING',
+        startedAt: new Date(),
+        provider: 'obd',
+        retryNumber: input.retryNumber ?? 0,
+        parentCallLogId: input.parentCallLogId,
+        isRetry: input.isRetry ?? false,
+        retryReason: input.retryReason,
+        correlationId: input.correlationId,
+      },
+    });
+  }
+
+  findByPublicIdForWebhook(publicId: string) {
+    return this.prisma.callLog.findFirst({
+      where: { publicId },
+      select: {
+        id: true,
+        companyId: true,
+        campaignId: true,
+        publicId: true,
+        status: true,
+        correlationId: true,
+        durationSeconds: true,
+        answeredAt: true,
+        endedAt: true,
+        providerWebhook: true,
+        providerRequest: true,
+        providerResponse: true,
+        company: { select: { id: true, cli: true } },
+        campaign: { select: { id: true, resourceKey: true, companyId: true } },
+        phoneNumber: {
+          select: { id: true, number: true, campaignId: true, companyId: true },
+        },
+      },
+    });
+  }
+
+  findByIdForDispatch(companyId: string, id: string) {
+    return this.prisma.callLog.findFirst({
+      where: { id, companyId },
+      select: {
+        id: true,
+        status: true,
+        publicId: true,
+        companyId: true,
+      },
+    });
+  }
+
+  transitionStatus(
+    companyId: string,
+    callLogId: string,
+    input: { from: CallStatus; to: CallStatus },
+  ) {
+    return this.prisma.callLog.updateMany({
+      where: { id: callLogId, companyId, status: input.from },
+      data: { status: input.to },
+    });
+  }
+
+  appendProviderWebhookOnly(
+    companyId: string,
+    callLogId: string,
+    data: { providerWebhook: Prisma.InputJsonValue },
+  ) {
+    return this.prisma.callLog.updateMany({
+      where: { id: callLogId, companyId },
+      data: { providerWebhook: data.providerWebhook },
+    });
+  }
+
+  updateFromProviderWebhook(
+    companyId: string,
+    callLogId: string,
+    data: {
+      status: CallStatus;
+      providerStatus: string;
+      durationSeconds?: number;
+      answeredAt?: Date;
+      endedAt?: Date;
+      disconnectReason?: string;
+      providerWebhook: Prisma.InputJsonValue;
+      providerCompletedAt?: Date;
+    },
+  ) {
+    return this.prisma.callLog.updateMany({
+      where: { id: callLogId, companyId },
+      data: {
+        status: data.status,
+        providerStatus: data.providerStatus,
+        ...(data.durationSeconds !== undefined
+          ? { durationSeconds: data.durationSeconds }
+          : {}),
+        ...(data.answeredAt !== undefined ? { answeredAt: data.answeredAt } : {}),
+        ...(data.endedAt !== undefined ? { endedAt: data.endedAt } : {}),
+        ...(data.disconnectReason !== undefined
+          ? { disconnectReason: data.disconnectReason }
+          : {}),
+        providerWebhook: data.providerWebhook,
+        ...(data.providerCompletedAt !== undefined
+          ? { providerCompletedAt: data.providerCompletedAt }
+          : {}),
+      },
+    });
+  }
+
+  countByStatuses(companyId: string, statuses: CallStatus[]) {
+    return this.prisma.callLog.count({
+      where: { companyId, status: { in: statuses } },
+    });
+  }
+
+  async findQueuedCallLogIds(companyId: string): Promise<string[]> {
+    const rows = await this.prisma.callLog.findMany({
+      where: { companyId, status: 'QUEUED' },
+      select: { id: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    return rows.map((row) => row.id);
+  }
+
+  startProviderDispatch(
+    companyId: string,
+    callLogId: string,
+    data: {
+      correlationId: string;
+      providerRequest: Prisma.InputJsonValue;
+    },
+  ) {
+    return this.prisma.callLog.updateMany({
+      where: {
+        id: callLogId,
+        companyId,
+        status: { in: ['PENDING', 'QUEUED'] },
+      },
+      data: {
+        status: 'DISPATCHING',
+        correlationId: data.correlationId,
+        providerRequest: data.providerRequest,
+        providerRequestedAt: new Date(),
+        provider: 'obd',
+      },
+    });
+  }
+
+  completeProviderDispatchSuccess(
+    companyId: string,
+    callLogId: string,
+    data: {
+      providerCallId: string | null;
+      providerResponse: Prisma.InputJsonValue;
+    },
+  ) {
+    return this.prisma.callLog.updateMany({
+      where: { id: callLogId, companyId },
+      data: {
+        status: 'QUEUED_AT_PROVIDER',
+        providerCallId: data.providerCallId,
+        providerResponse: data.providerResponse,
+        providerAcceptedAt: new Date(),
+      },
+    });
+  }
+
+  completeProviderDispatchFailure(
+    companyId: string,
+    callLogId: string,
+    data: { providerResponse: Prisma.InputJsonValue },
+  ) {
+    return this.prisma.callLog.updateMany({
+      where: { id: callLogId, companyId },
+      data: {
+        status: 'FAILED',
+        providerResponse: data.providerResponse,
+        providerCompletedAt: new Date(),
+      },
     });
   }
 }

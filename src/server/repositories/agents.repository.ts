@@ -5,6 +5,8 @@ import type {
   Prisma,
 } from "@prisma/client";
 
+import { PublicResourceType } from "@/server/lib/public-id/types";
+import { allocateResourceKey } from "@/server/lib/resource-key";
 import { BaseRepository } from "@/server/repositories/base.repository";
 
 export class AgentsRepository extends BaseRepository {
@@ -46,12 +48,19 @@ export class AgentsRepository extends BaseRepository {
     return this.prisma.aiAgent.count({ where: { companyId, campaignId } });
   }
 
-  create(companyId: string, data: Prisma.AiAgentCreateWithoutCompanyInput) {
-    return this.prisma.aiAgent.create({
-      data: {
-        ...data,
-        company: { connect: { id: companyId } },
-      },
+  create(companyId: string, data: Omit<Prisma.AiAgentCreateWithoutCompanyInput, "resourceKey"> & { resourceKey?: string }) {
+    return this.prisma.$transaction(async (tx) => {
+      const resourceKey =
+        data.resourceKey ??
+        (await allocateResourceKey(tx, companyId, PublicResourceType.AGENT));
+
+      return tx.aiAgent.create({
+        data: {
+          ...data,
+          resourceKey,
+          company: { connect: { id: companyId } },
+        },
+      });
     });
   }
 

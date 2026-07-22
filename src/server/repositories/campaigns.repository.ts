@@ -1,5 +1,7 @@
 import type { CampaignStatus, Prisma } from "@prisma/client";
 
+import { allocateResourceKey } from "@/server/lib/resource-key";
+import { PublicResourceType } from "@/server/lib/public-id/types";
 import { BaseRepository } from "@/server/repositories/base.repository";
 import { decodeIdCursor } from "@/server/lib/pagination";
 
@@ -118,15 +120,26 @@ export class CampaignsRepository extends BaseRepository {
     });
   }
 
-  create(companyId: string, data: Prisma.CampaignCreateWithoutCompanyInput) {
-    return this.prisma.campaign.create({
-      data: {
-        ...data,
-        company: { connect: { id: companyId } },
-      },
-      include: {
-        invitation: true,
-      },
+  create(companyId: string, data: Omit<Prisma.CampaignCreateWithoutCompanyInput, "resourceKey"> & { resourceKey?: string }) {
+    return this.prisma.$transaction(async (tx) => {
+      const resourceKey =
+        data.resourceKey ??
+        (await allocateResourceKey(
+          tx,
+          companyId,
+          PublicResourceType.CAMPAIGN,
+        ));
+
+      return tx.campaign.create({
+        data: {
+          ...data,
+          resourceKey,
+          company: { connect: { id: companyId } },
+        },
+        include: {
+          invitation: true,
+        },
+      });
     });
   }
 
@@ -161,6 +174,32 @@ export class CampaignsRepository extends BaseRepository {
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: limit,
       ...(cursor ? { cursor: { id: cursor.id }, skip: 1 } : {}),
+    });
+  }
+
+  countContacts(companyId: string, campaignId: string) {
+    return this.prisma.uploadedContact.count({
+      where: { companyId, campaignIds: { has: campaignId } },
+    });
+  }
+
+  findContactsForExecution(
+    companyId: string,
+    campaignId: string,
+    limit: number,
+    afterContactId?: string,
+  ) {
+    return this.prisma.uploadedContact.findMany({
+      where: { companyId, campaignIds: { has: campaignId } },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      take: limit,
+      select: { id: true, phone: true },
+      ...(afterContactId
+        ? {
+            cursor: { id: afterContactId },
+            skip: 1,
+          }
+        : {}),
     });
   }
 

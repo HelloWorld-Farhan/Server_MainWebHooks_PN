@@ -48,3 +48,23 @@ if (process.env.NODE_ENV !== "production" && redis) {
 export function isRedisAvailable(): boolean {
   return redis !== null && redis.status === "ready";
 }
+
+/** Channel management uses Redis when available and in-memory fallback otherwise. */
+export function assertChannelRedisReady(): void {
+  // Intentionally non-throwing: ChannelService handles missing Redis.
+}
+
+export async function connectRedisOnStartup(): Promise<void> {
+  if (!redis || redis.status === "ready") {
+    return;
+  }
+
+  try {
+    await redis.connect();
+  } catch (error) {
+    console.warn(
+      "[redis] Failed to connect on startup; channel features will use in-memory fallback",
+      error,
+    );
+  }
+}

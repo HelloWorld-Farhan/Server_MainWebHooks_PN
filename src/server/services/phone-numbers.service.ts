@@ -16,9 +16,22 @@ import type { TenantContext } from "@/server/types/context";
 import { PERMISSIONS } from "@/server/types/permissions";
 import { tenantService } from "@/server/services/tenant.service";
 
-function mapPhoneNumber(row: Awaited<
-  ReturnType<PhoneNumbersRepository["findMany"]>
->[number]) {
+function mapPhoneNumber(row: {
+  id: string;
+  number: string;
+  label: string | null;
+  provider: TelephonyProvider;
+  status: PhoneNumberStatus;
+  inboundAgentId: string | null;
+  outboundAgentId: string | null;
+  inboundAgent?: { id: string; name: string } | null;
+  outboundAgent?: { id: string; name: string } | null;
+  inboundCallsCount: number;
+  outboundCallsCount: number;
+  lastActivityAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
   return {
     id: row.id,
     number: row.number,

@@ -1,11 +1,20 @@
 import type {
   PhoneNumberStatus,
   Prisma,
+  PrismaClient,
   TelephonyProvider,
 } from "@prisma/client";
 
+import { generateLegacyPublicId, generatePublicId } from "@/server/lib/public-id";
+import { PublicResourceType } from "@/server/lib/public-id/types";
 import { decodeIdCursor } from "@/server/lib/pagination";
+import { allocateResourceKey } from "@/server/lib/resource-key";
 import { BaseRepository } from "@/server/repositories/base.repository";
+
+type TransactionClient = Omit<
+  PrismaClient,
+  "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
+>;
 
 const agentSelect = {
   id: true,
@@ -239,25 +248,63 @@ export class PhoneNumbersRepository extends BaseRepository {
       label?: string;
       inboundAgentId?: string;
       outboundAgentId?: string;
+      campaignId?: string;
+      campaignResourceKey?: string;
+      companyCli?: string;
     },
   ) {
-    return this.prisma.phoneNumber.create({
-      data: {
-        number: data.number,
-        provider: data.provider,
-        label: data.label,
-        company: { connect: { id: companyId } },
-        ...(data.inboundAgentId
-          ? { inboundAgent: { connect: { id: data.inboundAgentId } } }
-          : {}),
-        ...(data.outboundAgentId
-          ? { outboundAgent: { connect: { id: data.outboundAgentId } } }
-          : {}),
-      },
-      include: {
-        inboundAgent: { select: agentSelect },
-        outboundAgent: { select: agentSelect },
-      },
+    return this.prisma.$transaction(async (tx) => {
+      const phoneNumberId = await allocateResourceKey(
+        tx,
+        companyId,
+        PublicResourceType.PHONE_NUMBER,
+      );
+
+      let publicId: string;
+      if (data.campaignResourceKey && data.companyCli) {
+        publicId = generatePublicId({
+          cli: data.companyCli,
+          campaignId: data.campaignResourceKey,
+          entityId: phoneNumberId,
+        });
+      } else {
+        const company = await tx.company.findUnique({
+          where: { id: companyId },
+          select: { cli: true, companyCode: true },
+        });
+        if (!company) {
+          throw new Error("Company not found");
+        }
+        publicId = generateLegacyPublicId({
+          cli: company.cli,
+          companyCode: company.companyCode,
+          resourceKey: phoneNumberId,
+        });
+      }
+
+      return tx.phoneNumber.create({
+        data: {
+          number: data.number,
+          provider: data.provider,
+          label: data.label,
+          phoneNumberId,
+          publicId,
+          company: { connect: { id: companyId } },
+          ...(data.campaignId
+            ? { campaign: { connect: { id: data.campaignId } } }
+            : {}),
+          ...(data.inboundAgentId
+            ? { inboundAgent: { connect: { id: data.inboundAgentId } } }
+            : {}),
+          ...(data.outboundAgentId
+            ? { outboundAgent: { connect: { id: data.outboundAgentId } } }
+            : {}),
+        },
+        include: {
+          inboundAgent: { select: agentSelect },
+          outboundAgent: { select: agentSelect },
+        },
+      });
     });
   }
 
@@ -272,6 +319,48 @@ export class PhoneNumbersRepository extends BaseRepository {
       include: {
         inboundAgent: { select: agentSelect },
         outboundAgent: { select: agentSelect },
+      },
+    });
+  }
+
+  findByCampaignAndNumber(
+    tx: TransactionClient,
+    companyId: string,
+    campaignId: string,
+    number: string,
+  ) {
+    return tx.phoneNumber.findFirst({
+      where: { companyId, campaignId, number },
+    });
+  }
+
+  async createForCampaign(
+    tx: TransactionClient,
+    companyId: string,
+    campaignId: string,
+    number: string,
+    campaignResourceKey: string,
+    companyCli: string,
+  ) {
+    const phoneNumberId = await allocateResourceKey(
+      tx,
+      companyId,
+      PublicResourceType.PHONE_NUMBER,
+    );
+    const publicId = generatePublicId({
+      cli: companyCli,
+      campaignId: campaignResourceKey,
+      entityId: phoneNumberId,
+    });
+
+    return tx.phoneNumber.create({
+      data: {
+        companyId,
+        campaignId,
+        number,
+        phoneNumberId,
+        publicId,
+        provider: "PROPNEX",
       },
     });
   }
