@@ -61,16 +61,16 @@ async function listResourceKeysForType(
       return (
         await tx.phoneNumber.findMany({
           where: { companyId },
-          select: { resourceKey: true },
+          select: { phoneNumberId: true },
         })
-      ).map((row) => row.resourceKey);
+      ).map((row) => row.phoneNumberId);
     case PublicResourceType.CALL_LOG:
       return (
         await tx.callLog.findMany({
           where: { companyId },
-          select: { resourceKey: true },
+          select: { callLogId: true },
         })
-      ).map((row) => row.resourceKey);
+      ).map((row) => row.callLogId);
     default:
       return [];
   }
