@@ -1,3 +1,19 @@
+enum CampaignExecutionStatus {
+  DRAFT
+  SCHEDULED
+  RUNNING
+  PAUSED
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+type CampaignExecutionSummary {
+  status: CampaignExecutionStatus!
+  scheduledAt: String
+  totalContacts: Int!
+}
+
 type Campaign {
   id: ID!
   name: String!
@@ -19,6 +35,7 @@ type Campaign {
   updatedAt: String!
   invitationEmailSent: Boolean
   invitation: CampaignInvitation
+  execution: CampaignExecutionSummary
 }
 
 type CampaignEdge {

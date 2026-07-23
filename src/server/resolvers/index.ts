@@ -1,4 +1,5 @@
 import type { TenantContext } from "@/server/types/context";
+import prisma from "@/server/lib/prisma";
 import { agentsService } from "@/server/services/agents.service";
 import { agentLibraryService } from "@/server/services/agent-library.service";
 import { analyticsService } from "@/server/services/analytics.service";
@@ -602,6 +603,34 @@ export const resolvers = {
       Promise.all(
         (parent.campaignIds ?? []).map((id) => ctx.loaders.campaign.load(id)),
       ).then((campaigns) => campaigns.filter((campaign) => campaign !== null)),
+  },
+
+  Campaign: {
+    execution: async (
+      parent: { id: string; companyId?: string },
+      _: unknown,
+      ctx: TenantContext,
+    ) => {
+      const execution = await prisma.campaignExecution.findFirst({
+        where: {
+          companyId: parent.companyId ?? ctx.companyId,
+          campaignId: parent.id,
+        },
+        select: {
+          status: true,
+          scheduledAt: true,
+          totalContacts: true,
+        },
+      });
+
+      if (!execution) return null;
+
+      return {
+        status: execution.status,
+        scheduledAt: execution.scheduledAt?.toISOString() ?? null,
+        totalContacts: execution.totalContacts,
+      };
+    },
   },
 
   CallLog: {

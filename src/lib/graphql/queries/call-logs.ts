@@ -6,36 +6,21 @@ export const CALL_LOGS_PAGE_QUERY = `
           node {
             id
             startedAt
-            direction
-            status
-            outcome
-            durationSeconds
-            recordingUrl
-            transcriptUrl
-            cost
-            creditsUsed
-            provider
-            aiSummary
-            sentiment
-            leadId
-            aiAgentId
-            phoneNumberId
-            lead {
-              id
-              firstName
-              lastName
-              phone
-              temperature
-              score
-            }
             aiAgent {
               id
               name
             }
-            phoneNumber {
+            campaign {
               id
-              number
-              label
+              name
+              status
+              customFields
+              createdAt
+              execution {
+                status
+                scheduledAt
+                totalContacts
+              }
             }
           }
           cursor
@@ -112,33 +97,18 @@ export type CallLogsPageResult = {
         node: {
           id: string;
           startedAt: string;
-          direction: string;
-          status: string;
-          outcome: string | null;
-          durationSeconds: number;
-          recordingUrl: string | null;
-          transcriptUrl: string | null;
-          cost: number | null;
-          creditsUsed: number | null;
-          provider: string | null;
-          aiSummary: Record<string, unknown> | null;
-          sentiment: Record<string, unknown> | null;
-          leadId: string | null;
-          aiAgentId: string | null;
-          phoneNumberId: string | null;
-          lead: {
-            id: string;
-            firstName: string | null;
-            lastName: string | null;
-            phone: string | null;
-            temperature: string | null;
-            score: number;
-          } | null;
           aiAgent: { id: string; name: string } | null;
-          phoneNumber: {
+          campaign: {
             id: string;
-            number: string;
-            label: string | null;
+            name: string;
+            status: string;
+            customFields: Record<string, unknown> | null;
+            createdAt: string;
+            execution: {
+              status: string;
+              scheduledAt: string | null;
+              totalContacts: number;
+            } | null;
           } | null;
         };
         cursor: string;
