@@ -6,6 +6,7 @@ import {
 
 import { campaignExecutionConfig } from "@/server/campaign-execution/campaign-execution.config";
 import { campaignProgressService } from "@/server/campaign-execution/campaign-progress.service";
+import { runWorkerTask } from "@/server/lib/run-worker-task";
 
 @Injectable()
 export class CampaignProgressWorker implements OnModuleInit, OnModuleDestroy {
@@ -14,7 +15,7 @@ export class CampaignProgressWorker implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit(): void {
     this.interval = setInterval(() => {
-      void this.tick();
+      runWorkerTask("campaign-progress", () => this.tick());
     }, campaignExecutionConfig.progressIntervalMs);
   }
 

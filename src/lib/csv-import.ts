@@ -97,8 +97,8 @@ export function guessColumnMapping(headers: string[]): ColumnMapping {
   };
 
   return {
-    contactName: findHeader("fullname", "contactname", "name"),
-    phoneNumber: findHeader("phonee164", "phone", "mobile", "tel"),
+    contactName: findHeader("fullname", "contactname", "username", "name"),
+    phoneNumber: findHeader("msisdn", "phonee164", "phone", "mobile", "tel"),
     agentId: findHeader("agentid", "agent"),
     country: findHeader("country", "countrycode", "iso"),
   };

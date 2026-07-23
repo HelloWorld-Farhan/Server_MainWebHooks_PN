@@ -3,6 +3,7 @@ import {
   DEFAULT_CONTACT_PHONE_COUNTRY,
   splitStoredContactPhone,
 } from "@/lib/country-dial-codes";
+import { normalizeStoredContactPhone } from "@/lib/contact-phone-validation";
 import { guessColumnMapping, parseCsv } from "@/lib/csv-import";
 
 export type ParsedContactRecord = {
@@ -72,6 +73,39 @@ function getCampaignNames(row: string[], index: number): string[] {
     .filter((name) => name.length > 0);
 }
 
+function normalizePhoneValue(rawPhone: string, countryRaw: string): string | null {
+  const stored = buildStoredContactPhone(countryRaw, rawPhone);
+  if (stored) return stored;
+
+  const digits = rawPhone.trim().replace(/\D/g, "");
+  if (!digits) return null;
+
+  if (digits.length > 10) {
+    const fromLocal = buildStoredContactPhone(countryRaw, digits.slice(-10));
+    if (fromLocal) return fromLocal;
+  }
+
+  return normalizeStoredContactPhone(digits);
+}
+
+function buildAddressValue(
+  row: string[],
+  addressIndex: number,
+  recordingIndex: number,
+  transcriptIndex: number,
+): string | null {
+  const parts: string[] = [];
+  const address = getRowValue(row, addressIndex);
+  const recording = getRowValue(row, recordingIndex);
+  const transcript = getRowValue(row, transcriptIndex);
+
+  if (address) parts.push(address);
+  if (recording) parts.push(`Recording: ${recording}`);
+  if (transcript) parts.push(`Transcript: ${transcript}`);
+
+  return parts.length > 0 ? parts.join("\n") : null;
+}
+
 export function parsePhonesFromStructuredRows(
   headers: string[],
   rows: string[][],
@@ -109,6 +143,8 @@ export function parsePhonesFromStructuredRows(
     "street",
   );
   const campaignsIndex = findColumnIndex(headers, "campaign", "campaigns");
+  const recordingIndex = findColumnIndex(headers, "recordingurl", "recording");
+  const transcriptIndex = findColumnIndex(headers, "transcript", "transcripts");
 
   const seen = new Set<string>();
   const contacts: ParsedContactRecord[] = [];
@@ -130,7 +166,7 @@ export function parsePhonesFromStructuredRows(
       continue;
     }
 
-    const stored = buildStoredContactPhone(countryRaw, rawPhone);
+    const stored = normalizePhoneValue(rawPhone, countryRaw);
     if (!stored) {
       invalid++;
       continue;
@@ -144,7 +180,12 @@ export function parsePhonesFromStructuredRows(
       phone: stored,
       name: getRowValue(row, nameIndex),
       email: getRowValue(row, emailIndex),
-      address: getRowValue(row, addressIndex),
+      address: buildAddressValue(
+        row,
+        addressIndex,
+        recordingIndex,
+        transcriptIndex,
+      ),
       campaignNames: getCampaignNames(row, campaignsIndex),
     });
   }

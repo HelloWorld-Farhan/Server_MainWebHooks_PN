@@ -6,6 +6,7 @@ import {
 
 import { campaignExecutionConfig } from "@/server/campaign-execution/campaign-execution.config";
 import { campaignRunnerService } from "@/server/campaign-execution/campaign-runner.service";
+import { runWorkerTask } from "@/server/lib/run-worker-task";
 import { retryWorkerService } from "@/server/campaign-execution/retry/retry-worker.service";
 
 @Injectable()
@@ -15,7 +16,7 @@ export class CampaignRunnerWorker implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit(): void {
     this.interval = setInterval(() => {
-      void this.tick();
+      runWorkerTask("campaign-runner", () => this.tick());
     }, campaignExecutionConfig.runnerIntervalMs);
   }
 

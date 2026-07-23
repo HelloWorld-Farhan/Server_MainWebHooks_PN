@@ -10,6 +10,7 @@ import {
 } from "@/server/channels/channel-keys";
 import { channelService } from "@/server/channels/channel.service";
 import { callService } from "@/server/services/call.service";
+import { runWorkerTask } from "@/server/lib/run-worker-task";
 
 @Injectable()
 export class ChannelQueueWorker implements OnModuleInit, OnModuleDestroy {
@@ -18,7 +19,7 @@ export class ChannelQueueWorker implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit(): void {
     this.interval = setInterval(() => {
-      void this.tick();
+      runWorkerTask("channel-queue", () => this.tick());
     }, getChannelQueuePollMs());
   }
 

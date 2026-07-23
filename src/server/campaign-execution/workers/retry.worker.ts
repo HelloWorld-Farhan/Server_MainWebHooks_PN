@@ -1,5 +1,6 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 
+import { runWorkerTask } from "@/server/lib/run-worker-task";
 import { retryConfig } from "@/server/campaign-execution/retry/retry.config";
 import { retryWorkerService } from "@/server/campaign-execution/retry/retry-worker.service";
 
@@ -9,9 +10,9 @@ export class RetryWorker implements OnModuleInit, OnModuleDestroy {
   private processing = false;
 
   onModuleInit(): void {
-    void this.tick();
+    runWorkerTask("retry", () => this.tick());
     this.interval = setInterval(
-      () => void this.tick(),
+      () => runWorkerTask("retry", () => this.tick()),
       retryConfig.workerIntervalMs,
     );
   }

@@ -6,6 +6,7 @@ import {
 
 import { campaignExecutionConfig } from "@/server/campaign-execution/campaign-execution.config";
 import { campaignSchedulerService } from "@/server/campaign-execution/campaign-scheduler.service";
+import { runWorkerTask } from "@/server/lib/run-worker-task";
 
 @Injectable()
 export class CampaignSchedulerWorker implements OnModuleInit, OnModuleDestroy {
@@ -13,9 +14,12 @@ export class CampaignSchedulerWorker implements OnModuleInit, OnModuleDestroy {
   private processing = false;
 
   onModuleInit(): void {
-    void campaignSchedulerService.recoverOnStartup();
+    runWorkerTask(
+      "campaign-scheduler",
+      () => campaignSchedulerService.recoverOnStartup(),
+    );
     this.interval = setInterval(() => {
-      void this.tick();
+      runWorkerTask("campaign-scheduler", () => this.tick());
     }, campaignExecutionConfig.schedulerIntervalMs);
   }
 
