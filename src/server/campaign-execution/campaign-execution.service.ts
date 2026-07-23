@@ -461,6 +461,65 @@ export class CampaignExecutionService {
     return this.loadExecutionView(ctx, campaignPublicId);
   }
 
+  async retry(
+    ctx: TenantContext,
+    campaignPublicId: string,
+  ): Promise<CampaignExecutionView> {
+    tenantService.requirePermission(ctx, PERMISSIONS.CAMPAIGNS_WRITE);
+    const campaign = await this.resolveCampaign(ctx, campaignPublicId);
+
+    const totalContacts = await this.campaignsRepo.countContacts(
+      ctx.companyId,
+      campaign.internalId,
+    );
+    if (totalContacts === 0) {
+      throw new ValidationError(
+        "Upload contacts before retrying the campaign.",
+      );
+    }
+
+    const correlationId = randomUUID();
+    const now = new Date();
+    const lockExpiresAt = new Date(
+      now.getTime() + campaignExecutionConfig.lockTtlMs,
+    );
+
+    const result = await campaignExecutionRepository.transitionStatus(
+      ctx.companyId,
+      campaign.internalId,
+      ["FAILED"],
+      {
+        status: "RUNNING",
+        failedAt: null,
+        failureReason: null,
+        correlationId,
+        totalContacts,
+        workerId: campaignExecutionConfig.workerId,
+        lockExpiresAt,
+      },
+    );
+    if (result.count === 0) {
+      throw new ValidationError("Campaign is not in a failed state");
+    }
+
+    logCampaignExecutionEvent("campaign:retried", {
+      campaignPublicId: campaign.publicId,
+      correlationId,
+      totalContacts,
+    });
+
+    await this.writeActivity(
+      ctx.companyId,
+      campaign.internalId,
+      "CAMPAIGN_EXECUTION_RETRIED",
+      "Campaign execution retried after failure",
+      ctx.userId,
+      { correlationId, totalContacts },
+    );
+
+    return this.loadExecutionView(ctx, campaignPublicId);
+  }
+
   async cancel(
     ctx: TenantContext,
     campaignPublicId: string,

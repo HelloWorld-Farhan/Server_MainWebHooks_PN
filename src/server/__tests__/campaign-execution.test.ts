@@ -499,4 +499,40 @@ describe("Campaign execution engine", () => {
     await runUntilOutboundCount(1);
     assert.equal(outboundCallsCreated, 1);
   });
+
+  it("retries a failed campaign and resumes calling", async () => {
+    outboundCallsCreated = 0;
+    campaignExecutionConfig.batchSize = 10;
+    const suffix = Date.now();
+    const resourceKey = randomCampaignResourceKey();
+    const campaign = await prisma.campaign.create({
+      data: {
+        companyId,
+        resourceKey,
+        name: `Retry ${suffix}`,
+      },
+    });
+    const publicId = generateCampaignPublicId({
+      cli: companyCli,
+      campaignResourceKey: resourceKey,
+    });
+    await seedContacts(companyId, campaign.id, ["+955555555501"]);
+
+    await campaignExecutionService.start(ctx, publicId);
+    await campaignExecutionService.markFailed(
+      companyId,
+      campaign.id,
+      "Simulated runner failure",
+    );
+
+    const failed = await campaignExecutionService.getStatus(ctx, publicId);
+    assert.equal(failed.status, "FAILED");
+
+    const retried = await campaignExecutionService.retry(ctx, publicId);
+    assert.equal(retried.status, "RUNNING");
+    assert.equal(retried.failureReason, null);
+
+    await runUntilOutboundCount(1);
+    assert.equal(outboundCallsCreated, 1);
+  });
 });
