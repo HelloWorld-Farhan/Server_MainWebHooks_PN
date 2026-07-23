@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import type { CallStatus } from "@prisma/client";
 
-import { normalizeE164Phone } from "@/lib/phone-validation";
+import { normalizeOutboundPhone } from "@/lib/phone-validation";
 import { ValidationError } from "@/server/lib/errors";
 import { resolveResourceId } from "@/server/lib/public-id/mapper";
 import { PublicResourceType } from "@/server/lib/public-id/types";
@@ -60,7 +60,7 @@ export class OutboundCallsService {
       throw new ValidationError("Phone number is required");
     }
 
-    const normalizedPhone = normalizeE164Phone(phoneRaw);
+    const normalizedPhone = normalizeOutboundPhone(phoneRaw);
     if (!normalizedPhone) {
       throw new ValidationError("Phone number must be in E.164 format");
     }
@@ -128,7 +128,7 @@ export class OutboundCallsService {
       throw new ValidationError("Phone number is required");
     }
 
-    const normalizedPhone = normalizeE164Phone(phoneRaw);
+    const normalizedPhone = normalizeOutboundPhone(phoneRaw);
     if (!normalizedPhone) {
       throw new ValidationError("Phone number must be in E.164 format");
     }

@@ -1,3 +1,4 @@
+import { normalizeOutboundPhone } from "@/lib/phone-validation";
 import { campaignExecutionConfig } from "@/server/campaign-execution/campaign-execution.config";
 import { campaignExecutionRepository } from "@/server/campaign-execution/campaign-execution.repository";
 import { campaignExecutionService } from "@/server/campaign-execution/campaign-execution.service";
@@ -115,11 +116,29 @@ export class CampaignRunnerService {
           break;
         }
 
+        const normalizedPhone = normalizeOutboundPhone(contact.phone);
+        if (!normalizedPhone) {
+          logCampaignExecutionEvent("contact:skipped", {
+            campaignPublicId,
+            correlationId: execution.correlationId ?? undefined,
+            reason: "invalid_phone",
+            phone: contact.phone,
+          });
+          processedCount += 1;
+          await campaignExecutionRepository.updateCursor(
+            execution.companyId,
+            execution.campaignId,
+            contact.id,
+            processedCount,
+          );
+          continue;
+        }
+
         const existingCall = await prisma.callLog.findFirst({
           where: {
             companyId: execution.companyId,
             campaignId: execution.campaignId,
-            phoneNumber: { number: contact.phone },
+            phoneNumber: { number: normalizedPhone },
           },
           select: { id: true },
         });
@@ -127,7 +146,7 @@ export class CampaignRunnerService {
         if (!existingCall) {
           await outboundCallsService.createOutboundCall(ctx, {
             campaignId: campaignPublicId,
-            phoneNumber: contact.phone,
+            phoneNumber: normalizedPhone,
           });
         }
 
