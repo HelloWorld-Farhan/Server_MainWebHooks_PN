@@ -175,20 +175,17 @@ export class UploadedContactsRepository extends BaseRepository {
           toCreate.length,
         );
 
-        for (let index = 0; index < toCreate.length; index++) {
-          const contact = toCreate[index]!;
-          await tx.uploadedContact.create({
-            data: {
-              companyId,
-              phone: contact.phone,
-              field1: contact.field1 ?? null,
-              field2: contact.field2 ?? null,
-              field3: contact.field3 ?? null,
-              campaignIds: contact.campaignIds ?? [],
-              resourceKey: resourceKeys[index]!,
-            },
-          });
-        }
+        await tx.uploadedContact.createMany({
+          data: toCreate.map((contact, index) => ({
+            companyId,
+            phone: contact.phone,
+            field1: contact.field1 ?? null,
+            field2: contact.field2 ?? null,
+            field3: contact.field3 ?? null,
+            campaignIds: contact.campaignIds ?? [],
+            resourceKey: resourceKeys[index]!,
+          })),
+        });
       });
     }
 

@@ -1,0 +1,98 @@
+[Nest] 14132  - 07/22/2026, 10:51:23 PM     LOG [NestFactory] Starting Nest application...
+[Nest] 14132  - 07/22/2026, 10:51:24 PM     LOG [InstanceLoader] AppConfigModule dependencies initialized +81ms
+[Nest] 14132  - 07/22/2026, 10:51:24 PM     LOG [InstanceLoader] PrismaModule dependencies initialized +3ms
+[Nest] 14132  - 07/22/2026, 10:51:24 PM     LOG [InstanceLoader] CampaignExecutionModule dependencies initialized +4ms
+[Nest] 14132  - 07/22/2026, 10:51:24 PM     LOG [InstanceLoader] AppModule dependencies initialized +24ms
+[Nest] 14132  - 07/22/2026, 10:51:24 PM     LOG [InstanceLoader] ConfigHostModule dependencies initialized +3ms
+[Nest] 14132  - 07/22/2026, 10:51:24 PM     LOG [InstanceLoader] GraphQLModule dependencies initialized +3ms
+[Nest] 14132  - 07/22/2026, 10:51:24 PM     LOG [InstanceLoader] ChannelsModule dependencies initialized +4ms
+[Nest] 14132  - 07/22/2026, 10:51:24 PM     LOG [InstanceLoader] ConfigModule dependencies initialized +4ms
+[Nest] 14132  - 07/22/2026, 10:51:24 PM     LOG [InstanceLoader] ApiModule dependencies initialized +4ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RoutesResolver] AppController {/}: +1623ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/, GET} route +9ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/health, GET} route +3ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RoutesResolver] CompanyController {/api/company}: +3ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/company/contact, GET} route +2ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/company/contact, PUT} route +4ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/company/contract, GET} route +3ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/company/contract/link, POST} route +3ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RoutesResolver] ContactRequestsController {/api/contact-requests}: +2ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/contact-requests, POST} route +2ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RoutesResolver] BillingController {/api/billing}: +1ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/billing/rates, GET} route +3ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/billing/quotes, GET} route +2ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/billing/quotes, POST} route +2ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/billing/quotes/:id/purchase, POST} route +4ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RoutesResolver] TelephonyController {/api/telephony}: +3ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/telephony/config, GET} route +3ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/telephony/config, PUT} route +3ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/telephony/test-connection, POST} route +2ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/telephony/test-call, POST} route +3ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RoutesResolver] ObdController {/api/obd}: +2ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/obd/service-numbers, GET} route +3ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RoutesResolver] WebhooksController {/api/webhooks/clerk}: +3ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/webhooks/clerk, POST} route +2ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RoutesResolver] ObdWebhooksController {/api/webhooks/obd}: +2ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/webhooks/obd, POST} route +3ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RoutesResolver] InternalController {/api/internal/dialer}: +2ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/internal/dialer/sheets-sync, POST} route +2ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RoutesResolver] ChannelsInternalController {/api/internal/channels}: +3ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/internal/channels/metrics, GET} route +2ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/internal/channels/:companyId/status, GET} route +2ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RoutesResolver] IntegrationsController {/api/integrations}: +3ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/integrations, GET} route +2ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/integrations/google/oauth/start, GET} route +3ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/integrations/google/oauth/callback, GET} route +3ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/integrations/google/connect, POST} route +3ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/integrations/google/sheets/config, PUT} route +2ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/integrations/google/sheets/spreadsheets, GET} route +1ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/integrations/google/sheets/spreadsheets, POST} route +2ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/integrations/google/sheets/spreadsheets/create, POST} route +2ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/integrations/google/sheets/spreadsheets, DELETE} route +2ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/integrations/google/sheets/worksheets, GET} route +1ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/integrations/google/sheets/headers, GET} route +2ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/integrations/google/sheets/sync, POST} route +3ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/integrations/google/sheets/sync-history, GET} route +2ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/integrations/google/calendar/config, PUT} route +2ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/integrations/google/calendar/calendars, GET} route +3ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/integrations/:id, GET} route +3ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/integrations/:id/connect, POST} route +4ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/integrations/:id/disconnect, POST} route +2ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RoutesResolver] InvitationsController {/api/invitations/campaign}: +1ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/invitations/campaign/:token, GET} route +3ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/invitations/campaign/:token/accept, POST} route +3ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RoutesResolver] AgentsController {/api/agents}: +1ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/agents/:agentId/tools, GET} route +3ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/agents/:agentId/tools/:toolId, PUT} route +2ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/agents/:agentId/tools/:toolId, POST} route +4ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RoutesResolver] ToolsController {/api/tools}: +2ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/tools/billing/lookup, POST} route +2ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/tools/faq/search, POST} route +3ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/tools/google-sheets/execute, POST} route +4ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/tools/google-calendar/events, POST} route +4ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/tools/google-calendar/availability, POST} route +3ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RoutesResolver] ContactPhonesController {/api/contact-phones}: +2ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/contact-phones/parse-upload, POST} route +2ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RoutesResolver] PageCacheController {/api/page-cache}: +2ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/page-cache/:pageKey, GET} route +4ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RoutesResolver] CallsController {/api/calls}: +2ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/calls/outbound, GET} route +2ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/calls/outbound, POST} route +3ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RoutesResolver] CampaignExecutionController {/api/campaigns/:campaignId/execution}: +3ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/campaigns/:campaignId/execution/start, POST} route +3ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/campaigns/:campaignId/execution/schedule, POST} route +3ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/campaigns/:campaignId/execution/pause, POST} route +2ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/campaigns/:campaignId/execution/resume, POST} route +2ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/campaigns/:campaignId/execution/cancel, POST} route +3ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/campaigns/:campaignId/execution/status, GET} route +1ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/campaigns/:campaignId/execution/statistics, GET} route +2ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/campaigns/:campaignId/execution/progress, GET} route +3ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/campaigns/:campaignId/execution/retry-policy, GET} route +3ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/campaigns/:campaignId/execution/retry-policy, PUT} route +3ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/campaigns/:campaignId/execution/retry-history, GET} route +3ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/campaigns/:campaignId/execution/pending-retries, GET} route +2ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/campaigns/:campaignId/execution/retry-statistics, GET} route +3ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/api/campaigns/:campaignId/execution/retry-summary, GET} route +3ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RoutesResolver] GraphQLController {/}: +1ms
+[Nest] 14132  - 07/22/2026, 10:51:25 PM     LOG [RouterExplorer] Mapped {/graphql, ALL} route +3ms
+[Nest] 14132  - 07/22/2026, 10:51:26 PM     LOG [NestApplication] Nest application successfully started +987ms
