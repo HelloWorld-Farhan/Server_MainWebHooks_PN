@@ -5,7 +5,7 @@ export async function executeGraphQLFromRequest<T>(
   query: string,
   variables?: Record<string, unknown>,
 ): Promise<T> {
-  const url = new URL("/api/graphql", request.url);
+  const url = new URL("/graphql", request.url);
   const cookie = request.headers.get("cookie");
 
   const response = await yoga.fetch(
