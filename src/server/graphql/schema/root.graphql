@@ -13,10 +13,19 @@ enum CallDirection {
 }
 
 enum CallStatus {
+  PENDING
+  QUEUED
+  DISPATCHING
+  QUEUED_AT_PROVIDER
+  RINGING
+  ANSWERED
   COMPLETED
+  FAILED
+  BUSY
+  NO_ANSWER
+  CANCELLED
   MISSED
   VOICEMAIL
-  FAILED
 }
 
 enum BillingStatus {
