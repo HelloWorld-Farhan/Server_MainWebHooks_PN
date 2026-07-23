@@ -107,14 +107,21 @@ async function main() {
 
   let campaign = company.campaigns[0];
   if (!campaign) {
-    campaign = await prisma.campaign.create({
-      data: {
-        companyId: company.id,
-        resourceKey: "CP000001",
-        name: "Nirupam Outbound Campaign",
-        status: "ACTIVE",
-        aiEnabled: true,
-      },
+    campaign = await prisma.$transaction(async (tx) => {
+      const resourceKey = await allocateResourceKey(
+        tx,
+        company.id,
+        PublicResourceType.CAMPAIGN,
+      );
+      return tx.campaign.create({
+        data: {
+          companyId: company.id,
+          resourceKey,
+          name: "Nirupam Outbound Campaign",
+          status: "ACTIVE",
+          aiEnabled: true,
+        },
+      });
     });
     console.log(`Created campaign: ${campaign.name}`);
   } else {

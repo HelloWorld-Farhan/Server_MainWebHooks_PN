@@ -1,12 +1,98 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 
-import { formatResourceKey } from "@/server/lib/public-id";
+import {
+  formatResourceKey,
+  inferResourceTypeFromKey,
+} from "@/server/lib/public-id";
 import { PublicResourceType } from "@/server/lib/public-id/types";
 
 type TransactionClient = Omit<
   PrismaClient,
   "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
 >;
+
+function parseSequenceFromResourceKey(
+  resourceKey: string,
+  resourceType: PublicResourceType,
+): number | null {
+  if (inferResourceTypeFromKey(resourceKey) !== resourceType) {
+    return null;
+  }
+
+  const numericPart =
+    resourceType === PublicResourceType.CALL_LOG
+      ? resourceKey.startsWith("CL")
+        ? resourceKey.slice(2)
+        : resourceKey
+      : resourceKey.slice(2);
+
+  const sequence = Number.parseInt(numericPart, 10);
+  return Number.isFinite(sequence) && sequence > 0 ? sequence : null;
+}
+
+async function listResourceKeysForType(
+  tx: TransactionClient,
+  companyId: string,
+  resourceType: PublicResourceType,
+): Promise<string[]> {
+  switch (resourceType) {
+    case PublicResourceType.CAMPAIGN:
+      return (
+        await tx.campaign.findMany({
+          where: { companyId },
+          select: { resourceKey: true },
+        })
+      ).map((row) => row.resourceKey);
+    case PublicResourceType.AGENT:
+      return (
+        await tx.aiAgent.findMany({
+          where: { companyId },
+          select: { resourceKey: true },
+        })
+      ).map((row) => row.resourceKey);
+    case PublicResourceType.CONTACT:
+      return (
+        await tx.uploadedContact.findMany({
+          where: { companyId },
+          select: { resourceKey: true },
+        })
+      ).map((row) => row.resourceKey);
+    case PublicResourceType.PHONE_NUMBER:
+      return (
+        await tx.phoneNumber.findMany({
+          where: { companyId },
+          select: { resourceKey: true },
+        })
+      ).map((row) => row.resourceKey);
+    case PublicResourceType.CALL_LOG:
+      return (
+        await tx.callLog.findMany({
+          where: { companyId },
+          select: { resourceKey: true },
+        })
+      ).map((row) => row.resourceKey);
+    default:
+      return [];
+  }
+}
+
+async function getMaxExistingResourceSequence(
+  tx: TransactionClient,
+  companyId: string,
+  resourceType: PublicResourceType,
+): Promise<number> {
+  const resourceKeys = await listResourceKeysForType(tx, companyId, resourceType);
+  let maxSequence = 0;
+
+  for (const resourceKey of resourceKeys) {
+    const sequence = parseSequenceFromResourceKey(resourceKey, resourceType);
+    if (sequence !== null) {
+      maxSequence = Math.max(maxSequence, sequence);
+    }
+  }
+
+  return maxSequence;
+}
 
 export async function allocateResourceKey(
   tx: TransactionClient,
@@ -22,7 +108,13 @@ export async function allocateResourceKey(
     },
   });
 
-  const nextSequence = (existing?.lastSequence ?? 0) + 1;
+  const maxExistingSequence = await getMaxExistingResourceSequence(
+    tx,
+    companyId,
+    resourceType,
+  );
+  const nextSequence =
+    Math.max(existing?.lastSequence ?? 0, maxExistingSequence) + 1;
   const resourceKey = formatResourceKey(resourceType, nextSequence);
 
   await tx.companyResourceSequence.upsert({
