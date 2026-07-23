@@ -94,11 +94,12 @@ async function getMaxExistingResourceSequence(
   return maxSequence;
 }
 
-export async function allocateResourceKey(
+async function reserveResourceKeySequences(
   tx: TransactionClient,
   companyId: string,
   resourceType: PublicResourceType,
-): Promise<string> {
+  count: number,
+): Promise<{ startSequence: number; endSequence: number }> {
   const existing = await tx.companyResourceSequence.findUnique({
     where: {
       companyId_resourceType: {
@@ -113,9 +114,9 @@ export async function allocateResourceKey(
     companyId,
     resourceType,
   );
-  const nextSequence =
+  const startSequence =
     Math.max(existing?.lastSequence ?? 0, maxExistingSequence) + 1;
-  const resourceKey = formatResourceKey(resourceType, nextSequence);
+  const endSequence = startSequence + count - 1;
 
   await tx.companyResourceSequence.upsert({
     where: {
@@ -127,14 +128,53 @@ export async function allocateResourceKey(
     create: {
       companyId,
       resourceType,
-      lastSequence: nextSequence,
+      lastSequence: endSequence,
     },
     update: {
-      lastSequence: nextSequence,
+      lastSequence: endSequence,
     },
   });
 
-  return resourceKey;
+  return { startSequence, endSequence };
+}
+
+export async function allocateResourceKey(
+  tx: TransactionClient,
+  companyId: string,
+  resourceType: PublicResourceType,
+): Promise<string> {
+  const { startSequence } = await reserveResourceKeySequences(
+    tx,
+    companyId,
+    resourceType,
+    1,
+  );
+  return formatResourceKey(resourceType, startSequence);
+}
+
+export async function allocateResourceKeys(
+  tx: TransactionClient,
+  companyId: string,
+  resourceType: PublicResourceType,
+  count: number,
+): Promise<string[]> {
+  if (count <= 0) {
+    return [];
+  }
+
+  const { startSequence, endSequence } = await reserveResourceKeySequences(
+    tx,
+    companyId,
+    resourceType,
+    count,
+  );
+
+  const resourceKeys: string[] = [];
+  for (let sequence = startSequence; sequence <= endSequence; sequence++) {
+    resourceKeys.push(formatResourceKey(resourceType, sequence));
+  }
+
+  return resourceKeys;
 }
 
 export async function allocateResourceKeyWithPrisma(

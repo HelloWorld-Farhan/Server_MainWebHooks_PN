@@ -143,17 +143,18 @@ export class UploadedContactsService {
       },
     );
 
-    const { created, skipped } = await this.repo.createMany(
+    const { created, updated, skipped } = await this.repo.createMany(
       ctx.companyId,
       validContacts,
     );
 
-    if (created > 0) {
+    if (created > 0 || updated > 0) {
       await cacheService.invalidateUploadedContactPages(ctx.companyId);
     }
 
     return {
       created,
+      updated,
       skipped,
       invalid,
       unmatchedCampaigns: [...unmatchedCampaigns],

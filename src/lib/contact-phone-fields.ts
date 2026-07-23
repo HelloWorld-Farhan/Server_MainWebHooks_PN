@@ -6,3 +6,7 @@ export const CONTACT_PHONE_FIELD_LABELS = {
 } as const;
 
 export type ContactPhoneFieldKey = keyof typeof CONTACT_PHONE_FIELD_LABELS;
+
+export function displayContactFieldValue(value: string | null | undefined): string {
+  return value?.trim() ? value : "Nil";
+}

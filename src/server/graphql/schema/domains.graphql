@@ -251,6 +251,7 @@ type UploadedContactsQueries {
 
 type UploadedContactImportResult {
   created: Int!
+  updated: Int!
   skipped: Int!
   invalid: Int!
   unmatchedCampaigns: [String!]!

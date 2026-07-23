@@ -33,6 +33,7 @@ export const IMPORT_UPLOADED_CONTACTS_MUTATION = `
     uploadedContacts {
       importContacts(contacts: $contacts) {
         created
+        updated
         skipped
         invalid
         unmatchedCampaigns
@@ -85,6 +86,7 @@ export type UploadedContactImportResult = {
   uploadedContacts: {
     importContacts: {
       created: number;
+      updated: number;
       skipped: number;
       invalid: number;
       unmatchedCampaigns: string[];
