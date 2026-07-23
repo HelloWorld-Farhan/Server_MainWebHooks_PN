@@ -247,7 +247,7 @@ async function findOrCreateTestCompany(): Promise<SetupResult> {
         data: {
           companyId,
           phone: TEST_PHONE,
-          name: "Load Test Contact",
+          field1: "Load Test Contact",
           resourceKey,
           campaignIds: [campaignId],
         },

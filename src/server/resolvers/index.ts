@@ -371,10 +371,11 @@ export const resolvers = {
       args: {
         contacts: Array<{
           phone: string;
-          name?: string | null;
-          email?: string | null;
-          address?: string | null;
+          field1?: string | null;
+          field2?: string | null;
+          field3?: string | null;
           campaignNames?: string[];
+          campaignIds?: string[];
         }>;
       },
       ctx: TenantContext,

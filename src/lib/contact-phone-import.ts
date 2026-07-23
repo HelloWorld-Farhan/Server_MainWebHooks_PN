@@ -8,9 +8,9 @@ import { guessColumnMapping, parseCsv } from "@/lib/csv-import";
 
 export type ParsedContactRecord = {
   phone: string;
-  name: string | null;
-  email: string | null;
-  address: string | null;
+  field1: string | null;
+  field2: string | null;
+  field3: string | null;
   campaignNames: string[];
 };
 
@@ -88,24 +88,6 @@ function normalizePhoneValue(rawPhone: string, countryRaw: string): string | nul
   return normalizeStoredContactPhone(digits);
 }
 
-function buildAddressValue(
-  row: string[],
-  addressIndex: number,
-  recordingIndex: number,
-  transcriptIndex: number,
-): string | null {
-  const parts: string[] = [];
-  const address = getRowValue(row, addressIndex);
-  const recording = getRowValue(row, recordingIndex);
-  const transcript = getRowValue(row, transcriptIndex);
-
-  if (address) parts.push(address);
-  if (recording) parts.push(`Recording: ${recording}`);
-  if (transcript) parts.push(`Transcript: ${transcript}`);
-
-  return parts.length > 0 ? parts.join("\n") : null;
-}
-
 export function parsePhonesFromStructuredRows(
   headers: string[],
   rows: string[][],
@@ -132,19 +114,16 @@ export function parsePhonesFromStructuredRows(
   const countryIndex =
     countryColumn !== null ? headers.indexOf(countryColumn) : -1;
   const hasCountryColumn = countryIndex !== -1;
-  const nameIndex =
-    mapping.contactName !== null ? headers.indexOf(mapping.contactName) : -1;
-  const emailIndex = findColumnIndex(headers, "email", "mail");
-  const addressIndex = findColumnIndex(
+  const field1Index = findColumnIndex(
     headers,
-    "address",
-    "location",
-    "addr",
-    "street",
+    "username",
+    "contactname",
+    "fullname",
+    "name",
   );
+  const field2Index = findColumnIndex(headers, "recordingurl", "recording");
+  const field3Index = findColumnIndex(headers, "transcript", "transcripts");
   const campaignsIndex = findColumnIndex(headers, "campaign", "campaigns");
-  const recordingIndex = findColumnIndex(headers, "recordingurl", "recording");
-  const transcriptIndex = findColumnIndex(headers, "transcript", "transcripts");
 
   const seen = new Set<string>();
   const contacts: ParsedContactRecord[] = [];
@@ -178,14 +157,9 @@ export function parsePhonesFromStructuredRows(
     seen.add(stored);
     contacts.push({
       phone: stored,
-      name: getRowValue(row, nameIndex),
-      email: getRowValue(row, emailIndex),
-      address: buildAddressValue(
-        row,
-        addressIndex,
-        recordingIndex,
-        transcriptIndex,
-      ),
+      field1: getRowValue(row, field1Index),
+      field2: getRowValue(row, field2Index),
+      field3: getRowValue(row, field3Index),
       campaignNames: getCampaignNames(row, campaignsIndex),
     });
   }
@@ -246,12 +220,11 @@ export async function parsePhonesFromUploadFile(
 
 export const CONTACT_PHONES_SAMPLE_FILENAME = "propnex-phone-contacts-sample.csv";
 
-export const CONTACT_PHONES_SAMPLE_CONTENT = `country,phone,name,email,address,campaigns
-IN,9876543210,John Doe,john.doe@example.com,"123 Main St, Mumbai","Downtown Campaign"
-IN,9123456789,Jane Smith,jane.smith@example.com,"45 Park Ave, Delhi","Downtown Campaign,North Campaign"
-US,5551234567,Alex Rivera,alex.rivera@example.com,"10 Oak Lane, Austin",
-GB,7911123456,Maria Chen,maria.chen@example.com,"22 Baker Street, London","North Campaign"
-AU,4123456789,Sam Wilson,sam.wilson@example.com,"8 Harbour Rd, Sydney",
+export const CONTACT_PHONES_SAMPLE_CONTENT = `MSISDN,user_name,Recording URL,Transcripts
+9876543210,John Doe,https://example.com/recording/1,"Hello, this is a sample transcript."
+9123456789,Jane Smith,https://example.com/recording/2,"Another sample transcript."
+5551234567,Alex Rivera,,
+7911123456,Maria Chen,https://example.com/recording/3,"London contact transcript."
 `;
 
 export function downloadContactPhonesSampleCsv(): void {
@@ -269,14 +242,14 @@ export function downloadContactPhonesSampleCsv(): void {
 export function contactsToCsv(
   contacts: { phone: string }[],
 ): string {
-  const lines = ["country,phone"];
+  const lines = ["MSISDN"];
 
   for (const contact of contacts) {
     const split = splitStoredContactPhone(contact.phone);
     if (split) {
-      lines.push(`${split.country},${split.local}`);
+      lines.push(`${split.local}`);
     } else {
-      lines.push(`,${contact.phone}`);
+      lines.push(contact.phone);
     }
   }
 

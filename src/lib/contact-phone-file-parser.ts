@@ -72,9 +72,9 @@ export function parsePhonesFromText(
     seen.add(normalized);
     contacts.push({
       phone: normalized,
-      name: null,
-      email: null,
-      address: null,
+      field1: null,
+      field2: null,
+      field3: null,
       campaignNames: [],
     });
   }

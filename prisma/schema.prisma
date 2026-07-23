@@ -739,9 +739,12 @@ model UploadedContact {
   /// Public ID resource segment (e.g. CT000001).
   resourceKey String
   phone     String
-  name      String?
-  email     String?
-  address   String?
+  /// Excel column: user_name
+  field1    String?
+  /// Excel column: Recording URL
+  field2    String?
+  /// Excel column: Transcripts
+  field3    String?
   campaignIds String[] @default([])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -15,18 +15,18 @@ const MAX_IMPORT_ROWS = 5000;
 function mapUploadedContact(row: {
   id: string;
   phone: string;
-  name: string | null;
-  email: string | null;
-  address: string | null;
+  field1: string | null;
+  field2: string | null;
+  field3: string | null;
   campaignIds: string[];
   createdAt: Date;
 }) {
   return {
     id: row.id,
     phone: row.phone,
-    name: row.name,
-    email: row.email,
-    address: row.address,
+    field1: row.field1,
+    field2: row.field2,
+    field3: row.field3,
     campaignIds: row.campaignIds,
     createdAt: row.createdAt.toISOString(),
   };
@@ -34,11 +34,15 @@ function mapUploadedContact(row: {
 
 type ImportedContactRow = UploadedContactCreateInput & {
   campaignNames?: string[];
+  campaignIds?: string[];
 };
 
 function normalizeImportedContact(
   contact: ImportedContactRow,
-): (UploadedContactCreateInput & { campaignNames: string[] }) | null {
+): (UploadedContactCreateInput & {
+  campaignNames: string[];
+  campaignIds: string[];
+}) | null {
   const normalized = normalizeStoredContactPhone(contact.phone);
   if (!normalized) {
     return null;
@@ -46,12 +50,13 @@ function normalizeImportedContact(
 
   return {
     phone: normalized,
-    name: contact.name?.trim() || null,
-    email: contact.email?.trim() || null,
-    address: contact.address?.trim() || null,
+    field1: contact.field1?.trim() || null,
+    field2: contact.field2?.trim() || null,
+    field3: contact.field3?.trim() || null,
     campaignNames: (contact.campaignNames ?? [])
       .map((name) => name.trim())
       .filter((name) => name.length > 0),
+    campaignIds: (contact.campaignIds ?? []).filter((id) => id.length > 0),
   };
 }
 
@@ -90,7 +95,10 @@ export class UploadedContactsService {
     tenantService.requirePermission(ctx, PERMISSIONS.LEADS_WRITE);
 
     const normalizedRows: Array<
-      UploadedContactCreateInput & { campaignNames: string[] }
+      UploadedContactCreateInput & {
+        campaignNames: string[];
+        campaignIds: string[];
+      }
     > = [];
     let invalid = 0;
     const seen = new Set<string>();
@@ -116,7 +124,7 @@ export class UploadedContactsService {
 
     const validContacts: UploadedContactCreateInput[] = normalizedRows.map(
       (row) => {
-        const campaignIds: string[] = [];
+        const campaignIds: string[] = [...row.campaignIds];
         for (const name of row.campaignNames) {
           const campaignId = branchByName.get(name.toLowerCase());
           if (campaignId) {
@@ -127,9 +135,9 @@ export class UploadedContactsService {
         }
         return {
           phone: row.phone,
-          name: row.name,
-          email: row.email,
-          address: row.address,
+          field1: row.field1,
+          field2: row.field2,
+          field3: row.field3,
           campaignIds: [...new Set(campaignIds)],
         };
       },

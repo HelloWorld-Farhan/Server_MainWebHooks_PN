@@ -228,9 +228,9 @@ type PhoneNumbersMutations {
 type UploadedContact {
   id: ID!
   phone: String!
-  name: String
-  email: String
-  address: String
+  field1: String
+  field2: String
+  field3: String
   campaignIds: [ID!]!
   campaigns: [Campaign!]!
   createdAt: String!
@@ -238,10 +238,11 @@ type UploadedContact {
 
 input ImportedContactInput {
   phone: String!
-  name: String
-  email: String
-  address: String
+  field1: String
+  field2: String
+  field3: String
   campaignNames: [String!]
+  campaignIds: [ID!]
 }
 
 type UploadedContactsQueries {

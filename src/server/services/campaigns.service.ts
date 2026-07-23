@@ -440,17 +440,14 @@ export class CampaignsService {
     campaignAccessService.assertCampaignAccess(ctx, campaignId);
     const limit = Math.min(Math.max(first ?? 25, 1), 100);
     const rows = await this.repo.findContacts(ctx.companyId, campaignId, limit, after);
-    return rows.map((row) => {
-      const nameParts = row.name?.trim().split(/\s+/).filter(Boolean) ?? [];
-      return {
-        id: row.id,
-        firstName: nameParts[0] ?? null,
-        lastName: nameParts.slice(1).join(" ") || null,
-        email: row.email,
-        phone: row.phone,
-        createdAt: row.createdAt.toISOString(),
-      };
-    });
+    return rows.map((row) => ({
+      id: row.id,
+      phone: row.phone,
+      field1: row.field1,
+      field2: row.field2,
+      field3: row.field3,
+      createdAt: row.createdAt.toISOString(),
+    }));
   }
 
   async getCallLogs(

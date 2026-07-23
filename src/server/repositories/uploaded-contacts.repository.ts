@@ -4,9 +4,9 @@ import { BaseRepository } from "@/server/repositories/base.repository";
 
 export type UploadedContactCreateInput = {
   phone: string;
-  name?: string | null;
-  email?: string | null;
-  address?: string | null;
+  field1?: string | null;
+  field2?: string | null;
+  field3?: string | null;
   campaignIds?: string[];
 };
 
@@ -45,9 +45,9 @@ export class UploadedContactsRepository extends BaseRepository {
       return tx.uploadedContact.create({
         data: {
           phone: contact.phone,
-          name: contact.name ?? null,
-          email: contact.email ?? null,
-          address: contact.address ?? null,
+          field1: contact.field1 ?? null,
+          field2: contact.field2 ?? null,
+          field3: contact.field3 ?? null,
           campaignIds: contact.campaignIds ?? [],
           resourceKey,
           company: { connect: { id: companyId } },
@@ -97,9 +97,9 @@ export class UploadedContactsRepository extends BaseRepository {
             data: {
               companyId,
               phone: contact.phone,
-              name: contact.name ?? null,
-              email: contact.email ?? null,
-              address: contact.address ?? null,
+              field1: contact.field1 ?? null,
+              field2: contact.field2 ?? null,
+              field3: contact.field3 ?? null,
               campaignIds: contact.campaignIds ?? [],
               resourceKey,
             },

@@ -4,13 +4,9 @@ export const UPLOADED_CONTACTS_LIST_QUERY = `
       list {
         id
         phone
-        name
-        email
-        address
-        campaigns {
-          id
-          name
-        }
+        field1
+        field2
+        field3
         createdAt
       }
     }
@@ -23,9 +19,9 @@ export const CREATE_UPLOADED_CONTACT_MUTATION = `
       create(phone: $phone) {
         id
         phone
-        name
-        email
-        address
+        field1
+        field2
+        field3
         createdAt
       }
     }
@@ -64,19 +60,19 @@ export const BULK_DELETE_UPLOADED_CONTACTS_MUTATION = `
 export type UploadedContactResult = {
   id: string;
   phone: string;
-  name: string | null;
-  email: string | null;
-  address: string | null;
-  campaigns: { id: string; name: string }[];
+  field1: string | null;
+  field2: string | null;
+  field3: string | null;
   createdAt: string;
 };
 
 export type ImportedContactInput = {
   phone: string;
-  name?: string | null;
-  email?: string | null;
-  address?: string | null;
+  field1?: string | null;
+  field2?: string | null;
+  field3?: string | null;
   campaignNames?: string[];
+  campaignIds?: string[];
 };
 
 export type UploadedContactsListResult = {

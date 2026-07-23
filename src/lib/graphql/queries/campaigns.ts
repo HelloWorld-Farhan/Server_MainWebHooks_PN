@@ -81,6 +81,18 @@ export type CampaignNode = {
   updatedAt: string;
   invitationEmailSent: boolean | null;
   invitation: CampaignInvitationNode | null;
+  execution?: {
+    status:
+      | "DRAFT"
+      | "SCHEDULED"
+      | "RUNNING"
+      | "PAUSED"
+      | "COMPLETED"
+      | "FAILED"
+      | "CANCELLED";
+    scheduledAt: string | null;
+    totalContacts: number;
+  } | null;
 };
 
 export type CampaignsConnectionResult = {
@@ -95,10 +107,10 @@ export type CampaignsConnectionResult = {
 
 export type CampaignContactNode = {
   id: string;
-  firstName: string | null;
-  lastName: string | null;
-  email: string | null;
   phone: string | null;
+  field1: string | null;
+  field2: string | null;
+  field3: string | null;
   createdAt: string | null;
 };
 
@@ -171,6 +183,11 @@ const BRANCH_FIELDS = `
   createdAt
   updatedAt
   invitationEmailSent
+  execution {
+    status
+    scheduledAt
+    totalContacts
+  }
   invitation {
     id
     email
@@ -222,10 +239,10 @@ export const CAMPAIGN_CONTACTS_QUERY = `
     campaigns {
       contacts(campaignId: $campaignId, first: $first, after: $after) {
         id
-        firstName
-        lastName
-        email
         phone
+        field1
+        field2
+        field3
         createdAt
       }
     }
