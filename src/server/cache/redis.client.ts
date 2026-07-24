@@ -4,6 +4,12 @@ const globalForRedis = globalThis as unknown as {
   redis: Redis | undefined;
 };
 
+/** TEMP: set REDIS_ENABLED=false to skip Redis + channel gating. */
+export function isRedisDisabled(): boolean {
+  const flag = (process.env.REDIS_ENABLED ?? "true").trim().toLowerCase();
+  return flag === "0" || flag === "false" || flag === "off" || flag === "no";
+}
+
 function resolveRedisUrl(): string | null {
   if (process.env.REDIS_URL) {
     return process.env.REDIS_URL;
@@ -22,6 +28,11 @@ function resolveRedisUrl(): string | null {
 }
 
 function createRedisClient(): Redis | null {
+  if (isRedisDisabled()) {
+    console.warn("[redis] REDIS_ENABLED=false; Redis and channel gating disabled");
+    return null;
+  }
+
   const url = resolveRedisUrl();
   if (!url) {
     if (process.env.NODE_ENV === "production") {
@@ -55,7 +66,7 @@ export function assertChannelRedisReady(): void {
 }
 
 export async function connectRedisOnStartup(): Promise<void> {
-  if (!redis || redis.status === "ready") {
+  if (isRedisDisabled() || !redis || redis.status === "ready") {
     return;
   }
 

@@ -1,6 +1,9 @@
 import { Module, OnModuleInit } from "@nestjs/common";
 
-import { connectRedisOnStartup } from "@/server/cache/redis.client";
+import {
+  connectRedisOnStartup,
+  isRedisDisabled,
+} from "@/server/cache/redis.client";
 import { ChannelQueueWorker } from "@/server/channels/channel-queue.worker";
 import { ChannelReconciliationService } from "@/server/channels/channel-reconciliation.service";
 
@@ -13,6 +16,13 @@ export class ChannelsModule implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
+    if (isRedisDisabled()) {
+      console.warn(
+        "[channels] REDIS_ENABLED=false; skipping Redis connect, reconcile, and queue worker gating",
+      );
+      return;
+    }
+
     await connectRedisOnStartup();
     void this.reconciliation.reconcileAll().catch((error) => {
       console.error(

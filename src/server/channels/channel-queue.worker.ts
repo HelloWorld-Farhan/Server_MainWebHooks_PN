@@ -4,6 +4,7 @@ import {
   OnModuleInit,
 } from "@nestjs/common";
 
+import { isRedisDisabled } from "@/server/cache/redis.client";
 import {
   getChannelCooldownMs,
   getChannelQueuePollMs,
@@ -22,6 +23,11 @@ export class ChannelQueueWorker implements OnModuleInit, OnModuleDestroy {
   private processing = false;
 
   onModuleInit(): void {
+    if (isRedisDisabled()) {
+      registerCompanyQueueWake(async () => undefined);
+      return;
+    }
+
     registerCompanyQueueWake(drainCompanyQueue);
     this.interval = setInterval(() => {
       runWorkerTask("channel-queue", () => this.tick());

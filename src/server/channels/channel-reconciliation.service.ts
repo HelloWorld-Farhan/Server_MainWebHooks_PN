@@ -5,6 +5,7 @@ import {
 } from "@nestjs/common";
 import type { CallStatus } from "@prisma/client";
 
+import { isRedisDisabled } from "@/server/cache/redis.client";
 import {
   getChannelReconcilePollMs,
   getStaleQueuedAtProviderMs,
@@ -42,6 +43,10 @@ export class ChannelReconciliationService
   private processing = false;
 
   onModuleInit(): void {
+    if (isRedisDisabled()) {
+      return;
+    }
+
     this.interval = setInterval(() => {
       runWorkerTask("channel-reconcile", () => this.reconcileAll());
     }, getChannelReconcilePollMs());

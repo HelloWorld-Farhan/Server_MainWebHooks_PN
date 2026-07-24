@@ -8,7 +8,7 @@ import {
   logChannelEvent,
   recordQueueWaitMs,
 } from "@/server/channels/channel-metrics";
-import { assertChannelRedisReady } from "@/server/cache/redis.client";
+import { assertChannelRedisReady, isRedisDisabled } from "@/server/cache/redis.client";
 import { ValidationError } from "@/server/lib/errors";
 import prisma from "@/server/lib/prisma";
 import { CallLogsRepository } from "@/server/repositories/call-logs.repository";
@@ -59,9 +59,6 @@ export class CallService {
   async requestDispatch(
     input: RequestDispatchInput,
   ): Promise<RequestDispatchResult> {
-    assertChannelRedisReady();
-    await this.ensureChannelState(input.companyId);
-
     const callLog = await this.callLogsRepo.findByIdForDispatch(
       input.companyId,
       input.callLogId,
@@ -74,6 +71,19 @@ export class CallService {
         `Call log must be PENDING to dispatch (current: ${callLog.status})`,
       );
     }
+
+    // TEMP: skip Redis channel reservation so calls dial immediately.
+    if (isRedisDisabled()) {
+      logChannelEvent("channels:bypass", {
+        companyId: input.companyId,
+        callLogId: input.callLogId,
+        reason: "REDIS_ENABLED=false",
+      });
+      return this.dispatchDirect(input);
+    }
+
+    assertChannelRedisReady();
+    await this.ensureChannelState(input.companyId);
 
     const allocated = await this.getAllocatedChannels(input.companyId);
     if (allocated <= 0) {
@@ -224,6 +234,24 @@ export class CallService {
     });
     await channelService.enqueue(companyId, callLogId);
     return { status: "QUEUED" };
+  }
+
+  private async dispatchDirect(
+    input: RequestDispatchInput,
+  ): Promise<RequestDispatchResult> {
+    const result = await obdOutboundService.dispatch({
+      companyId: input.companyId,
+      callLogId: input.callLogId,
+      callLogPublicId: input.callLogPublicId,
+      phone: input.phone,
+      campaignPublicId: input.campaignPublicId,
+    });
+
+    if (result.status === "FAILED") {
+      return { status: "FAILED" };
+    }
+
+    return { status: "QUEUED_AT_PROVIDER" };
   }
 
   private async dispatchWithReservedChannel(
