@@ -1,6 +1,7 @@
 import type { CallStatus } from "@prisma/client";
 
 import { getChannelCooldownMs } from "@/server/channels/channel-keys";
+import { wakeCompanyQueue } from "@/server/channels/channel-queue.hooks";
 import { channelService } from "@/server/channels/channel.service";
 import {
   incrementChannelMetric,
@@ -233,7 +234,7 @@ export class CallService {
     );
     if (!lockAcquired) {
       await channelService.release(input.companyId);
-      this.wakeCompanyQueue(input.companyId);
+      wakeCompanyQueue(input.companyId);
       return this.queueCall(input.companyId, input.callLogId);
     }
 
@@ -248,30 +249,18 @@ export class CallService {
 
       if (result.status === "FAILED") {
         await channelService.release(input.companyId);
-        this.wakeCompanyQueue(input.companyId);
+        wakeCompanyQueue(input.companyId);
         return { status: "FAILED" };
       }
 
       return { status: "QUEUED_AT_PROVIDER" };
     } catch (error) {
       await channelService.release(input.companyId);
-      this.wakeCompanyQueue(input.companyId);
+      wakeCompanyQueue(input.companyId);
       throw error;
     } finally {
       await channelService.releaseDispatchLock(input.callLogId);
     }
-  }
-
-  /** Fire-and-forget queue drain after a slot is freed without a cooldown. */
-  private wakeCompanyQueue(companyId: string): void {
-    void import("@/server/channels/channel-queue.worker")
-      .then(({ drainCompanyQueue }) => drainCompanyQueue(companyId))
-      .catch((error) => {
-        console.warn("[channels] wakeCompanyQueue failed", {
-          companyId,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      });
   }
 
   async markCancelled(companyId: string, callLogId: string): Promise<void> {

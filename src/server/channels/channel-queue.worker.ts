@@ -8,38 +8,13 @@ import {
   getChannelCooldownMs,
   getChannelQueuePollMs,
 } from "@/server/channels/channel-keys";
+import { drainCompanyQueue } from "@/server/channels/channel-queue.drain";
+import { registerCompanyQueueWake } from "@/server/channels/channel-queue.hooks";
 import { channelService } from "@/server/channels/channel.service";
 import prisma from "@/server/lib/prisma";
-import { callService } from "@/server/services/call.service";
 import { runWorkerTask } from "@/server/lib/run-worker-task";
 
-/** Drain a single company's Redis queue while free capacity remains. */
-export async function drainCompanyQueue(companyId: string): Promise<void> {
-  const metrics = await channelService.getMetrics(companyId);
-  if (metrics.allocated <= 0) {
-    return;
-  }
-
-  while (true) {
-    const reserved = await channelService.tryReserve(companyId);
-    if (!reserved) {
-      break;
-    }
-
-    const callLogId = await channelService.dequeue(companyId);
-    if (!callLogId) {
-      await channelService.release(companyId);
-      break;
-    }
-
-    const dispatched = await callService.dispatchQueuedCall(callLogId);
-    if (!dispatched) {
-      await channelService.release(companyId);
-      // Skip bad/stale entries; keep draining remaining queue.
-      continue;
-    }
-  }
-}
+export { drainCompanyQueue } from "@/server/channels/channel-queue.drain";
 
 @Injectable()
 export class ChannelQueueWorker implements OnModuleInit, OnModuleDestroy {
@@ -47,6 +22,7 @@ export class ChannelQueueWorker implements OnModuleInit, OnModuleDestroy {
   private processing = false;
 
   onModuleInit(): void {
+    registerCompanyQueueWake(drainCompanyQueue);
     this.interval = setInterval(() => {
       runWorkerTask("channel-queue", () => this.tick());
     }, getChannelQueuePollMs());
