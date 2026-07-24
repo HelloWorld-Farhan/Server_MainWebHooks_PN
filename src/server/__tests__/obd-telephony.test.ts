@@ -109,12 +109,13 @@ describe("OBD telephony", () => {
       const body = JSON.parse(String(calls[0]?.init?.body)) as {
         sourcetype: string;
         sendnow: string;
+        schddate?: string;
         ukey: string;
         serviceno: string;
         ivrtemplateid: string;
         msisdnlist: Array<{
           phoneno: string;
-          callid: string;
+          callid?: string;
           user_name: string;
           "Recording URL": string;
           Summary: string;
@@ -123,19 +124,19 @@ describe("OBD telephony", () => {
         }>;
       };
       assert.equal(body.sourcetype, "1");
-      assert.equal(body.sendnow, "1");
+      assert.equal(body.sendnow, "0");
+      assert.equal(body.schddate, "2018-02-15 12:57:00");
       assert.equal(body.ukey, OBD_TEST_CONFIG.apiKey);
       assert.equal(body.serviceno, OBD_TEST_CONFIG.serviceNo);
       assert.equal(body.ivrtemplateid, OBD_TEST_CONFIG.ivrTemplateId);
       assert.equal(body.msisdnlist[0]?.phoneno, "9876543210");
-      assert.equal(body.msisdnlist[0]?.callid, callid);
+      assert.equal(body.msisdnlist[0]?.callid, undefined);
       assert.equal(body.msisdnlist[0]?.user_name, "Nil");
       assert.equal(body.msisdnlist[0]?.["Recording URL"], "Nil");
       assert.equal(body.msisdnlist[0]?.Summary, "Nil");
       assert.equal(body.msisdnlist[0]?.[" Transcripts"], "Nil");
-      assert.equal(body.msisdnlist[0]?.webhookurl, OBD_TEST_CONFIG.webhookUrl);
+      assert.equal(body.msisdnlist[0]?.webhookurl, undefined);
       assert.equal("webhookurl" in body, false);
-      assert.equal("schddate" in body, false);
       assert.equal("voice_file" in (body.msisdnlist[0] ?? {}), false);
       assert.equal("param1" in (body.msisdnlist[0] ?? {}), false);
     });
@@ -170,7 +171,7 @@ describe("OBD telephony", () => {
       const body = JSON.parse(String(calls[0]?.init?.body)) as {
         msisdnlist: Array<{
           phoneno: string;
-          callid: string;
+          callid?: string;
           user_name: string;
           "Recording URL": string;
           Summary: string;
@@ -178,7 +179,7 @@ describe("OBD telephony", () => {
         }>;
       };
       assert.equal(body.msisdnlist[0]?.phoneno, "8810214283");
-      assert.equal(body.msisdnlist[0]?.callid, callid);
+      assert.equal(body.msisdnlist[0]?.callid, undefined);
       assert.equal(body.msisdnlist[0]?.user_name, "XYZ");
       assert.equal(
         body.msisdnlist[0]?.["Recording URL"],
@@ -276,7 +277,7 @@ describe("OBD telephony", () => {
         return;
       }
       assert.equal(result.providerCallId, null);
-      assert.match(result.warning ?? "", /returned no campaign ID/i);
+      assert.deepEqual(result.raw, { value: "accepted", status: "success" });
     });
 
     it("handles provider timeouts", async () => {

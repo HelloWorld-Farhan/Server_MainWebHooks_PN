@@ -29,28 +29,21 @@ export type ObdOutboundCallInput = {
 };
 
 /**
- * VoiceNSMS `msisdnlist` entry for IVR template campaigns.
- * Note: IVR template 179 expects the key `" Transcripts"` (leading space).
+ * TEMP test shape: matches the VoiceNSMS curl that actually rings.
+ * No callid / webhookurl.
  */
 export type VoiceNsmsMsisdnListEntry = {
   phoneno: string;
-  callid: string;
   user_name: string;
   "Recording URL": string;
   Summary: string;
   " Transcripts": string;
-  /**
-   * Call-status callback URL. VoiceNSMS rejects unknown top-level fields, but
-   * accepts `webhookurl` on each msisdnlist entry.
-   */
-  webhookurl?: string;
 };
 
 /** VoiceNSMS CreateOBDCampaignPost wire payload. */
 export type ObdProviderOutboundPayload = {
   sourcetype: string;
   sendnow: string;
-  /** Required by VoiceNSMS when `sendnow` is `"0"`. */
   schddate?: string;
   campaigntype: string;
   filetype: string;
@@ -74,7 +67,6 @@ export function toVoiceNsmsMsisdn(phone: string): string {
   return digits;
 }
 
-/** Format local-ish schedule timestamp VoiceNSMS accepts. */
 export function formatObdScheduleDate(date = new Date()): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return (
@@ -83,6 +75,10 @@ export function formatObdScheduleDate(date = new Date()): string {
   );
 }
 
+/**
+ * TEMP: minimal working VoiceNSMS payload for dial tests.
+ * Omits callid / webhookurl so the provider dials like the known-good curl.
+ */
 export function buildObdProviderOutboundPayload(
   input: ObdOutboundCallInput,
   config: Pick<
@@ -99,22 +95,12 @@ export function buildObdProviderOutboundPayload(
   >,
 ): ObdProviderOutboundPayload {
   const fields = input.contactFields ?? {};
-  const webhookUrl = input.webhookUrl?.trim() || undefined;
-  const msisdnEntry: VoiceNsmsMsisdnListEntry = {
-    phoneno: toVoiceNsmsMsisdn(input.phone),
-    callid: input.callid,
-    user_name: displayContactFieldValue(fields.userName),
-    "Recording URL": displayContactFieldValue(fields.recordingUrl),
-    Summary: displayContactFieldValue(fields.summary),
-    " Transcripts": displayContactFieldValue(fields.transcripts),
-  };
-  if (webhookUrl) {
-    msisdnEntry.webhookurl = webhookUrl;
-  }
 
-  const payload: ObdProviderOutboundPayload = {
+  return {
     sourcetype: config.sourceType,
-    sendnow: config.sendNow,
+    sendnow: "0",
+    schddate:
+      process.env.OBD_SCHEDULE_DATE?.trim() || "2018-02-15 12:57:00",
     campaigntype: config.campaignType,
     filetype: config.fileType,
     ukey: config.apiKey,
@@ -122,14 +108,14 @@ export function buildObdProviderOutboundPayload(
     ivrtemplateid: config.ivrTemplateId,
     retryatmpt: config.retryAttempts,
     retryduration: config.retryDuration,
-    msisdnlist: [msisdnEntry],
+    msisdnlist: [
+      {
+        phoneno: toVoiceNsmsMsisdn(input.phone),
+        user_name: displayContactFieldValue(fields.userName),
+        "Recording URL": displayContactFieldValue(fields.recordingUrl),
+        Summary: displayContactFieldValue(fields.summary),
+        " Transcripts": displayContactFieldValue(fields.transcripts),
+      },
+    ],
   };
-
-  // Working VoiceNSMS dials use sendnow=0 + schddate (past/near-now), not sendnow=1 alone.
-  if (config.sendNow.trim() !== "1") {
-    payload.schddate =
-      process.env.OBD_SCHEDULE_DATE?.trim() || formatObdScheduleDate();
-  }
-
-  return payload;
 }
