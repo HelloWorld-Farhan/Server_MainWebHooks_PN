@@ -414,6 +414,27 @@ export class ChannelService {
     };
   }
 
+  /**
+   * Companies that have free channel capacity and a non-empty queue.
+   * Prefer passing DB company IDs with totalChannels > 0 over Redis KEYS.
+   */
+  async listCompaniesWithPendingWork(
+    companyIds: string[],
+  ): Promise<string[]> {
+    const pending: string[] = [];
+    for (const companyId of companyIds) {
+      const metrics = await this.getMetrics(companyId);
+      if (
+        metrics.allocated > 0 &&
+        metrics.available > 0 &&
+        metrics.queueLength > 0
+      ) {
+        pending.push(companyId);
+      }
+    }
+    return pending;
+  }
+
   resetInMemoryForTests(): void {
     this.inMemory.clear();
   }

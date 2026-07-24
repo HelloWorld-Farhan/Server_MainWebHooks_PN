@@ -120,7 +120,10 @@ export class ObdOutboundService {
       logObdProviderResponse({
         correlationId,
         httpStatus: 200,
+        responseHeaders: {},
+        responseBody: result.raw,
         providerCallId: result.providerCallId,
+        warning: result.warning,
       });
 
       return {
@@ -147,6 +150,7 @@ export class ObdOutboundService {
       correlationId,
       message: result.error.message,
       httpStatus: result.error.httpStatus,
+      responseBody: result.error.responseBody,
     });
 
     return {

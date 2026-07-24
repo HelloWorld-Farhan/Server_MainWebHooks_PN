@@ -27,14 +27,13 @@ const OBD_TEST_CONFIG = {
   webhookSecret: null,
   serviceNo: "7912345678",
   voiceFile: "welcome.mp3",
-  ivrTemplateId: "26",
+  ivrTemplateId: "179",
   retryAttempts: "0",
   retryDuration: "15",
   sourceType: "1",
   campaignType: "4",
   fileType: "2",
-  sendNow: "0",
-  scheduleDate: null,
+  sendNow: "1",
 };
 
 const CORRELATION_ID = "00000000-0000-4000-8000-000000000001";
@@ -120,7 +119,7 @@ describe("OBD telephony", () => {
         }>;
       };
       assert.equal(body.sourcetype, "1");
-      assert.equal(body.sendnow, "0");
+      assert.equal(body.sendnow, "1");
       assert.equal(body.ukey, OBD_TEST_CONFIG.apiKey);
       assert.equal(body.serviceno, OBD_TEST_CONFIG.serviceNo);
       assert.equal(body.ivrtemplateid, OBD_TEST_CONFIG.ivrTemplateId);
@@ -128,6 +127,8 @@ describe("OBD telephony", () => {
       assert.equal(body.msisdnlist[0]?.callid, callid);
       assert.equal(body.msisdnlist[0]?.voice_file, OBD_TEST_CONFIG.voiceFile);
       assert.equal(body.msisdnlist[0]?.param1, CORRELATION_ID);
+      assert.equal("schddate" in body, false);
+      assert.equal("altno1" in (body.msisdnlist[0] ?? {}), false);
     });
 
     it("does not retry auth failures", async () => {

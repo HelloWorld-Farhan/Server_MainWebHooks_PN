@@ -452,4 +452,54 @@ export class CallLogsRepository extends BaseRepository {
       },
     });
   }
+
+  failStaleDispatching(companyId: string, olderThan: Date) {
+    return this.prisma.callLog.updateMany({
+      where: {
+        companyId,
+        status: 'DISPATCHING',
+        OR: [
+          { providerRequestedAt: { lt: olderThan } },
+          {
+            providerRequestedAt: null,
+            updatedAt: { lt: olderThan },
+          },
+        ],
+      },
+      data: {
+        status: 'FAILED',
+        providerCompletedAt: new Date(),
+        disconnectReason: 'Stale DISPATCHING cleanup',
+      },
+    });
+  }
+
+  async failStaleQueuedAtProvider(companyId: string, olderThan: Date) {
+    const stale = await this.prisma.callLog.findMany({
+      where: {
+        companyId,
+        status: 'QUEUED_AT_PROVIDER',
+        startedAt: { lt: olderThan },
+      },
+      select: { id: true, endedAt: true },
+    });
+    const ids = stale
+      .filter((row) => row.endedAt == null)
+      .map((row) => row.id);
+    if (ids.length === 0) {
+      return { count: 0 };
+    }
+    return this.prisma.callLog.updateMany({
+      where: {
+        companyId,
+        id: { in: ids },
+        status: 'QUEUED_AT_PROVIDER',
+      },
+      data: {
+        status: 'FAILED',
+        providerCompletedAt: new Date(),
+        disconnectReason: 'Stale QUEUED_AT_PROVIDER cleanup (no webhook)',
+      },
+    });
+  }
 }

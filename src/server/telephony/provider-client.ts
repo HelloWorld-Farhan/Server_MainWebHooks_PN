@@ -5,6 +5,7 @@ import {
 import {
   extractProviderCallId,
   extractProviderErrorMessage,
+  extractProviderResponseWarning,
   type ObdProviderOutboundResult,
 } from "./dto/outbound-response.dto";
 import type { ProviderErrorDetails } from "./dto/provider-error.dto";
@@ -16,6 +17,7 @@ import {
 import { isRetryableProviderError } from "./retry-policy";
 import {
   logObdError,
+  logObdProviderRequest,
   logObdProviderResponse,
   logObdRetry,
 } from "./telephony-logger";
@@ -37,6 +39,14 @@ async function parseResponseBody(response: Response): Promise<unknown> {
   }
 }
 
+function headersToRecord(headers: Headers): Record<string, string> {
+  const record: Record<string, string> = {};
+  headers.forEach((value, key) => {
+    record[key] = value;
+  });
+  return record;
+}
+
 export class ObdProviderClient {
   private readonly fetchFn: typeof fetch;
   private readonly config: ObdConfig;
@@ -55,6 +65,19 @@ export class ObdProviderClient {
 
     const payload = buildObdProviderOutboundPayload(input, config);
     const url = config.baseUrl;
+    const requestHeaders = {
+      "Content-Type": "application/json",
+      "X-Correlation-Id": input.correlationId,
+    };
+
+    logObdProviderRequest({
+      correlationId: input.correlationId,
+      url,
+      method: "POST",
+      headers: requestHeaders,
+      payload,
+    });
+
     let lastError: ProviderErrorDetails | null = null;
 
     for (let attempt = 0; attempt <= config.maxRetries; attempt += 1) {
@@ -63,13 +86,9 @@ export class ObdProviderClient {
         payload,
         input.correlationId,
         config.timeoutMs,
+        requestHeaders,
       );
       if (result.ok) {
-        logObdProviderResponse({
-          correlationId: input.correlationId,
-          httpStatus: 200,
-          providerCallId: result.providerCallId,
-        });
         return result;
       }
 
@@ -92,6 +111,7 @@ export class ObdProviderClient {
       correlationId: input.correlationId,
       message: lastError?.message ?? "Unknown OBD provider error",
       httpStatus: lastError?.httpStatus,
+      responseBody: lastError?.responseBody,
     });
 
     return {
@@ -105,6 +125,7 @@ export class ObdProviderClient {
     payload: ReturnType<typeof buildObdProviderOutboundPayload>,
     correlationId: string,
     timeoutMs: number,
+    requestHeaders: Record<string, string>,
   ): Promise<ObdProviderOutboundResult> {
     const controller = new AbortController();
     const timeoutId = setTimeout(
@@ -115,15 +136,22 @@ export class ObdProviderClient {
     try {
       const response = await this.fetchFn(url, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Correlation-Id": correlationId,
-        },
+        headers: requestHeaders,
         body: JSON.stringify(payload),
         signal: controller.signal,
       });
 
       const responseBody = await parseResponseBody(response);
+      const responseHeaders = headersToRecord(response.headers);
+
+      logObdProviderResponse({
+        correlationId,
+        httpStatus: response.status,
+        responseHeaders,
+        responseBody,
+        providerCallId: extractProviderCallId(responseBody),
+        warning: extractProviderResponseWarning(responseBody) ?? undefined,
+      });
 
       if (!response.ok) {
         return {
@@ -138,6 +166,12 @@ export class ObdProviderClient {
 
       const providerError = extractProviderErrorMessage(responseBody);
       if (providerError) {
+        logObdError({
+          correlationId,
+          message: providerError,
+          httpStatus: response.status,
+          responseBody,
+        });
         return {
           ok: false,
           error: {
@@ -148,22 +182,40 @@ export class ObdProviderClient {
         };
       }
 
+      const warning = extractProviderResponseWarning(responseBody);
+      if (warning) {
+        logObdError({
+          correlationId,
+          message: warning,
+          httpStatus: response.status,
+          responseBody,
+        });
+      }
+
       return {
         ok: true,
         providerCallId: extractProviderCallId(responseBody),
         raw: responseBody,
+        warning: warning ?? undefined,
       };
     } catch (error) {
       const isAbort =
         error instanceof Error && error.name === "AbortError";
+      const message = isAbort
+        ? `OBD provider request timed out after ${timeoutMs}ms`
+        : error instanceof Error
+          ? error.message
+          : "OBD provider network error";
+
+      logObdError({
+        correlationId,
+        message,
+      });
+
       return {
         ok: false,
         error: {
-          message: isAbort
-            ? `OBD provider request timed out after ${timeoutMs}ms`
-            : error instanceof Error
-              ? error.message
-              : "OBD provider network error",
+          message,
           isNetworkError: !isAbort,
           isTimeout: isAbort,
         },

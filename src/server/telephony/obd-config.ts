@@ -20,10 +20,8 @@ export type ObdConfig = {
   sourceType: string;
   campaignType: string;
   fileType: string;
-  /** `0` = send immediately, `1` = schedule (`schddate` required). */
+  /** `1` = send immediately; do not include `schddate`. */
   sendNow: string;
-  /** `YYYY-MM-DD HH:mm:ss` when `sendNow` is `1`. */
-  scheduleDate: string | null;
 };
 
 export function getObdServiceNumbers(): string[] {
@@ -56,14 +54,13 @@ export function getObdConfig(): ObdConfig {
     webhookSecret: (process.env.OBD_WEBHOOK_SECRET ?? "").trim() || null,
     serviceNo: resolveDefaultServiceNo(),
     voiceFile: (process.env.OBD_VOICE_FILE ?? "").trim(),
-    ivrTemplateId: (process.env.OBD_IVR_TEMPLATE_ID ?? "26").trim(),
+    ivrTemplateId: (process.env.OBD_IVR_TEMPLATE_ID ?? "179").trim(),
     retryAttempts: (process.env.OBD_RETRY_ATTEMPTS ?? "0").trim(),
     retryDuration: (process.env.OBD_RETRY_DURATION ?? "15").trim(),
     sourceType: (process.env.OBD_SOURCE_TYPE ?? "1").trim(),
     campaignType: (process.env.OBD_CAMPAIGN_TYPE ?? "4").trim(),
     fileType: (process.env.OBD_FILE_TYPE ?? "2").trim(),
-    sendNow: (process.env.OBD_SEND_NOW ?? "0").trim(),
-    scheduleDate: (process.env.OBD_SCHEDULE_DATE ?? "").trim() || null,
+    sendNow: (process.env.OBD_SEND_NOW ?? "1").trim(),
   };
 }
 
@@ -79,9 +76,6 @@ export function assertObdDispatchConfig(config: ObdConfig): void {
   }
   if (!config.voiceFile) {
     throw new Error("OBD_VOICE_FILE is not configured");
-  }
-  if (config.sendNow === "1" && !config.scheduleDate) {
-    throw new Error("OBD_SCHEDULE_DATE is required when OBD_SEND_NOW=1");
   }
 }
 

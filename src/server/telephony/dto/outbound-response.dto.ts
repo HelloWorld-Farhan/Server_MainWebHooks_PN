@@ -6,6 +6,7 @@ export type ObdProviderOutboundSuccess = {
   ok: true;
   providerCallId: string | null;
   raw: unknown;
+  warning?: string;
 };
 
 export type ObdProviderOutboundFailure = {
@@ -26,6 +27,7 @@ export const obdProviderSuccessBodySchema = z
     campaignid: z.union([z.string(), z.number()]).optional(),
     campaign_id: z.union([z.string(), z.number()]).optional(),
     status: z.union([z.string(), z.number()]).optional(),
+    value: z.union([z.string(), z.number()]).optional(),
     message: z.string().optional(),
     error: z.union([z.string(), z.boolean()]).optional(),
     success: z.boolean().optional(),
@@ -56,6 +58,46 @@ export function extractProviderCallId(body: unknown): string | null {
   );
 }
 
+function normalizeProviderStatus(status: unknown): string | null {
+  if (typeof status === "string") {
+    return status.trim().toLowerCase();
+  }
+  if (typeof status === "number") {
+    return String(status);
+  }
+  return null;
+}
+
+function normalizeProviderValue(value: unknown): string | null {
+  if (typeof value === "string") {
+    return value.trim().toLowerCase();
+  }
+  if (typeof value === "number") {
+    return String(value);
+  }
+  return null;
+}
+
+export function extractProviderResponseWarning(body: unknown): string | null {
+  const parsed = obdProviderSuccessBodySchema.safeParse(body);
+  if (!parsed.success) {
+    return null;
+  }
+
+  const status = normalizeProviderStatus(parsed.data.status);
+  const value = normalizeProviderValue(parsed.data.value);
+  const providerCallId = extractProviderCallId(body);
+
+  if (status === "success" && value === "accepted" && !providerCallId) {
+    return (
+      "VoiceNSMS accepted the campaign but returned no campaign ID. " +
+      "Verify IVR template is active, service number is configured, and destination is valid."
+    );
+  }
+
+  return null;
+}
+
 export function extractProviderErrorMessage(body: unknown): string | null {
   const parsed = obdProviderSuccessBodySchema.safeParse(body);
   if (!parsed.success) {
@@ -70,16 +112,20 @@ export function extractProviderErrorMessage(body: unknown): string | null {
     return parsed.data.message ?? "OBD provider returned an error";
   }
 
-  const status = parsed.data.status;
-  if (typeof status === "string") {
-    const normalized = status.trim().toLowerCase();
-    if (
-      normalized === "error" ||
-      normalized === "failed" ||
-      normalized === "failure"
-    ) {
-      return parsed.data.message ?? `OBD provider status: ${status}`;
-    }
+  const status = normalizeProviderStatus(parsed.data.status);
+  if (status === "error" || status === "failed" || status === "failure") {
+    return parsed.data.message ?? `OBD provider status: ${status}`;
+  }
+
+  const value = normalizeProviderValue(parsed.data.value);
+  if (
+    value &&
+    (value.includes("invalid") ||
+      value.includes("error") ||
+      value.includes("fail") ||
+      value.includes("reject"))
+  ) {
+    return parsed.data.message ?? `OBD provider value: ${value}`;
   }
 
   if (typeof parsed.data.message === "string") {

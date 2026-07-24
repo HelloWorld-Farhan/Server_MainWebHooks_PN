@@ -342,4 +342,133 @@ describe("Channel management", () => {
     assert.equal(metrics.active, 3);
     assert.equal(metrics.available, 0);
   });
+
+  it("wakes queued calls when capacity frees without a cooldown", async () => {
+    await resetCompanyChannelState(1);
+
+    const first = await createCall(
+      `+9180${Math.random().toString().slice(2, 10)}`,
+    );
+    const second = await createCall(
+      `+9179${Math.random().toString().slice(2, 10)}`,
+    );
+    assert.equal(first.status, "QUEUED_AT_PROVIDER");
+    assert.equal(second.status, "QUEUED");
+
+    await channelService.release(companyId);
+    await worker.tick();
+
+    const secondLog = await prisma.callLog.findFirst({
+      where: { companyId, publicId: second.callLogId },
+    });
+    assert.equal(secondLog?.status, "QUEUED_AT_PROVIDER");
+
+    const metrics = await channelService.getMetrics(companyId);
+    assert.equal(metrics.active, 1);
+    assert.equal(metrics.queueLength, 0);
+  });
+
+  it("continues draining queue after a bad dequeue entry", async () => {
+    await resetCompanyChannelState(1);
+
+    const first = await createCall(
+      `+9178${Math.random().toString().slice(2, 10)}`,
+    );
+    const second = await createCall(
+      `+9177${Math.random().toString().slice(2, 10)}`,
+    );
+    assert.equal(first.status, "QUEUED_AT_PROVIDER");
+    assert.equal(second.status, "QUEUED");
+
+    // Valid ObjectId shape but not present in DB / not QUEUED
+    await channelService.enqueueFront(companyId, "000000000000000000000000");
+    await channelService.release(companyId);
+    await worker.tick();
+
+    const secondLog = await prisma.callLog.findFirst({
+      where: { companyId, publicId: second.callLogId },
+    });
+    assert.equal(secondLog?.status, "QUEUED_AT_PROVIDER");
+  });
+
+  it("fails stale DISPATCHING and QUEUED_AT_PROVIDER during reconcile", async () => {
+    const suffix = Math.random().toString(36).slice(2, 8);
+    const staleCompany = await prisma.company.create({
+      data: {
+        name: `Stale Co ${suffix}`,
+        slug: `stale-co-${suffix}`,
+        contractId: `ST${suffix.toUpperCase()}`.slice(0, 10),
+        cli: randomCli(),
+        companyCode: randomCompanyCode(),
+        ownerUserId: `owner_${suffix}`,
+        setupConfig: {
+          create: {
+            totalChannels: 2,
+          },
+        },
+      },
+    });
+
+    const old = new Date(Date.now() - 60 * 60 * 1000);
+    const staleDispatching = await prisma.callLog.create({
+      data: {
+        callLogId: "CL77777777",
+        publicId: `v1.${staleCompany.cli}.CP000077.CL77777777`,
+        companyId: staleCompany.id,
+        direction: "OUTBOUND",
+        status: "DISPATCHING",
+        startedAt: old,
+        updatedAt: old,
+        providerRequestedAt: old,
+      },
+    });
+    const staleQueuedAtProvider = await prisma.callLog.create({
+      data: {
+        callLogId: "CL77777776",
+        publicId: `v1.${staleCompany.cli}.CP000077.CL77777776`,
+        companyId: staleCompany.id,
+        direction: "OUTBOUND",
+        status: "QUEUED_AT_PROVIDER",
+        startedAt: old,
+        updatedAt: old,
+        providerAcceptedAt: old,
+      },
+    });
+    const queuedLog = await prisma.callLog.create({
+      data: {
+        callLogId: "CL77777775",
+        publicId: `v1.${staleCompany.cli}.CP000077.CL77777775`,
+        companyId: staleCompany.id,
+        direction: "OUTBOUND",
+        status: "QUEUED",
+        startedAt: new Date(),
+      },
+    });
+
+    const reconciliation = new ChannelReconciliationService();
+    await reconciliation.reconcileAll();
+
+    const refreshedDispatching = await prisma.callLog.findUnique({
+      where: { id: staleDispatching.id },
+    });
+    const refreshedQueuedAtProvider = await prisma.callLog.findUnique({
+      where: { id: staleQueuedAtProvider.id },
+    });
+    assert.equal(refreshedDispatching?.status, "FAILED");
+    assert.equal(refreshedQueuedAtProvider?.status, "FAILED");
+
+    const metrics = await channelService.getMetrics(staleCompany.id);
+    assert.equal(metrics.allocated, 2);
+    assert.equal(metrics.active, 0);
+    assert.equal(metrics.queueLength, 1);
+
+    await prisma.callLog.deleteMany({
+      where: {
+        id: {
+          in: [staleDispatching.id, staleQueuedAtProvider.id, queuedLog.id],
+        },
+      },
+    });
+    await prisma.company.delete({ where: { id: staleCompany.id } });
+  });
 });

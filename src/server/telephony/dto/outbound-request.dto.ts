@@ -23,17 +23,13 @@ export type VoiceNsmsMsisdnListEntry = {
   phoneno: string;
   callid: string;
   voice_file: string;
-  param1?: string;
-  altno1?: string;
-  altno2?: string;
-  text1?: string;
+  param1: string;
 };
 
 /** VoiceNSMS CreateOBDCampaignPost wire payload. */
 export type ObdProviderOutboundPayload = {
   sourcetype: string;
   sendnow: string;
-  schddate?: string;
   campaigntype: string;
   filetype: string;
   ukey: string;
@@ -70,10 +66,9 @@ export function buildObdProviderOutboundPayload(
     | "campaignType"
     | "fileType"
     | "sendNow"
-    | "scheduleDate"
   >,
 ): ObdProviderOutboundPayload {
-  const payload: ObdProviderOutboundPayload = {
+  return {
     sourcetype: config.sourceType,
     sendnow: config.sendNow,
     campaigntype: config.campaignType,
@@ -89,16 +84,7 @@ export function buildObdProviderOutboundPayload(
         callid: input.callid,
         voice_file: config.voiceFile,
         param1: input.correlationId,
-        altno1: "",
-        altno2: "",
-        text1: "",
       },
     ],
   };
-
-  if (config.sendNow === "1" && config.scheduleDate) {
-    payload.schddate = config.scheduleDate;
-  }
-
-  return payload;
 }

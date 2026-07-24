@@ -21,15 +21,37 @@ export function logObdOutbound(fields: {
   });
 }
 
+export function logObdProviderRequest(fields: {
+  correlationId: string;
+  url: string;
+  method: string;
+  headers: Record<string, string>;
+  payload: unknown;
+}): void {
+  console.info("[obd:provider-request]", {
+    correlationId: fields.correlationId,
+    url: fields.url,
+    method: fields.method,
+    headers: fields.headers,
+    payload: fields.payload,
+  });
+}
+
 export function logObdProviderResponse(fields: {
   correlationId: string;
   httpStatus: number;
+  responseHeaders: Record<string, string>;
+  responseBody: unknown;
   providerCallId?: string | null;
+  warning?: string;
 }): void {
   console.info("[obd:provider-response]", {
     correlationId: fields.correlationId,
     httpStatus: fields.httpStatus,
+    responseHeaders: fields.responseHeaders,
+    responseBody: fields.responseBody,
     providerCallId: fields.providerCallId ?? null,
+    ...(fields.warning ? { warning: fields.warning } : {}),
   });
 }
 
@@ -65,11 +87,15 @@ export function logObdError(fields: {
   correlationId: string;
   message: string;
   httpStatus?: number;
+  responseBody?: unknown;
 }): void {
   console.warn("[obd:error]", {
     correlationId: fields.correlationId,
     message: fields.message,
     httpStatus: fields.httpStatus,
+    ...(fields.responseBody !== undefined
+      ? { responseBody: fields.responseBody }
+      : {}),
   });
 }
 

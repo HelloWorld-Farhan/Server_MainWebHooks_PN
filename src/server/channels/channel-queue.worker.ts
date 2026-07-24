@@ -9,8 +9,37 @@ import {
   getChannelQueuePollMs,
 } from "@/server/channels/channel-keys";
 import { channelService } from "@/server/channels/channel.service";
+import prisma from "@/server/lib/prisma";
 import { callService } from "@/server/services/call.service";
 import { runWorkerTask } from "@/server/lib/run-worker-task";
+
+/** Drain a single company's Redis queue while free capacity remains. */
+export async function drainCompanyQueue(companyId: string): Promise<void> {
+  const metrics = await channelService.getMetrics(companyId);
+  if (metrics.allocated <= 0) {
+    return;
+  }
+
+  while (true) {
+    const reserved = await channelService.tryReserve(companyId);
+    if (!reserved) {
+      break;
+    }
+
+    const callLogId = await channelService.dequeue(companyId);
+    if (!callLogId) {
+      await channelService.release(companyId);
+      break;
+    }
+
+    const dispatched = await callService.dispatchQueuedCall(callLogId);
+    if (!dispatched) {
+      await channelService.release(companyId);
+      // Skip bad/stale entries; keep draining remaining queue.
+      continue;
+    }
+  }
+}
 
 @Injectable()
 export class ChannelQueueWorker implements OnModuleInit, OnModuleDestroy {
@@ -45,6 +74,24 @@ export class ChannelQueueWorker implements OnModuleInit, OnModuleDestroy {
         companies.add(release.companyId);
       }
 
+      const companiesWithChannels = await prisma.company.findMany({
+        where: {
+          setupConfig: {
+            is: {
+              totalChannels: { gt: 0 },
+            },
+          },
+        },
+        select: { id: true },
+      });
+
+      const pending = await channelService.listCompaniesWithPendingWork(
+        companiesWithChannels.map((company) => company.id),
+      );
+      for (const companyId of pending) {
+        companies.add(companyId);
+      }
+
       for (const companyId of companies) {
         await this.processCompanyQueue(companyId);
       }
@@ -54,29 +101,7 @@ export class ChannelQueueWorker implements OnModuleInit, OnModuleDestroy {
   }
 
   async processCompanyQueue(companyId: string): Promise<void> {
-    const metrics = await channelService.getMetrics(companyId);
-    if (metrics.allocated <= 0) {
-      return;
-    }
-
-    while (true) {
-      const reserved = await channelService.tryReserve(companyId);
-      if (!reserved) {
-        break;
-      }
-
-      const callLogId = await channelService.dequeue(companyId);
-      if (!callLogId) {
-        await channelService.release(companyId);
-        break;
-      }
-
-      const dispatched = await callService.dispatchQueuedCall(callLogId);
-      if (!dispatched) {
-        await channelService.release(companyId);
-        break;
-      }
-    }
+    await drainCompanyQueue(companyId);
   }
 }
 

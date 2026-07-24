@@ -93,17 +93,34 @@ export class CallService {
   }
 
   async dispatchQueuedCall(callLogId: string): Promise<boolean> {
-    const callLog = await prisma.callLog.findFirst({
-      where: { id: callLogId, status: "QUEUED" },
-      select: {
-        id: true,
-        companyId: true,
-        publicId: true,
-        createdAt: true,
-        phoneNumber: { select: { number: true } },
-        campaign: { select: { resourceKey: true } },
-      },
-    });
+    if (!/^[a-fA-F0-9]{24}$/.test(callLogId)) {
+      return false;
+    }
+
+    let callLog: {
+      id: string;
+      companyId: string;
+      publicId: string;
+      createdAt: Date;
+      phoneNumber: { number: string } | null;
+      campaign: { resourceKey: string } | null;
+    } | null;
+
+    try {
+      callLog = await prisma.callLog.findFirst({
+        where: { id: callLogId, status: "QUEUED" },
+        select: {
+          id: true,
+          companyId: true,
+          publicId: true,
+          createdAt: true,
+          phoneNumber: { select: { number: true } },
+          campaign: { select: { resourceKey: true } },
+        },
+      });
+    } catch {
+      return false;
+    }
 
     if (!callLog?.phoneNumber?.number) {
       return false;
@@ -216,6 +233,7 @@ export class CallService {
     );
     if (!lockAcquired) {
       await channelService.release(input.companyId);
+      this.wakeCompanyQueue(input.companyId);
       return this.queueCall(input.companyId, input.callLogId);
     }
 
@@ -230,16 +248,30 @@ export class CallService {
 
       if (result.status === "FAILED") {
         await channelService.release(input.companyId);
+        this.wakeCompanyQueue(input.companyId);
         return { status: "FAILED" };
       }
 
       return { status: "QUEUED_AT_PROVIDER" };
     } catch (error) {
       await channelService.release(input.companyId);
+      this.wakeCompanyQueue(input.companyId);
       throw error;
     } finally {
       await channelService.releaseDispatchLock(input.callLogId);
     }
+  }
+
+  /** Fire-and-forget queue drain after a slot is freed without a cooldown. */
+  private wakeCompanyQueue(companyId: string): void {
+    void import("@/server/channels/channel-queue.worker")
+      .then(({ drainCompanyQueue }) => drainCompanyQueue(companyId))
+      .catch((error) => {
+        console.warn("[channels] wakeCompanyQueue failed", {
+          companyId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
   }
 
   async markCancelled(companyId: string, callLogId: string): Promise<void> {
