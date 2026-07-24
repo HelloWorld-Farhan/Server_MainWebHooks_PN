@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { displayContactFieldValue } from "@/lib/contact-phone-fields";
 import type { ObdConfig } from "@/server/telephony/obd-config";
 
 /** Single phone entry sent to the OBD provider. */
@@ -10,20 +11,31 @@ export const obdOutboundPhoneEntrySchema = z.object({
 
 export type ObdOutboundPhoneEntry = z.infer<typeof obdOutboundPhoneEntrySchema>;
 
+/** Contact custom fields mapped into VoiceNSMS `msisdnlist`. */
+export type ObdOutboundContactFields = {
+  userName?: string | null;
+  recordingUrl?: string | null;
+  transcripts?: string | null;
+  summary?: string | null;
+};
+
 /** Normalized input for the provider client (no business logic). */
 export type ObdOutboundCallInput = {
   callid: string;
   phone: string;
   correlationId: string;
   webhookUrl?: string;
+  contactFields?: ObdOutboundContactFields;
 };
 
-/** Simple-voice entry inside VoiceNSMS `msisdnlist`. */
+/** VoiceNSMS `msisdnlist` entry for IVR template campaigns. */
 export type VoiceNsmsMsisdnListEntry = {
   phoneno: string;
   callid: string;
-  voice_file: string;
-  param1: string;
+  user_name: string;
+  "Recording URL": string;
+  Summary: string;
+  Transcripts: string;
 };
 
 /** VoiceNSMS CreateOBDCampaignPost wire payload. */
@@ -58,7 +70,6 @@ export function buildObdProviderOutboundPayload(
     ObdConfig,
     | "apiKey"
     | "serviceNo"
-    | "voiceFile"
     | "ivrTemplateId"
     | "retryAttempts"
     | "retryDuration"
@@ -68,6 +79,7 @@ export function buildObdProviderOutboundPayload(
     | "sendNow"
   >,
 ): ObdProviderOutboundPayload {
+  const fields = input.contactFields ?? {};
   return {
     sourcetype: config.sourceType,
     sendnow: config.sendNow,
@@ -82,8 +94,10 @@ export function buildObdProviderOutboundPayload(
       {
         phoneno: toVoiceNsmsMsisdn(input.phone),
         callid: input.callid,
-        voice_file: config.voiceFile,
-        param1: input.correlationId,
+        user_name: displayContactFieldValue(fields.userName),
+        "Recording URL": displayContactFieldValue(fields.recordingUrl),
+        Summary: displayContactFieldValue(fields.summary),
+        Transcripts: displayContactFieldValue(fields.transcripts),
       },
     ],
   };

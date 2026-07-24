@@ -1,10 +1,15 @@
 import type { CallStatus } from "@prisma/client";
 
+import { normalizeStoredContactPhone } from "@/lib/contact-phone-validation";
 import prisma from "@/server/lib/prisma";
 import { CallLogsRepository } from "@/server/repositories/call-logs.repository";
 import { generateCorrelationId } from "@/server/telephony/correlation-id";
 import { toProviderErrorJson } from "@/server/telephony/dto/provider-error.dto";
-import { buildObdProviderOutboundPayload } from "@/server/telephony/dto/outbound-request.dto";
+import {
+  buildObdProviderOutboundPayload,
+  type ObdOutboundContactFields,
+  type ObdOutboundCallInput,
+} from "@/server/telephony/dto/outbound-request.dto";
 import {
   getObdConfig,
   getObdServiceNumbers,
@@ -52,16 +57,20 @@ export class ObdOutboundService {
     );
     const correlationId =
       existing?.correlationId ?? generateCorrelationId();
-
-    const requestPayload = buildObdProviderOutboundPayload(
-      {
-        callid: input.callLogPublicId,
-        phone: input.phone,
-        correlationId,
-        webhookUrl: config.webhookUrl ?? undefined,
-      },
-      config,
+    const contactFields = await this.resolveContactFields(
+      input.companyId,
+      input.phone,
     );
+
+    const callInput: ObdOutboundCallInput = {
+      callid: input.callLogPublicId,
+      phone: input.phone,
+      correlationId,
+      webhookUrl: config.webhookUrl ?? undefined,
+      contactFields,
+    };
+
+    const requestPayload = buildObdProviderOutboundPayload(callInput, config);
 
     const providerRequest = appendProviderRequest(existing?.providerRequest, {
       at: new Date().toISOString(),
@@ -82,15 +91,9 @@ export class ObdOutboundService {
       phone: input.phone,
     });
 
-    const result = await this.providerClient.sendOutboundCall(
-      {
-        callid: input.callLogPublicId,
-        phone: input.phone,
-        correlationId,
-        webhookUrl: config.webhookUrl ?? undefined,
-      },
-      { serviceNo: config.serviceNo },
-    );
+    const result = await this.providerClient.sendOutboundCall(callInput, {
+      serviceNo: config.serviceNo,
+    });
 
     const refreshed = await this.callLogsRepo.findByPublicIdForWebhook(
       input.callLogPublicId,
@@ -176,6 +179,40 @@ export class ObdOutboundService {
     }
 
     return config;
+  }
+
+  private async resolveContactFields(
+    companyId: string,
+    phone: string,
+  ): Promise<ObdOutboundContactFields> {
+    const storedPhone = normalizeStoredContactPhone(phone);
+    if (!storedPhone) {
+      return {};
+    }
+
+    const contact = await prisma.uploadedContact.findUnique({
+      where: {
+        companyId_phone: {
+          companyId,
+          phone: storedPhone,
+        },
+      },
+      select: {
+        field1: true,
+        field2: true,
+        field3: true,
+      },
+    });
+
+    if (!contact) {
+      return {};
+    }
+
+    return {
+      userName: contact.field1,
+      recordingUrl: contact.field2,
+      transcripts: contact.field3,
+    };
   }
 }
 

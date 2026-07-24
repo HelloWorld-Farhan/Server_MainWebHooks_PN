@@ -114,8 +114,10 @@ describe("OBD telephony", () => {
         msisdnlist: Array<{
           phoneno: string;
           callid: string;
-          voice_file: string;
-          param1: string;
+          user_name: string;
+          "Recording URL": string;
+          Summary: string;
+          Transcripts: string;
         }>;
       };
       assert.equal(body.sourcetype, "1");
@@ -125,10 +127,61 @@ describe("OBD telephony", () => {
       assert.equal(body.ivrtemplateid, OBD_TEST_CONFIG.ivrTemplateId);
       assert.equal(body.msisdnlist[0]?.phoneno, "9876543210");
       assert.equal(body.msisdnlist[0]?.callid, callid);
-      assert.equal(body.msisdnlist[0]?.voice_file, OBD_TEST_CONFIG.voiceFile);
-      assert.equal(body.msisdnlist[0]?.param1, CORRELATION_ID);
+      assert.equal(body.msisdnlist[0]?.user_name, "Nil");
+      assert.equal(body.msisdnlist[0]?.["Recording URL"], "Nil");
+      assert.equal(body.msisdnlist[0]?.Summary, "Nil");
+      assert.equal(body.msisdnlist[0]?.Transcripts, "Nil");
       assert.equal("schddate" in body, false);
-      assert.equal("altno1" in (body.msisdnlist[0] ?? {}), false);
+      assert.equal("voice_file" in (body.msisdnlist[0] ?? {}), false);
+      assert.equal("param1" in (body.msisdnlist[0] ?? {}), false);
+    });
+
+    it("maps uploaded contact fields into VoiceNSMS msisdnlist", async () => {
+      const calls: Array<{ url: string; init?: RequestInit }> = [];
+      const client = new ObdProviderClient({
+        config: OBD_TEST_CONFIG,
+        fetchFn: async (url, init) => {
+          calls.push({ url: String(url), init });
+          return new Response(
+            JSON.stringify({ campaignid: "provider-req-456", status: "success" }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        },
+      });
+
+      const callid = "v1.PNX.CP000001.CL00000002";
+      const result = await client.sendOutboundCall({
+        callid,
+        phone: "+918810214283",
+        correlationId: CORRELATION_ID,
+        contactFields: {
+          userName: "XYZ",
+          recordingUrl: "https://example.com/recording.mp3",
+          summary: "ABCD",
+          transcripts: "XXXX",
+        },
+      });
+
+      assert.equal(result.ok, true);
+      const body = JSON.parse(String(calls[0]?.init?.body)) as {
+        msisdnlist: Array<{
+          phoneno: string;
+          callid: string;
+          user_name: string;
+          "Recording URL": string;
+          Summary: string;
+          Transcripts: string;
+        }>;
+      };
+      assert.equal(body.msisdnlist[0]?.phoneno, "8810214283");
+      assert.equal(body.msisdnlist[0]?.callid, callid);
+      assert.equal(body.msisdnlist[0]?.user_name, "XYZ");
+      assert.equal(
+        body.msisdnlist[0]?.["Recording URL"],
+        "https://example.com/recording.mp3",
+      );
+      assert.equal(body.msisdnlist[0]?.Summary, "ABCD");
+      assert.equal(body.msisdnlist[0]?.Transcripts, "XXXX");
     });
 
     it("does not retry auth failures", async () => {

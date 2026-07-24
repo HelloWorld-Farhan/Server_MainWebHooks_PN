@@ -74,9 +74,6 @@ export function assertObdDispatchConfig(config: ObdConfig): void {
   if (!config.serviceNo) {
     throw new Error("No OBD service number is configured");
   }
-  if (!config.voiceFile) {
-    throw new Error("OBD_VOICE_FILE is not configured");
-  }
 }
 
 export function resolveWebhookApiKey(config: ObdConfig): string | null {
