@@ -44,10 +44,13 @@ function parsePositiveInt(value: string | undefined, fallback: number): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+/** TEMP: hardcoded VoiceNSMS ukey until Render OBD_API_KEY is confirmed working. */
+const HARDCODED_OBD_UKEY = "ZgoluYBmEwUZZp4CgDiCtXbC_aAXeMjuGg==";
+
 export function getObdConfig(): ObdConfig {
   return {
     baseUrl: (process.env.OBD_BASE_URL ?? "").trim().replace(/\/$/, ""),
-    apiKey: (process.env.OBD_API_KEY ?? "").trim(),
+    apiKey: HARDCODED_OBD_UKEY,
     webhookUrl: (process.env.OBD_WEBHOOK_URL ?? "").trim() || null,
     timeoutMs: parsePositiveInt(process.env.OBD_TIMEOUT_MS, 30_000),
     maxRetries: parsePositiveInt(process.env.OBD_MAX_RETRIES, 2),
