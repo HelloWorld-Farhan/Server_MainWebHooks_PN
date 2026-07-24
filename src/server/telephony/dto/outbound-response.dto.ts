@@ -98,11 +98,6 @@ export function extractProviderResponseWarning(body: unknown): string | null {
 }
 
 export function extractProviderErrorMessage(body: unknown): string | null {
-  const missingCampaignIdError = extractProviderResponseWarning(body);
-  if (missingCampaignIdError) {
-    return missingCampaignIdError;
-  }
-
   const parsed = obdProviderSuccessBodySchema.safeParse(body);
   if (!parsed.success) {
     return null;
@@ -122,8 +117,10 @@ export function extractProviderErrorMessage(body: unknown): string | null {
   }
 
   const value = normalizeProviderValue(parsed.data.value);
+  // "accepted" without campaign ID is a warning, not an error (VoiceNSMS common response).
   if (
     value &&
+    value !== "accepted" &&
     (value.includes("invalid") ||
       value.includes("error") ||
       value.includes("fail") ||

@@ -118,7 +118,7 @@ describe("OBD telephony", () => {
           user_name: string;
           "Recording URL": string;
           Summary: string;
-          Transcripts: string;
+          " Transcripts": string;
           webhookurl?: string;
         }>;
       };
@@ -132,7 +132,7 @@ describe("OBD telephony", () => {
       assert.equal(body.msisdnlist[0]?.user_name, "Nil");
       assert.equal(body.msisdnlist[0]?.["Recording URL"], "Nil");
       assert.equal(body.msisdnlist[0]?.Summary, "Nil");
-      assert.equal(body.msisdnlist[0]?.Transcripts, "Nil");
+      assert.equal(body.msisdnlist[0]?.[" Transcripts"], "Nil");
       assert.equal(body.msisdnlist[0]?.webhookurl, OBD_TEST_CONFIG.webhookUrl);
       assert.equal("webhookurl" in body, false);
       assert.equal("schddate" in body, false);
@@ -174,7 +174,7 @@ describe("OBD telephony", () => {
           user_name: string;
           "Recording URL": string;
           Summary: string;
-          Transcripts: string;
+          " Transcripts": string;
         }>;
       };
       assert.equal(body.msisdnlist[0]?.phoneno, "8810214283");
@@ -185,7 +185,7 @@ describe("OBD telephony", () => {
         "https://example.com/recording.mp3",
       );
       assert.equal(body.msisdnlist[0]?.Summary, "ABCD");
-      assert.equal(body.msisdnlist[0]?.Transcripts, "XXXX");
+      assert.equal(body.msisdnlist[0]?.[" Transcripts"], "XXXX");
     });
 
     it("does not retry auth failures", async () => {

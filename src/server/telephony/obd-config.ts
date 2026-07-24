@@ -60,7 +60,7 @@ export function getObdConfig(): ObdConfig {
     sourceType: (process.env.OBD_SOURCE_TYPE ?? "1").trim(),
     campaignType: (process.env.OBD_CAMPAIGN_TYPE ?? "4").trim(),
     fileType: (process.env.OBD_FILE_TYPE ?? "2").trim(),
-    sendNow: (process.env.OBD_SEND_NOW ?? "1").trim(),
+    sendNow: (process.env.OBD_SEND_NOW ?? "0").trim(),
   };
 }
 
