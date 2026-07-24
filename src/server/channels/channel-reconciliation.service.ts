@@ -1,10 +1,20 @@
-import { Injectable } from "@nestjs/common";
+import {
+  Injectable,
+  OnModuleDestroy,
+  OnModuleInit,
+} from "@nestjs/common";
 import type { CallStatus } from "@prisma/client";
 
+import {
+  getChannelReconcilePollMs,
+  getStaleQueuedAtProviderMs,
+} from "@/server/channels/channel-keys";
+import { wakeCompanyQueue } from "@/server/channels/channel-queue.hooks";
 import { channelService } from "@/server/channels/channel.service";
 import { logChannelEvent } from "@/server/channels/channel-metrics";
 import { gqlDebug } from "@/server/graphql/debug";
 import prisma from "@/server/lib/prisma";
+import { runWorkerTask } from "@/server/lib/run-worker-task";
 import { CallLogsRepository } from "@/server/repositories/call-logs.repository";
 
 const ACTIVE_CHANNEL_STATUSES: CallStatus[] = [
@@ -18,16 +28,46 @@ const ACTIVE_CHANNEL_STATUSES: CallStatus[] = [
 export const STALE_DISPATCHING_MS = 2 * 60 * 1000;
 
 /**
- * QUEUED_AT_PROVIDER with no terminal webhook older than this is failed
- * so the channel slot can be freed.
+ * @deprecated Prefer getStaleQueuedAtProviderMs() so env overrides apply.
+ * Kept for tests/scripts that import the constant.
  */
-export const STALE_QUEUED_AT_PROVIDER_MS = 30 * 60 * 1000;
+export const STALE_QUEUED_AT_PROVIDER_MS = 2 * 60 * 1000;
 
 @Injectable()
-export class ChannelReconciliationService {
+export class ChannelReconciliationService
+  implements OnModuleInit, OnModuleDestroy
+{
   private readonly callLogsRepo = new CallLogsRepository(prisma);
+  private interval: ReturnType<typeof setInterval> | null = null;
+  private processing = false;
+
+  onModuleInit(): void {
+    this.interval = setInterval(() => {
+      runWorkerTask("channel-reconcile", () => this.reconcileAll());
+    }, getChannelReconcilePollMs());
+  }
+
+  onModuleDestroy(): void {
+    if (this.interval) {
+      clearInterval(this.interval);
+      this.interval = null;
+    }
+  }
 
   async reconcileAll(): Promise<void> {
+    if (this.processing) {
+      return;
+    }
+
+    this.processing = true;
+    try {
+      await this.runReconcile();
+    } finally {
+      this.processing = false;
+    }
+  }
+
+  private async runReconcile(): Promise<void> {
     const companies = await prisma.company.findMany({
       where: {
         setupConfig: {
@@ -47,7 +87,7 @@ export class ChannelReconciliationService {
     const now = Date.now();
     const staleDispatchingBefore = new Date(now - STALE_DISPATCHING_MS);
     const staleQueuedAtProviderBefore = new Date(
-      now - STALE_QUEUED_AT_PROVIDER_MS,
+      now - getStaleQueuedAtProviderMs(),
     );
 
     for (const company of companies) {
@@ -86,6 +126,11 @@ export class ChannelReconciliationService {
         active,
         queued,
       );
+
+      const metrics = await channelService.getMetrics(company.id);
+      if (metrics.available > 0 && metrics.queueLength > 0) {
+        wakeCompanyQueue(company.id);
+      }
 
       gqlDebug("channels:reconcile:company", {
         companyId: company.id,

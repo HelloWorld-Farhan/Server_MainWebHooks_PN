@@ -6,6 +6,23 @@ export function getChannelQueuePollMs(): number {
   return Number(process.env.CHANNEL_QUEUE_POLL_MS ?? 1_000);
 }
 
+/** How often to resync Redis channel state from DB and fail stale in-flight calls. */
+export function getChannelReconcilePollMs(): number {
+  const parsed = Number(process.env.CHANNEL_RECONCILE_POLL_MS ?? 30_000);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 30_000;
+}
+
+/**
+ * QUEUED_AT_PROVIDER older than this (no terminal webhook) is failed so the
+ * channel slot can be released. OBD providers often accept without completing.
+ */
+export function getStaleQueuedAtProviderMs(): number {
+  const parsed = Number(
+    process.env.CHANNEL_STALE_QUEUED_AT_PROVIDER_MS ?? 2 * 60 * 1000,
+  );
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 2 * 60 * 1000;
+}
+
 /** @deprecated Use getChannelCooldownMs() */
 export const CHANNEL_COOLDOWN_MS = getChannelCooldownMs();
 
