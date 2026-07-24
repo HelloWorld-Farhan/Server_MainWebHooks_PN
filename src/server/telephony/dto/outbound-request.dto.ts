@@ -36,6 +36,11 @@ export type VoiceNsmsMsisdnListEntry = {
   "Recording URL": string;
   Summary: string;
   Transcripts: string;
+  /**
+   * Call-status callback URL. VoiceNSMS rejects unknown top-level fields, but
+   * accepts `webhookurl` on each msisdnlist entry.
+   */
+  webhookurl?: string;
 };
 
 /** VoiceNSMS CreateOBDCampaignPost wire payload. */
@@ -80,6 +85,19 @@ export function buildObdProviderOutboundPayload(
   >,
 ): ObdProviderOutboundPayload {
   const fields = input.contactFields ?? {};
+  const webhookUrl = input.webhookUrl?.trim() || undefined;
+  const msisdnEntry: VoiceNsmsMsisdnListEntry = {
+    phoneno: toVoiceNsmsMsisdn(input.phone),
+    callid: input.callid,
+    user_name: displayContactFieldValue(fields.userName),
+    "Recording URL": displayContactFieldValue(fields.recordingUrl),
+    Summary: displayContactFieldValue(fields.summary),
+    Transcripts: displayContactFieldValue(fields.transcripts),
+  };
+  if (webhookUrl) {
+    msisdnEntry.webhookurl = webhookUrl;
+  }
+
   return {
     sourcetype: config.sourceType,
     sendnow: config.sendNow,
@@ -90,15 +108,6 @@ export function buildObdProviderOutboundPayload(
     ivrtemplateid: config.ivrTemplateId,
     retryatmpt: config.retryAttempts,
     retryduration: config.retryDuration,
-    msisdnlist: [
-      {
-        phoneno: toVoiceNsmsMsisdn(input.phone),
-        callid: input.callid,
-        user_name: displayContactFieldValue(fields.userName),
-        "Recording URL": displayContactFieldValue(fields.recordingUrl),
-        Summary: displayContactFieldValue(fields.summary),
-        Transcripts: displayContactFieldValue(fields.transcripts),
-      },
-    ],
+    msisdnlist: [msisdnEntry],
   };
 }

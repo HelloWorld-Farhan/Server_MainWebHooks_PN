@@ -94,6 +94,7 @@ describe("OBD telephony", () => {
         callid,
         phone: "+919876543210",
         correlationId: CORRELATION_ID,
+        webhookUrl: OBD_TEST_CONFIG.webhookUrl ?? undefined,
       });
 
       assert.equal(result.ok, true);
@@ -118,6 +119,7 @@ describe("OBD telephony", () => {
           "Recording URL": string;
           Summary: string;
           Transcripts: string;
+          webhookurl?: string;
         }>;
       };
       assert.equal(body.sourcetype, "1");
@@ -131,6 +133,8 @@ describe("OBD telephony", () => {
       assert.equal(body.msisdnlist[0]?.["Recording URL"], "Nil");
       assert.equal(body.msisdnlist[0]?.Summary, "Nil");
       assert.equal(body.msisdnlist[0]?.Transcripts, "Nil");
+      assert.equal(body.msisdnlist[0]?.webhookurl, OBD_TEST_CONFIG.webhookUrl);
+      assert.equal("webhookurl" in body, false);
       assert.equal("schddate" in body, false);
       assert.equal("voice_file" in (body.msisdnlist[0] ?? {}), false);
       assert.equal("param1" in (body.msisdnlist[0] ?? {}), false);
