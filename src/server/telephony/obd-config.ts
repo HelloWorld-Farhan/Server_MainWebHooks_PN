@@ -60,7 +60,7 @@ export function getObdConfig(): ObdConfig {
     sourceType: (process.env.OBD_SOURCE_TYPE ?? "1").trim(),
     campaignType: (process.env.OBD_CAMPAIGN_TYPE ?? "4").trim(),
     fileType: (process.env.OBD_FILE_TYPE ?? "2").trim(),
-    sendNow: (process.env.OBD_SEND_NOW ?? "0").trim(),
+    sendNow: (process.env.OBD_SEND_NOW ?? "1").trim(),
   };
 }
 
@@ -76,6 +76,10 @@ export function assertObdDispatchConfig(config: ObdConfig): void {
   }
 }
 
+/**
+ * VoiceNSMS webhook auth uses the same ukey as CreateOBDCampaignPost (`OBD_API_KEY`).
+ * Configure the provider dashboard header `x-obd-api-key` to that ukey value.
+ */
 export function resolveWebhookApiKey(config: ObdConfig): string | null {
-  return config.webhookSecret ?? (config.apiKey || null);
+  return config.apiKey || null;
 }

@@ -59,6 +59,23 @@ describe("OBD telephony", () => {
       assert.equal(getDefaultObdServiceNo(), DEFAULT_OBD_SERVICE_NUMBERS[0]);
       assert.equal(getObdConfig().serviceNo, DEFAULT_OBD_SERVICE_NUMBERS[0]);
     });
+
+    it("uses OBD ukey (apiKey) as webhook API key", async () => {
+      const { resolveWebhookApiKey } = await import(
+        "@/server/telephony/obd-config"
+      );
+      assert.equal(
+        resolveWebhookApiKey({
+          ...OBD_TEST_CONFIG,
+          webhookSecret: "ignored-webhook-secret",
+        }),
+        OBD_TEST_CONFIG.apiKey,
+      );
+      assert.equal(
+        resolveWebhookApiKey({ ...OBD_TEST_CONFIG, apiKey: "" }),
+        null,
+      );
+    });
   });
 
   describe("status-mapper", () => {
@@ -72,6 +89,50 @@ describe("OBD telephony", () => {
       assert.equal(mapProviderStatusToCallStatus("CANCELLED"), "CANCELLED");
       assert.equal(mapProviderStatusToCallStatus("FAILED"), "FAILED");
       assert.equal(mapProviderStatusToCallStatus("UNKNOWN_STATUS"), "FAILED");
+    });
+  });
+
+  describe("buildObdProviderOutboundPayload", () => {
+    it("omits schddate when sendNow is 1", async () => {
+      const { buildObdProviderOutboundPayload } = await import(
+        "@/server/telephony/dto/outbound-request.dto"
+      );
+      const body = buildObdProviderOutboundPayload(
+        {
+          callid: "v1.PNX.CP000001.CL00000001",
+          phone: "+919876543210",
+          correlationId: CORRELATION_ID,
+        },
+        OBD_TEST_CONFIG,
+      );
+      assert.equal(body.sendnow, "1");
+      assert.equal(body.schddate, undefined);
+    });
+
+    it("includes schddate when sendNow is 0", async () => {
+      const { buildObdProviderOutboundPayload } = await import(
+        "@/server/telephony/dto/outbound-request.dto"
+      );
+      const prev = process.env.OBD_SCHEDULE_DATE;
+      process.env.OBD_SCHEDULE_DATE = "2026-07-24 12:00:00";
+      try {
+        const body = buildObdProviderOutboundPayload(
+          {
+            callid: "v1.PNX.CP000001.CL00000001",
+            phone: "+919876543210",
+            correlationId: CORRELATION_ID,
+          },
+          { ...OBD_TEST_CONFIG, sendNow: "0" },
+        );
+        assert.equal(body.sendnow, "0");
+        assert.equal(body.schddate, "2026-07-24 12:00:00");
+      } finally {
+        if (prev === undefined) {
+          delete process.env.OBD_SCHEDULE_DATE;
+        } else {
+          process.env.OBD_SCHEDULE_DATE = prev;
+        }
+      }
     });
   });
 
@@ -124,8 +185,9 @@ describe("OBD telephony", () => {
         }>;
       };
       assert.equal(body.sourcetype, "1");
-      assert.equal(body.sendnow, "0");
-      assert.equal(body.schddate, "2018-02-15 12:57:00");
+      assert.equal(body.sendnow, "1");
+      assert.equal(body.schddate, undefined);
+      assert.equal("schddate" in body, false);
       assert.equal(body.ukey, OBD_TEST_CONFIG.apiKey);
       assert.equal(body.serviceno, OBD_TEST_CONFIG.serviceNo);
       assert.equal(body.ivrtemplateid, OBD_TEST_CONFIG.ivrTemplateId);

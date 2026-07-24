@@ -60,12 +60,18 @@ type CampaignContact {
 
 type CampaignCallLog {
   id: ID!
+  publicId: String
   direction: String!
   status: String!
   durationSeconds: Int!
   startedAt: String!
+  answeredAt: String
+  endedAt: String
   leadPhone: String
+  phoneNumber: String
   leadName: String
+  providerStatus: String
+  disconnectReason: String
 }
 
 type CampaignDocument {

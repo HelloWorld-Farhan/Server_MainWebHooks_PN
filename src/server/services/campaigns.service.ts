@@ -462,14 +462,20 @@ export class CampaignsService {
     const rows = await this.repo.findCallLogs(ctx.companyId, campaignId, limit, after);
     return rows.map((row) => ({
       id: row.id,
+      publicId: row.publicId ?? null,
       direction: row.direction,
       status: row.status,
       durationSeconds: row.durationSeconds,
       startedAt: row.startedAt.toISOString(),
-      leadPhone: row.lead?.phone ?? null,
+      answeredAt: row.answeredAt?.toISOString() ?? null,
+      endedAt: row.endedAt?.toISOString() ?? null,
+      leadPhone: row.lead?.phone ?? row.phoneNumber?.number ?? null,
+      phoneNumber: row.phoneNumber?.number ?? row.lead?.phone ?? null,
       leadName:
         [row.lead?.firstName, row.lead?.lastName].filter(Boolean).join(" ") ||
         null,
+      providerStatus: row.providerStatus ?? null,
+      disconnectReason: row.disconnectReason ?? null,
     }));
   }
 

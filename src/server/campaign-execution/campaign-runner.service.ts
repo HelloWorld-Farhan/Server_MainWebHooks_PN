@@ -140,10 +140,21 @@ export class CampaignRunnerService {
             campaignId: execution.campaignId,
             phoneNumber: { number: normalizedPhone },
           },
-          select: { id: true },
+          orderBy: { startedAt: "desc" },
+          select: { id: true, status: true },
         });
 
-        if (!existingCall) {
+        const terminalStatuses = new Set([
+          "FAILED",
+          "NO_ANSWER",
+          "BUSY",
+          "CANCELLED",
+          "MISSED",
+        ]);
+        const shouldDial =
+          !existingCall || terminalStatuses.has(existingCall.status);
+
+        if (shouldDial) {
           await outboundCallsService.createOutboundCall(ctx, {
             campaignId: campaignPublicId,
             phoneNumber: normalizedPhone,

@@ -216,6 +216,7 @@ export class CampaignsRepository extends BaseRepository {
       take: limit,
       include: {
         lead: { select: { firstName: true, lastName: true, phone: true } },
+        phoneNumber: { select: { number: true, publicId: true } },
       },
       ...(cursor ? { cursor: { id: cursor.id }, skip: 1 } : {}),
     });

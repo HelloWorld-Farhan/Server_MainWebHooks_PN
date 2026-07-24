@@ -90,12 +90,10 @@ export function buildObdProviderOutboundPayload(
   >,
 ): ObdProviderOutboundPayload {
   const fields = input.contactFields ?? {};
-
-  return {
+  const sendNow = config.sendNow === "1" ? "1" : "0";
+  const payload: ObdProviderOutboundPayload = {
     sourcetype: config.sourceType,
-    sendnow: "0",
-    schddate:
-      process.env.OBD_SCHEDULE_DATE?.trim() || "2018-02-15 12:57:00",
+    sendnow: sendNow,
     campaigntype: config.campaignType,
     filetype: config.fileType,
     ukey: config.apiKey,
@@ -114,4 +112,11 @@ export function buildObdProviderOutboundPayload(
       },
     ],
   };
+
+  if (sendNow !== "1") {
+    payload.schddate =
+      process.env.OBD_SCHEDULE_DATE?.trim() || formatObdScheduleDate();
+  }
+
+  return payload;
 }
