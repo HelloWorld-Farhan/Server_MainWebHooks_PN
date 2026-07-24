@@ -65,7 +65,6 @@ export class ObdOutboundService {
       callid: input.callLogPublicId,
       phone: input.phone,
       correlationId,
-      webhookUrl: config.webhookUrl ?? undefined,
       contactFields,
     };
 

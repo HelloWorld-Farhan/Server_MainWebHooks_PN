@@ -28,12 +28,10 @@ export type ObdOutboundCallInput = {
   contactFields?: ObdOutboundContactFields;
 };
 
-/**
- * TEMP test shape: matches the VoiceNSMS curl that actually rings.
- * No callid / webhookurl.
- */
+/** VoiceNSMS msisdnlist entry (callid for webhook correlation; no per-call webhookurl). */
 export type VoiceNsmsMsisdnListEntry = {
   phoneno: string;
+  callid: string;
   user_name: string;
   "Recording URL": string;
   Summary: string;
@@ -75,10 +73,7 @@ export function formatObdScheduleDate(date = new Date()): string {
   );
 }
 
-/**
- * TEMP: minimal working VoiceNSMS payload for dial tests.
- * Omits callid / webhookurl so the provider dials like the known-good curl.
- */
+/** Build VoiceNSMS CreateOBDCampaignPost payload (callid included; webhookurl omitted). */
 export function buildObdProviderOutboundPayload(
   input: ObdOutboundCallInput,
   config: Pick<
@@ -111,6 +106,7 @@ export function buildObdProviderOutboundPayload(
     msisdnlist: [
       {
         phoneno: toVoiceNsmsMsisdn(input.phone),
+        callid: input.callid,
         user_name: displayContactFieldValue(fields.userName),
         "Recording URL": displayContactFieldValue(fields.recordingUrl),
         Summary: displayContactFieldValue(fields.summary),

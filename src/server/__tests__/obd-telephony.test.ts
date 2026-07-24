@@ -130,7 +130,7 @@ describe("OBD telephony", () => {
       assert.equal(body.serviceno, OBD_TEST_CONFIG.serviceNo);
       assert.equal(body.ivrtemplateid, OBD_TEST_CONFIG.ivrTemplateId);
       assert.equal(body.msisdnlist[0]?.phoneno, "9876543210");
-      assert.equal(body.msisdnlist[0]?.callid, undefined);
+      assert.equal(body.msisdnlist[0]?.callid, callid);
       assert.equal(body.msisdnlist[0]?.user_name, "Nil");
       assert.equal(body.msisdnlist[0]?.["Recording URL"], "Nil");
       assert.equal(body.msisdnlist[0]?.Summary, "Nil");
@@ -179,7 +179,7 @@ describe("OBD telephony", () => {
         }>;
       };
       assert.equal(body.msisdnlist[0]?.phoneno, "8810214283");
-      assert.equal(body.msisdnlist[0]?.callid, undefined);
+      assert.equal(body.msisdnlist[0]?.callid, callid);
       assert.equal(body.msisdnlist[0]?.user_name, "XYZ");
       assert.equal(
         body.msisdnlist[0]?.["Recording URL"],
