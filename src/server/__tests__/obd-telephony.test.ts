@@ -255,7 +255,7 @@ describe("OBD telephony", () => {
       assert.equal(attempts, 3);
     });
 
-    it("fails when VoiceNSMS accepts without a campaign ID", async () => {
+    it("accepts VoiceNSMS success without a campaign ID (warning only)", async () => {
       const client = new ObdProviderClient({
         config: OBD_TEST_CONFIG,
         fetchFn: async () =>
@@ -271,11 +271,12 @@ describe("OBD telephony", () => {
         correlationId: CORRELATION_ID,
       });
 
-      assert.equal(result.ok, false);
-      if (result.ok) {
+      assert.equal(result.ok, true);
+      if (!result.ok) {
         return;
       }
-      assert.match(result.error.message, /returned no campaign ID/i);
+      assert.equal(result.providerCallId, null);
+      assert.match(result.warning ?? "", /returned no campaign ID/i);
     });
 
     it("handles provider timeouts", async () => {
