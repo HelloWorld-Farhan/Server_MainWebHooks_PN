@@ -255,6 +255,29 @@ describe("OBD telephony", () => {
       assert.equal(attempts, 3);
     });
 
+    it("fails when VoiceNSMS accepts without a campaign ID", async () => {
+      const client = new ObdProviderClient({
+        config: OBD_TEST_CONFIG,
+        fetchFn: async () =>
+          new Response(
+            JSON.stringify({ value: "accepted", status: "success" }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+      });
+
+      const result = await client.sendOutboundCall({
+        callid: "v1.PNX.CP000001.CL00000006",
+        phone: "+919876543215",
+        correlationId: CORRELATION_ID,
+      });
+
+      assert.equal(result.ok, false);
+      if (result.ok) {
+        return;
+      }
+      assert.match(result.error.message, /returned no campaign ID/i);
+    });
+
     it("handles provider timeouts", async () => {
       const client = new ObdProviderClient({
         config: { ...OBD_TEST_CONFIG, timeoutMs: 10, maxRetries: 0 },

@@ -1,5 +1,6 @@
 import type { CallStatus, ContactRetryJobStatus, Prisma } from "@prisma/client";
 
+import { withPrismaWriteRetry } from "@/server/lib/prisma-write-retry";
 import prisma from "@/server/lib/prisma";
 import { BaseRepository } from "@/server/repositories/base.repository";
 
@@ -145,10 +146,12 @@ export class RetryJobRepository extends BaseRepository {
     campaignId: string,
     data: Prisma.CampaignExecutionUpdateManyMutationInput,
   ) {
-    return this.prisma.campaignExecution.updateMany({
-      where: { companyId, campaignId },
-      data,
-    });
+    return withPrismaWriteRetry(() =>
+      this.prisma.campaignExecution.updateMany({
+        where: { companyId, campaignId },
+        data,
+      }),
+    );
   }
 }
 

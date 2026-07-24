@@ -26,7 +26,6 @@ import {
 import {
   logObdError,
   logObdOutbound,
-  logObdProviderResponse,
 } from "@/server/telephony/telephony-logger";
 
 export type ObdDispatchInput = {
@@ -117,15 +116,6 @@ export class ObdOutboundService {
           providerResponse,
         },
       );
-
-      logObdProviderResponse({
-        correlationId,
-        httpStatus: 200,
-        responseHeaders: {},
-        responseBody: result.raw,
-        providerCallId: result.providerCallId,
-        warning: result.warning,
-      });
 
       return {
         status: "QUEUED_AT_PROVIDER",

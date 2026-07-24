@@ -186,21 +186,10 @@ export class ObdProviderClient {
         };
       }
 
-      const warning = extractProviderResponseWarning(responseBody);
-      if (warning) {
-        logObdError({
-          correlationId,
-          message: warning,
-          httpStatus: response.status,
-          responseBody,
-        });
-      }
-
       return {
         ok: true,
         providerCallId: extractProviderCallId(responseBody),
         raw: responseBody,
-        warning: warning ?? undefined,
       };
     } catch (error) {
       const isAbort =

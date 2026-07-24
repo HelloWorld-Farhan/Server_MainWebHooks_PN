@@ -1,6 +1,7 @@
 import type { CampaignExecutionStatus, Prisma } from "@prisma/client";
 
 import { DEFAULT_RETRY_POLICY } from "@/server/campaign-execution/retry/retry.config";
+import { withPrismaWriteRetry } from "@/server/lib/prisma-write-retry";
 import prisma from "@/server/lib/prisma";
 import { BaseRepository } from "@/server/repositories/base.repository";
 
@@ -38,14 +39,16 @@ export class CampaignExecutionRepository extends BaseRepository {
     fromStatuses: CampaignExecutionStatus[],
     data: Prisma.CampaignExecutionUpdateInput,
   ) {
-    return this.prisma.campaignExecution.updateMany({
-      where: {
-        companyId,
-        campaignId,
-        status: { in: fromStatuses },
-      },
-      data: data as Prisma.CampaignExecutionUpdateManyMutationInput,
-    });
+    return withPrismaWriteRetry(() =>
+      this.prisma.campaignExecution.updateMany({
+        where: {
+          companyId,
+          campaignId,
+          status: { in: fromStatuses },
+        },
+        data: data as Prisma.CampaignExecutionUpdateManyMutationInput,
+      }),
+    );
   }
 
   findDueScheduled(limit: number, now: Date) {
@@ -92,10 +95,12 @@ export class CampaignExecutionRepository extends BaseRepository {
     workerId: string,
     lockExpiresAt: Date,
   ) {
-    return this.prisma.campaignExecution.updateMany({
-      where: { companyId, campaignId, status: "RUNNING" },
-      data: { workerId, lockExpiresAt },
-    });
+    return withPrismaWriteRetry(() =>
+      this.prisma.campaignExecution.updateMany({
+        where: { companyId, campaignId, status: "RUNNING" },
+        data: { workerId, lockExpiresAt },
+      }),
+    );
   }
 
   updateCursor(
@@ -104,10 +109,12 @@ export class CampaignExecutionRepository extends BaseRepository {
     lastProcessedContactId: string,
     processedCount: number,
   ) {
-    return this.prisma.campaignExecution.updateMany({
-      where: { companyId, campaignId, status: "RUNNING" },
-      data: { lastProcessedContactId, processedCount },
-    });
+    return withPrismaWriteRetry(() =>
+      this.prisma.campaignExecution.updateMany({
+        where: { companyId, campaignId, status: "RUNNING" },
+        data: { lastProcessedContactId, processedCount },
+      }),
+    );
   }
 
   updateStatistics(
@@ -115,10 +122,12 @@ export class CampaignExecutionRepository extends BaseRepository {
     campaignId: string,
     data: Prisma.CampaignExecutionUpdateManyMutationInput,
   ) {
-    return this.prisma.campaignExecution.updateMany({
-      where: { companyId, campaignId },
-      data,
-    });
+    return withPrismaWriteRetry(() =>
+      this.prisma.campaignExecution.updateMany({
+        where: { companyId, campaignId },
+        data,
+      }),
+    );
   }
 
   countRunning() {

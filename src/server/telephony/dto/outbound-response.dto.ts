@@ -6,7 +6,6 @@ export type ObdProviderOutboundSuccess = {
   ok: true;
   providerCallId: string | null;
   raw: unknown;
-  warning?: string;
 };
 
 export type ObdProviderOutboundFailure = {
@@ -99,6 +98,11 @@ export function extractProviderResponseWarning(body: unknown): string | null {
 }
 
 export function extractProviderErrorMessage(body: unknown): string | null {
+  const missingCampaignIdError = extractProviderResponseWarning(body);
+  if (missingCampaignIdError) {
+    return missingCampaignIdError;
+  }
+
   const parsed = obdProviderSuccessBodySchema.safeParse(body);
   if (!parsed.success) {
     return null;
