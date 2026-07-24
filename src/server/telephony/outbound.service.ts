@@ -186,16 +186,17 @@ export class ObdOutboundService {
     phone: string,
   ): Promise<ObdOutboundContactFields> {
     const storedPhone = normalizeStoredContactPhone(phone);
-    if (!storedPhone) {
+    const e164Phone = storedPhone ? `+${storedPhone}` : null;
+    const phoneCandidates = [...new Set([storedPhone, e164Phone, phone.trim()].filter(Boolean))] as string[];
+
+    if (phoneCandidates.length === 0) {
       return {};
     }
 
-    const contact = await prisma.uploadedContact.findUnique({
+    const contact = await prisma.uploadedContact.findFirst({
       where: {
-        companyId_phone: {
-          companyId,
-          phone: storedPhone,
-        },
+        companyId,
+        phone: { in: phoneCandidates },
       },
       select: {
         field1: true,
