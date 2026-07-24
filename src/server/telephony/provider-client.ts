@@ -49,18 +49,22 @@ function headersToRecord(headers: Headers): Record<string, string> {
 
 export class ObdProviderClient {
   private readonly fetchFn: typeof fetch;
-  private readonly config: ObdConfig;
+  private readonly configOverride?: ObdConfig;
 
   constructor(deps: ObdProviderClientDeps = {}) {
     this.fetchFn = deps.fetchFn ?? fetch;
-    this.config = deps.config ?? getObdConfig();
+    this.configOverride = deps.config;
   }
 
   async sendOutboundCall(
     input: ObdOutboundCallInput,
     configOverride?: Partial<ObdConfig>,
   ): Promise<ObdProviderOutboundResult> {
-    const config = { ...this.config, ...configOverride };
+    // Always re-read env-backed config so Render env updates apply without stale module state.
+    const config = {
+      ...(this.configOverride ?? getObdConfig()),
+      ...configOverride,
+    };
     assertObdDispatchConfig(config);
 
     const payload = buildObdProviderOutboundPayload(input, config);

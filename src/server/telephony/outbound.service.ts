@@ -91,9 +91,7 @@ export class ObdOutboundService {
       phone: input.phone,
     });
 
-    const result = await this.providerClient.sendOutboundCall(callInput, {
-      serviceNo: config.serviceNo,
-    });
+    const result = await this.providerClient.sendOutboundCall(callInput, config);
 
     const refreshed = await this.callLogsRepo.findByPublicIdForWebhook(
       input.callLogPublicId,
