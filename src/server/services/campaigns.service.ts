@@ -368,6 +368,31 @@ export class CampaignsService {
     return this.getById(ctx, id);
   }
 
+  async delete(ctx: TenantContext, id: string) {
+    tenantService.requirePermission(ctx, PERMISSIONS.CAMPAIGNS_WRITE);
+
+    const existing = await this.repo.findById(ctx.companyId, id);
+    if (!existing) throw new NotFoundError("Campaign not found");
+    campaignAccessService.assertCampaignAccess(ctx, id);
+
+    const deleted = await this.repo.deleteByIds(ctx.companyId, [id]);
+    if (deleted === 0) {
+      throw new NotFoundError("Campaign not found");
+    }
+    return true;
+  }
+
+  async bulkDelete(ctx: TenantContext, idsInput: string[]) {
+    tenantService.requirePermission(ctx, PERMISSIONS.CAMPAIGNS_BULK);
+
+    const ids = [...new Set(idsInput)].filter(Boolean);
+    if (ids.length === 0) throw new ValidationError("No campaigns selected");
+    campaignAccessService.assertCampaignIdsAccess(ctx, ids);
+
+    const deleted = await this.repo.deleteByIds(ctx.companyId, ids);
+    return { deleted };
+  }
+
   async bulkUpdate(
     ctx: TenantContext,
     input: {

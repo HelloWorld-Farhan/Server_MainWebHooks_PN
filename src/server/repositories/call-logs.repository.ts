@@ -388,7 +388,11 @@ export class CallLogsRepository extends BaseRepository {
 
   async findQueuedCallLogIds(companyId: string): Promise<string[]> {
     const rows = await this.prisma.callLog.findMany({
-      where: { companyId, status: 'QUEUED' },
+      where: {
+        companyId,
+        status: 'QUEUED',
+        phoneNumberId: { not: null },
+      },
       select: { id: true },
       orderBy: { createdAt: 'asc' },
     });
@@ -453,8 +457,8 @@ export class CallLogsRepository extends BaseRepository {
     });
   }
 
-  failStaleDispatching(companyId: string, olderThan: Date) {
-    return this.prisma.callLog.updateMany({
+  async failStaleDispatching(companyId: string, olderThan: Date) {
+    const stale = await this.prisma.callLog.findMany({
       where: {
         companyId,
         status: 'DISPATCHING',
@@ -466,12 +470,29 @@ export class CallLogsRepository extends BaseRepository {
           },
         ],
       },
+      select: {
+        id: true,
+        campaignId: true,
+        phoneNumber: { select: { number: true } },
+        correlationId: true,
+      },
+    });
+    if (stale.length === 0) {
+      return { count: 0, failed: [] as typeof stale };
+    }
+    const result = await this.prisma.callLog.updateMany({
+      where: {
+        companyId,
+        id: { in: stale.map((row) => row.id) },
+        status: 'DISPATCHING',
+      },
       data: {
         status: 'FAILED',
         providerCompletedAt: new Date(),
         disconnectReason: 'Stale DISPATCHING cleanup',
       },
     });
+    return { count: result.count, failed: stale };
   }
 
   async failStaleQueuedAtProvider(companyId: string, olderThan: Date) {
@@ -481,15 +502,20 @@ export class CallLogsRepository extends BaseRepository {
         status: 'QUEUED_AT_PROVIDER',
         startedAt: { lt: olderThan },
       },
-      select: { id: true, endedAt: true },
+      select: {
+        id: true,
+        endedAt: true,
+        campaignId: true,
+        phoneNumber: { select: { number: true } },
+        correlationId: true,
+      },
     });
-    const ids = stale
-      .filter((row) => row.endedAt == null)
-      .map((row) => row.id);
+    const targets = stale.filter((row) => row.endedAt == null);
+    const ids = targets.map((row) => row.id);
     if (ids.length === 0) {
-      return { count: 0 };
+      return { count: 0, failed: [] as typeof targets };
     }
-    return this.prisma.callLog.updateMany({
+    const result = await this.prisma.callLog.updateMany({
       where: {
         companyId,
         id: { in: ids },
@@ -501,5 +527,34 @@ export class CallLogsRepository extends BaseRepository {
         disconnectReason: 'Stale QUEUED_AT_PROVIDER cleanup (no webhook)',
       },
     });
+    return { count: result.count, failed: targets };
+  }
+
+  async failOrphanQueuedCalls(companyId: string) {
+    const orphans = await this.prisma.callLog.findMany({
+      where: {
+        companyId,
+        status: 'QUEUED',
+        phoneNumberId: null,
+      },
+      select: { id: true },
+    });
+    if (orphans.length === 0) {
+      return { count: 0, ids: [] as string[] };
+    }
+    const ids = orphans.map((row) => row.id);
+    const result = await this.prisma.callLog.updateMany({
+      where: {
+        companyId,
+        id: { in: ids },
+        status: 'QUEUED',
+      },
+      data: {
+        status: 'FAILED',
+        providerCompletedAt: new Date(),
+        disconnectReason: 'Orphan QUEUED cleanup (missing phone number)',
+      },
+    });
+    return { count: result.count, ids };
   }
 }

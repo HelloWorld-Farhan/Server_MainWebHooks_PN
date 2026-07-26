@@ -145,6 +145,10 @@ type BulkCampaignUpdateResult {
   updated: Int!
 }
 
+type BulkCampaignDeleteResult {
+  deleted: Int!
+}
+
 type CampaignsQueries {
   connection(first: Int, after: String, filter: CampaignFilter): CampaignConnection!
   byId(id: ID!): Campaign
@@ -160,7 +164,9 @@ type CampaignsMutations {
   update(id: ID!, input: UpdateCampaignInput!): Campaign!
   updateAi(id: ID!, input: UpdateCampaignAiInput!): Campaign!
   bulkUpdate(input: BulkCampaignUpdateInput!): BulkCampaignUpdateResult!
+  bulkDelete(ids: [ID!]!): BulkCampaignDeleteResult!
   archive(id: ID!): Campaign!
+  delete(id: ID!): Boolean!
   resendInvitation(campaignId: ID!): Campaign!
   cancelInvitation(campaignId: ID!): Campaign!
   generateNewInvitation(campaignId: ID!): Campaign!

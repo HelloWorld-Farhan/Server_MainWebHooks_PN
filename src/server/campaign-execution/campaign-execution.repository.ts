@@ -106,7 +106,7 @@ export class CampaignExecutionRepository extends BaseRepository {
   updateCursor(
     companyId: string,
     campaignId: string,
-    lastProcessedContactId: string,
+    lastProcessedContactId: string | null,
     processedCount: number,
   ) {
     return withPrismaWriteRetry(() =>

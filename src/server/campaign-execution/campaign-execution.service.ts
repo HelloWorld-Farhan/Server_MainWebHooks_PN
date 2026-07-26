@@ -430,7 +430,13 @@ export class CampaignExecutionService {
     const lockExpiresAt = new Date(
       now.getTime() + campaignExecutionConfig.lockTtlMs,
     );
+    const totalContacts = await this.campaignsRepo.countContacts(
+      ctx.companyId,
+      campaign.internalId,
+    );
 
+    // Re-scan from the start so FAILED contacts can be redialed and any
+    // contacts added while paused are included. shouldDial skips successes.
     const result = await campaignExecutionRepository.transitionStatus(
       ctx.companyId,
       campaign.internalId,
@@ -440,6 +446,9 @@ export class CampaignExecutionService {
         pausedAt: null,
         workerId: campaignExecutionConfig.workerId,
         lockExpiresAt,
+        totalContacts,
+        lastProcessedContactId: null,
+        processedCount: 0,
       },
     );
     if (result.count === 0) {
@@ -448,6 +457,7 @@ export class CampaignExecutionService {
 
     logCampaignExecutionEvent("campaign:resumed", {
       campaignPublicId: campaign.publicId,
+      totalContacts,
     });
 
     await this.writeActivity(
@@ -456,6 +466,7 @@ export class CampaignExecutionService {
       "CAMPAIGN_EXECUTION_RESUMED",
       "Campaign execution resumed",
       ctx.userId,
+      { totalContacts },
     );
 
     return this.loadExecutionView(ctx, campaignPublicId);

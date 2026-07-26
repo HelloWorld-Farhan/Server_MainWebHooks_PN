@@ -10,6 +10,8 @@ import { CampaignsRepository } from "@/server/repositories/campaigns.repository"
 import { outboundCallsService } from "@/server/services/outbound-calls.service";
 import { campaignExecutionLockService } from "@/server/campaign-execution/campaign-execution-lock.service";
 import { contactCompletionService } from "@/server/campaign-execution/retry/contact-completion.service";
+import { retryJobRepository } from "@/server/campaign-execution/retry/retry-job.repository";
+import { retrySchedulerService } from "@/server/campaign-execution/retry/retry-scheduler.service";
 
 export class CampaignRunnerService {
   private readonly campaignsRepo = new CampaignsRepository(prisma);
@@ -92,10 +94,17 @@ export class CampaignRunnerService {
       );
 
       if (contacts.length === 0) {
-        await contactCompletionService.checkCampaignCompletion(
+        const completed = await contactCompletionService.checkCampaignCompletion(
           execution.companyId,
           execution.campaignId,
         );
+        if (!completed) {
+          await this.scheduleRetriesForExhaustedContacts(
+            execution.companyId,
+            execution.campaignId,
+            execution.correlationId,
+          );
+        }
         return true;
       }
 
@@ -144,6 +153,12 @@ export class CampaignRunnerService {
           select: { id: true, status: true },
         });
 
+        const pendingRetries = await retryJobRepository.countPendingForPhone(
+          execution.companyId,
+          execution.campaignId,
+          normalizedPhone,
+        );
+
         const terminalStatuses = new Set([
           "FAILED",
           "NO_ANSWER",
@@ -152,7 +167,8 @@ export class CampaignRunnerService {
           "MISSED",
         ]);
         const shouldDial =
-          !existingCall || terminalStatuses.has(existingCall.status);
+          pendingRetries === 0 &&
+          (!existingCall || terminalStatuses.has(existingCall.status));
 
         if (shouldDial) {
           await outboundCallsService.createOutboundCall(ctx, {
@@ -220,6 +236,75 @@ export class CampaignRunnerService {
           campaignExecutionConfig.workerId,
         );
       }
+    }
+  }
+
+  /**
+   * When the cursor is exhausted but contacts are still incomplete (e.g. stale
+   * provider cleanup failed calls without scheduling retries), schedule retries
+   * from the latest terminal call per phone so the campaign can progress.
+   */
+  private async scheduleRetriesForExhaustedContacts(
+    companyId: string,
+    campaignId: string,
+    correlationId: string | null,
+  ): Promise<void> {
+    const contacts = await this.campaignsRepo.findContactsForExecution(
+      companyId,
+      campaignId,
+      100_000,
+    );
+
+    const seenPhones = new Set<string>();
+    for (const contact of contacts) {
+      const normalizedPhone = normalizeOutboundPhone(contact.phone);
+      if (!normalizedPhone || seenPhones.has(normalizedPhone)) {
+        continue;
+      }
+      seenPhones.add(normalizedPhone);
+
+      const pendingRetries = await retryJobRepository.countPendingForPhone(
+        companyId,
+        campaignId,
+        normalizedPhone,
+      );
+      if (pendingRetries > 0) {
+        continue;
+      }
+
+      const latestCall = await prisma.callLog.findFirst({
+        where: {
+          companyId,
+          campaignId,
+          phoneNumber: { number: normalizedPhone },
+        },
+        orderBy: { startedAt: "desc" },
+        select: { id: true, status: true, correlationId: true },
+      });
+      if (!latestCall) {
+        continue;
+      }
+
+      const terminalStatuses = new Set([
+        "FAILED",
+        "NO_ANSWER",
+        "BUSY",
+        "CANCELLED",
+        "MISSED",
+        "VOICEMAIL",
+      ]);
+      if (!terminalStatuses.has(latestCall.status)) {
+        continue;
+      }
+
+      await retrySchedulerService.handleTerminalCall({
+        companyId,
+        callLogId: latestCall.id,
+        campaignId,
+        phone: normalizedPhone,
+        mappedStatus: latestCall.status,
+        correlationId: correlationId ?? latestCall.correlationId ?? undefined,
+      });
     }
   }
 }

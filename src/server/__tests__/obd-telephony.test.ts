@@ -10,12 +10,15 @@ import { ObdProviderClient } from "@/server/telephony/provider-client";
 import { mapProviderStatusToCallStatus } from "@/server/telephony/status-mapper";
 import { channelService } from "@/server/channels/channel.service";
 import { ObdWebhookService } from "@/server/telephony/webhook.service";
+import { buildObdProviderOutboundPayload } from "@/server/telephony/dto/outbound-request.dto";
 import {
   DEFAULT_OBD_SERVICE_NUMBERS,
   getDefaultObdServiceNo,
   getObdConfig,
   getObdServiceNumbers,
+  resolveWebhookApiKey,
 } from "@/server/telephony/obd-config";
+import { validateWebhookCallLogChain } from "@/server/telephony/webhook-validation";
 
 const OBD_TEST_CONFIG = {
   baseUrl:
@@ -60,10 +63,7 @@ describe("OBD telephony", () => {
       assert.equal(getObdConfig().serviceNo, DEFAULT_OBD_SERVICE_NUMBERS[0]);
     });
 
-    it("uses OBD ukey (apiKey) as webhook API key", async () => {
-      const { resolveWebhookApiKey } = await import(
-        "@/server/telephony/obd-config"
-      );
+    it("uses OBD ukey (apiKey) as webhook API key", () => {
       assert.equal(
         resolveWebhookApiKey({
           ...OBD_TEST_CONFIG,
@@ -93,10 +93,7 @@ describe("OBD telephony", () => {
   });
 
   describe("buildObdProviderOutboundPayload", () => {
-    it("omits schddate when sendNow is 1", async () => {
-      const { buildObdProviderOutboundPayload } = await import(
-        "@/server/telephony/dto/outbound-request.dto"
-      );
+    it("omits schddate when sendNow is 1", () => {
       const body = buildObdProviderOutboundPayload(
         {
           callid: "v1.PNX.CP000001.CL00000001",
@@ -109,10 +106,7 @@ describe("OBD telephony", () => {
       assert.equal(body.schddate, undefined);
     });
 
-    it("includes schddate when sendNow is 0", async () => {
-      const { buildObdProviderOutboundPayload } = await import(
-        "@/server/telephony/dto/outbound-request.dto"
-      );
+    it("includes schddate when sendNow is 0", () => {
       const prev = process.env.OBD_SCHEDULE_DATE;
       process.env.OBD_SCHEDULE_DATE = "2026-07-24 12:00:00";
       try {
@@ -643,10 +637,6 @@ describe("OBD telephony", () => {
       });
       assert.ok(callLog?.company && callLog.phoneNumber && callLog.campaign);
 
-      const { validateWebhookCallLogChain } = await import(
-        "@/server/telephony/webhook-validation"
-      );
-
       assert.throws(
         () =>
           validateWebhookCallLogChain(
@@ -691,10 +681,6 @@ describe("OBD telephony", () => {
         },
       });
       assert.ok(callLog?.company && callLog.phoneNumber && callLog.campaign);
-
-      const { validateWebhookCallLogChain } = await import(
-        "@/server/telephony/webhook-validation"
-      );
 
       assert.throws(
         () =>

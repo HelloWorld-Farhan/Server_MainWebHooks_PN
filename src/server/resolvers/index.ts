@@ -540,8 +540,15 @@ export const resolvers = {
       args: { input: Record<string, unknown> },
       ctx: TenantContext,
     ) => campaignsService.bulkUpdate(ctx, args.input as never),
+    bulkDelete: (
+      _: unknown,
+      args: { ids: string[] },
+      ctx: TenantContext,
+    ) => campaignsService.bulkDelete(ctx, args.ids),
     archive: (_: unknown, args: { id: string }, ctx: TenantContext) =>
       campaignsService.archive(ctx, args.id),
+    delete: (_: unknown, args: { id: string }, ctx: TenantContext) =>
+      campaignsService.delete(ctx, args.id),
     resendInvitation: (
       _: unknown,
       args: { campaignId: string },

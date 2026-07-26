@@ -13,6 +13,7 @@ import {
 import { wakeCompanyQueue } from "@/server/channels/channel-queue.hooks";
 import { channelService } from "@/server/channels/channel.service";
 import { logChannelEvent } from "@/server/channels/channel-metrics";
+import { retrySchedulerService } from "@/server/campaign-execution/retry/retry-scheduler.service";
 import { gqlDebug } from "@/server/graphql/debug";
 import prisma from "@/server/lib/prisma";
 import { runWorkerTask } from "@/server/lib/run-worker-task";
@@ -107,15 +108,37 @@ export class ChannelReconciliationService
           company.id,
           staleQueuedAtProviderBefore,
         );
+      const orphanQueued = await this.callLogsRepo.failOrphanQueuedCalls(
+        company.id,
+      );
 
       if (
         staleDispatching.count > 0 ||
-        staleQueuedAtProvider.count > 0
+        staleQueuedAtProvider.count > 0 ||
+        orphanQueued.count > 0
       ) {
         logChannelEvent("channels:reconcile:stale-cleanup", {
           companyId: company.id,
           failedDispatching: staleDispatching.count,
           failedQueuedAtProvider: staleQueuedAtProvider.count,
+          failedOrphanQueued: orphanQueued.count,
+        });
+      }
+
+      for (const failed of [
+        ...staleDispatching.failed,
+        ...staleQueuedAtProvider.failed,
+      ]) {
+        if (!failed.campaignId) {
+          continue;
+        }
+        await retrySchedulerService.handleTerminalCall({
+          companyId: company.id,
+          callLogId: failed.id,
+          campaignId: failed.campaignId,
+          phone: failed.phoneNumber?.number,
+          mappedStatus: "FAILED",
+          correlationId: failed.correlationId ?? undefined,
         });
       }
 
