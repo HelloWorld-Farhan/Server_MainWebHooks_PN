@@ -5,7 +5,6 @@ import {
 import {
   extractProviderCallId,
   extractProviderErrorMessage,
-  extractProviderResponseWarning,
   type ObdProviderOutboundResult,
 } from "./dto/outbound-response.dto";
 import type { ProviderErrorDetails } from "./dto/provider-error.dto";
@@ -154,7 +153,6 @@ export class ObdProviderClient {
         responseHeaders,
         responseBody,
         providerCallId: extractProviderCallId(responseBody),
-        warning: extractProviderResponseWarning(responseBody) ?? undefined,
       });
 
       if (!response.ok) {

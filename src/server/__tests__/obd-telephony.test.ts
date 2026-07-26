@@ -312,7 +312,7 @@ describe("OBD telephony", () => {
       assert.equal(attempts, 3);
     });
 
-    it("accepts VoiceNSMS success without a campaign ID (warning only)", async () => {
+    it("accepts VoiceNSMS accepted response without a campaign ID", async () => {
       const client = new ObdProviderClient({
         config: OBD_TEST_CONFIG,
         fetchFn: async () =>
@@ -332,6 +332,7 @@ describe("OBD telephony", () => {
       if (!result.ok) {
         return;
       }
+      // Call ID/status come from the webhook; CreateOBD may omit campaignid.
       assert.equal(result.providerCallId, null);
       assert.deepEqual(result.raw, { value: "accepted", status: "success" });
     });

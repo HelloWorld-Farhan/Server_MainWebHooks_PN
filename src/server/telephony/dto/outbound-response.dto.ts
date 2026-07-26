@@ -42,6 +42,10 @@ function stringifyProviderId(
   return String(value);
 }
 
+/**
+ * Optional provider ID from CreateOBD (audit only when present).
+ * VoiceNSMS correlates call status via webhook `callid` (our call log public ID).
+ */
 export function extractProviderCallId(body: unknown): string | null {
   const parsed = obdProviderSuccessBodySchema.safeParse(body);
   if (!parsed.success) {
@@ -77,26 +81,6 @@ function normalizeProviderValue(value: unknown): string | null {
   return null;
 }
 
-export function extractProviderResponseWarning(body: unknown): string | null {
-  const parsed = obdProviderSuccessBodySchema.safeParse(body);
-  if (!parsed.success) {
-    return null;
-  }
-
-  const status = normalizeProviderStatus(parsed.data.status);
-  const value = normalizeProviderValue(parsed.data.value);
-  const providerCallId = extractProviderCallId(body);
-
-  if (status === "success" && value === "accepted" && !providerCallId) {
-    return (
-      "VoiceNSMS accepted the campaign but returned no campaign ID. " +
-      "Verify IVR template is active, service number is configured, and destination is valid."
-    );
-  }
-
-  return null;
-}
-
 export function extractProviderErrorMessage(body: unknown): string | null {
   const parsed = obdProviderSuccessBodySchema.safeParse(body);
   if (!parsed.success) {
@@ -117,7 +101,8 @@ export function extractProviderErrorMessage(body: unknown): string | null {
   }
 
   const value = normalizeProviderValue(parsed.data.value);
-  // "accepted" without campaign ID is a warning, not an error (VoiceNSMS common response).
+  // VoiceNSMS happy path is often `{ value: "accepted", status: "success" }` with no ID.
+  // Call status is delivered later via webhook correlated on our `callid`.
   if (
     value &&
     value !== "accepted" &&
