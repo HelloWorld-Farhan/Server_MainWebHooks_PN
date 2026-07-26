@@ -472,6 +472,128 @@ export class CampaignExecutionService {
     return this.loadExecutionView(ctx, campaignPublicId);
   }
 
+  /**
+   * Force-restart dialing: cancel in-flight calls that block redial, clear
+   * pending retries / cursor, and set the execution back to RUNNING.
+   */
+  async reset(
+    ctx: TenantContext,
+    campaignPublicId: string,
+  ): Promise<CampaignExecutionView> {
+    tenantService.requirePermission(ctx, PERMISSIONS.CAMPAIGNS_WRITE);
+    const campaign = await this.resolveCampaign(ctx, campaignPublicId);
+
+    const totalContacts = await this.campaignsRepo.countContacts(
+      ctx.companyId,
+      campaign.internalId,
+    );
+    if (totalContacts === 0) {
+      throw new ValidationError(
+        "Upload contacts before resetting the campaign.",
+      );
+    }
+
+    const existing = await campaignExecutionRepository.findByCampaignId(
+      ctx.companyId,
+      campaign.internalId,
+    );
+    if (!existing) {
+      throw new ValidationError("Campaign has not been started yet");
+    }
+    if (existing.status === "DRAFT" || existing.status === "SCHEDULED") {
+      throw new ValidationError(
+        "Campaign has not started yet — use Start instead",
+      );
+    }
+
+    const correlationId = randomUUID();
+    const now = new Date();
+    const lockExpiresAt = new Date(
+      now.getTime() + campaignExecutionConfig.lockTtlMs,
+    );
+
+    // Cancel calls that prevent shouldDial from placing a new outbound.
+    await prisma.callLog.updateMany({
+      where: {
+        companyId: ctx.companyId,
+        campaignId: campaign.internalId,
+        status: {
+          in: [
+            "PENDING",
+            "QUEUED",
+            "DISPATCHING",
+            "QUEUED_AT_PROVIDER",
+            "RINGING",
+            "ANSWERED",
+          ],
+        },
+      },
+      data: {
+        status: "CANCELLED",
+        endedAt: now,
+        disconnectReason: "Campaign execution reset",
+        providerCompletedAt: now,
+      },
+    });
+
+    const cancelledJobs = await retryJobRepository.cancelPendingForCampaign(
+      ctx.companyId,
+      campaign.internalId,
+    );
+
+    const result = await campaignExecutionRepository.transitionStatus(
+      ctx.companyId,
+      campaign.internalId,
+      ["RUNNING", "PAUSED", "COMPLETED", "FAILED", "CANCELLED"],
+      {
+        status: "RUNNING",
+        startedAt: now,
+        scheduledAt: null,
+        pausedAt: null,
+        completedAt: null,
+        failedAt: null,
+        cancelledAt: null,
+        failureReason: null,
+        correlationId,
+        totalContacts,
+        lastProcessedContactId: null,
+        processedCount: 0,
+        completedContactsCount: 0,
+        pendingRetries: 0,
+        workerId: campaignExecutionConfig.workerId,
+        lockExpiresAt,
+      },
+    );
+    if (result.count === 0) {
+      throw new ValidationError(
+        "Campaign cannot be reset from its current state",
+      );
+    }
+
+    await campaignExecutionLockService.release(
+      campaign.internalId,
+      campaignExecutionConfig.workerId,
+    );
+
+    logCampaignExecutionEvent("campaign:reset", {
+      campaignPublicId: campaign.publicId,
+      correlationId,
+      totalContacts,
+      cancelledRetryJobs: cancelledJobs.count,
+    });
+
+    await this.writeActivity(
+      ctx.companyId,
+      campaign.internalId,
+      "CAMPAIGN_EXECUTION_RESET",
+      "Campaign execution reset — dialing restarted",
+      ctx.userId,
+      { correlationId, totalContacts },
+    );
+
+    return this.loadExecutionView(ctx, campaignPublicId);
+  }
+
   async retry(
     ctx: TenantContext,
     campaignPublicId: string,

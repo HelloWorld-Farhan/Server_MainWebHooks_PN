@@ -158,6 +158,29 @@ export class CampaignExecutionController {
     }
   }
 
+  @Post("reset")
+  async reset(
+    @Param("campaignId") campaignId: string,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    const result = await requireTenantPermission(
+      req,
+      PERMISSIONS.CAMPAIGNS_WRITE,
+    );
+    if (!handleTenantResult(res, result) || !result.ctx) return;
+
+    try {
+      const response = await campaignExecutionService.reset(
+        result.ctx,
+        campaignId,
+      );
+      return res.json(response);
+    } catch (err) {
+      return this.handleError(res, err);
+    }
+  }
+
   @Post("cancel")
   async cancel(
     @Param("campaignId") campaignId: string,
