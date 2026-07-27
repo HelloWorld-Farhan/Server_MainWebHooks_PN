@@ -9,9 +9,7 @@ import prisma from "@/server/lib/prisma";
 import { CampaignsRepository } from "@/server/repositories/campaigns.repository";
 import { outboundCallsService } from "@/server/services/outbound-calls.service";
 import { campaignExecutionLockService } from "@/server/campaign-execution/campaign-execution-lock.service";
-import { contactCompletionService } from "@/server/campaign-execution/retry/contact-completion.service";
 import { retryJobRepository } from "@/server/campaign-execution/retry/retry-job.repository";
-import { retrySchedulerService } from "@/server/campaign-execution/retry/retry-scheduler.service";
 
 export class CampaignRunnerService {
   private readonly campaignsRepo = new CampaignsRepository(prisma);
@@ -94,17 +92,8 @@ export class CampaignRunnerService {
       );
 
       if (contacts.length === 0) {
-        const completed = await contactCompletionService.checkCampaignCompletion(
-          execution.companyId,
-          execution.campaignId,
-        );
-        if (!completed) {
-          await this.scheduleRetriesForExhaustedContacts(
-            execution.companyId,
-            execution.campaignId,
-            execution.correlationId,
-          );
-        }
+        // Cursor exhausted — all contacts were already dialed/sent to VoiceNSMS.
+        await this.completeIfQueueDrained(execution);
         return true;
       }
 
@@ -207,12 +196,14 @@ export class CampaignRunnerService {
         processedCount,
       });
 
-      if (contacts.length < campaignExecutionConfig.batchSize) {
-        await contactCompletionService.checkCampaignCompletion(
-          execution.companyId,
-          execution.campaignId,
-        );
-      }
+      // Stop as soon as the last contact has been dialed (sent to VoiceNSMS),
+      // without waiting for provider webhooks / call outcomes.
+      await this.completeIfQueueDrained({
+        companyId: execution.companyId,
+        campaignId: execution.campaignId,
+        processedCount,
+        totalContacts: execution.totalContacts,
+      });
 
       return true;
     } catch (error) {
@@ -240,72 +231,25 @@ export class CampaignRunnerService {
   }
 
   /**
-   * When the cursor is exhausted but contacts are still incomplete (e.g. stale
-   * provider cleanup failed calls without scheduling retries), schedule retries
-   * from the latest terminal call per phone so the campaign can progress.
+   * When every contact has been walked by the cursor (last call sent to
+   * VoiceNSMS), mark the campaign COMPLETED immediately.
    */
-  private async scheduleRetriesForExhaustedContacts(
-    companyId: string,
-    campaignId: string,
-    correlationId: string | null,
-  ): Promise<void> {
-    const contacts = await this.campaignsRepo.findContactsForExecution(
-      companyId,
-      campaignId,
-      100_000,
-    );
-
-    const seenPhones = new Set<string>();
-    for (const contact of contacts) {
-      const normalizedPhone = normalizeOutboundPhone(contact.phone);
-      if (!normalizedPhone || seenPhones.has(normalizedPhone)) {
-        continue;
-      }
-      seenPhones.add(normalizedPhone);
-
-      const pendingRetries = await retryJobRepository.countPendingForPhone(
-        companyId,
-        campaignId,
-        normalizedPhone,
-      );
-      if (pendingRetries > 0) {
-        continue;
-      }
-
-      const latestCall = await prisma.callLog.findFirst({
-        where: {
-          companyId,
-          campaignId,
-          phoneNumber: { number: normalizedPhone },
-        },
-        orderBy: { startedAt: "desc" },
-        select: { id: true, status: true, correlationId: true },
-      });
-      if (!latestCall) {
-        continue;
-      }
-
-      const terminalStatuses = new Set([
-        "FAILED",
-        "NO_ANSWER",
-        "BUSY",
-        "CANCELLED",
-        "MISSED",
-        "VOICEMAIL",
-      ]);
-      if (!terminalStatuses.has(latestCall.status)) {
-        continue;
-      }
-
-      await retrySchedulerService.handleTerminalCall({
-        companyId,
-        callLogId: latestCall.id,
-        campaignId,
-        phone: normalizedPhone,
-        mappedStatus: latestCall.status,
-        correlationId: correlationId ?? latestCall.correlationId ?? undefined,
-      });
+  private async completeIfQueueDrained(execution: {
+    companyId: string;
+    campaignId: string;
+    processedCount: number;
+    totalContacts: number;
+  }): Promise<void> {
+    if (execution.totalContacts <= 0) {
+      return;
     }
+    if (execution.processedCount < execution.totalContacts) {
+      return;
+    }
+    await campaignExecutionService.markCompleted(
+      execution.companyId,
+      execution.campaignId,
+    );
   }
 }
 

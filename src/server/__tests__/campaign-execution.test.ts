@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { after, afterEach, before, describe, it, mock } from "node:test";
 
-import { contactCompletionService } from "@/server/campaign-execution/retry/contact-completion.service";
 import { campaignExecutionConfig } from "@/server/campaign-execution/campaign-execution.config";
 import { campaignExecutionLockService } from "@/server/campaign-execution/campaign-execution-lock.service";
 import { campaignExecutionService } from "@/server/campaign-execution/campaign-execution.service";
@@ -278,8 +277,6 @@ describe("Campaign execution engine", () => {
 
     await runUntilOutboundCount(3);
     assert.equal(outboundCallsCreated, 3, `expected 3 outbound calls, got ${outboundCallsCreated}`);
-
-    await contactCompletionService.checkCampaignCompletion(companyId, campaign.id);
 
     const completed = await campaignExecutionService.getStatus(ctx, publicId);
     assert.equal(completed.status, "COMPLETED");
