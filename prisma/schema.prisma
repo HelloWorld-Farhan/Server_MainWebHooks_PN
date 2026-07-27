@@ -1405,6 +1405,7 @@ model CompanySetupConfig {
   companyId        String   @unique @db.ObjectId
   totalChannels    Int      @default(0)
   serviceNumber    String?
+  ivrTemplateId    String?
   pulseTimeSeconds Int      @default(60)
   deltaSeconds     Int      @default(2)
   agentsAllocated  Int      @default(0)

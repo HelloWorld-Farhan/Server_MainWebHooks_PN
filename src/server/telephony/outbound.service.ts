@@ -87,6 +87,7 @@ export class ObdOutboundService {
       campaignPublicId: input.campaignPublicId,
       companyId: input.companyId,
       phone: input.phone,
+      payload: requestPayload,
     });
 
     const result = await this.providerClient.sendOutboundCall(callInput, config);
@@ -154,18 +155,25 @@ export class ObdOutboundService {
     const config = getObdConfig();
     const setup = await prisma.companySetupConfig.findUnique({
       where: { companyId },
-      select: { serviceNumber: true },
+      select: { serviceNumber: true, ivrTemplateId: true },
     });
+
+    let resolved = config;
 
     const configuredNumber = setup?.serviceNumber?.trim();
     if (
       configuredNumber &&
       getObdServiceNumbers().includes(configuredNumber)
     ) {
-      return { ...config, serviceNo: configuredNumber };
+      resolved = { ...resolved, serviceNo: configuredNumber };
     }
 
-    return config;
+    const configuredIvrTemplateId = setup?.ivrTemplateId?.trim();
+    if (configuredIvrTemplateId) {
+      resolved = { ...resolved, ivrTemplateId: configuredIvrTemplateId };
+    }
+
+    return resolved;
   }
 
   private async resolveContactFields(
