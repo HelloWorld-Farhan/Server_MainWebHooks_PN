@@ -63,16 +63,16 @@ describe("OBD telephony", () => {
       assert.equal(getObdConfig().serviceNo, DEFAULT_OBD_SERVICE_NUMBERS[0]);
     });
 
-    it("uses OBD ukey (apiKey) as webhook API key", () => {
+    it("uses OBD_WEBHOOK_SECRET as webhook API key", () => {
       assert.equal(
         resolveWebhookApiKey({
           ...OBD_TEST_CONFIG,
-          webhookSecret: "ignored-webhook-secret",
+          webhookSecret: "test-webhook-secret",
         }),
-        OBD_TEST_CONFIG.apiKey,
+        "test-webhook-secret",
       );
       assert.equal(
-        resolveWebhookApiKey({ ...OBD_TEST_CONFIG, apiKey: "" }),
+        resolveWebhookApiKey({ ...OBD_TEST_CONFIG, webhookSecret: null }),
         null,
       );
     });

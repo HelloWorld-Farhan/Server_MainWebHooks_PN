@@ -77,9 +77,9 @@ export function assertObdDispatchConfig(config: ObdConfig): void {
 }
 
 /**
- * VoiceNSMS webhook auth uses the same ukey as CreateOBDCampaignPost (`OBD_API_KEY`).
- * Configure the provider dashboard header `x-obd-api-key` to that ukey value.
+ * Webhook auth uses `OBD_WEBHOOK_SECRET` (header `x-obd-api-key`).
+ * Outbound CreateOBDCampaignPost still sends `ukey` from `OBD_API_KEY`.
  */
 export function resolveWebhookApiKey(config: ObdConfig): string | null {
-  return config.apiKey || null;
+  return config.webhookSecret || null;
 }
