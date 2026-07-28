@@ -25,6 +25,7 @@ function parseCallLogFilter(filter?: {
   direction?: string;
   status?: string;
   aiAgentId?: string;
+  campaignId?: string;
   phoneNumberId?: string;
   assignedUserId?: string;
   dateFrom?: string;
@@ -36,6 +37,7 @@ function parseCallLogFilter(filter?: {
     direction: filter.direction as never,
     status: filter.status as never,
     aiAgentId: filter.aiAgentId,
+    campaignId: filter.campaignId,
     phoneNumberId: filter.phoneNumberId,
     assignedUserId: filter.assignedUserId,
     dateFrom: filter.dateFrom ? new Date(filter.dateFrom) : undefined,

@@ -2,6 +2,7 @@ input CallLogFilter {
   direction: CallDirection
   status: CallStatus
   aiAgentId: ID
+  campaignId: ID
   phoneNumberId: ID
   assignedUserId: ID
   dateFrom: String

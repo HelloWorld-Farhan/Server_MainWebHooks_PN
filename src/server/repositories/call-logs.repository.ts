@@ -28,6 +28,7 @@ export type CallLogFilter = {
   direction?: CallDirection;
   status?: CallStatus;
   aiAgentId?: string;
+  campaignId?: string;
   phoneNumberId?: string;
   assignedUserId?: string;
   dateFrom?: Date;
@@ -46,6 +47,7 @@ export class CallLogsRepository extends BaseRepository {
     if (filter?.direction) where.direction = filter.direction;
     if (filter?.status) where.status = filter.status;
     if (filter?.aiAgentId) where.aiAgentId = filter.aiAgentId;
+    if (filter?.campaignId) where.campaignId = filter.campaignId;
     if (filter?.phoneNumberId) where.phoneNumberId = filter.phoneNumberId;
     if (filter?.assignedUserId) where.assignedUserId = filter.assignedUserId;
 

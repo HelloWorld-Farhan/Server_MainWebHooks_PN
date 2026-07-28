@@ -117,18 +117,14 @@ export const CAMPAIGN_DASHBOARD_QUERY = `
         aiEnabled
         lastActivityAt
       }
-    }
-    callLogs {
-      recent(limit: 10) {
+      callLogs(campaignId: $campaignId, first: 10) {
         id
         startedAt
         direction
         status
         durationSeconds
-        lead {
-          firstName
-          lastName
-        }
+        leadPhone
+        leadName
       }
     }
     analytics {
@@ -158,15 +154,14 @@ export type CampaignDashboardResult = {
       aiEnabled: boolean;
       lastActivityAt: string | null;
     } | null;
-  };
-  callLogs: {
-    recent: {
+    callLogs: {
       id: string;
       startedAt: string;
       direction: string;
       status: string;
       durationSeconds: number;
-      lead: { firstName: string | null; lastName: string | null } | null;
+      leadPhone: string | null;
+      leadName: string | null;
     }[];
   };
   analytics: {
