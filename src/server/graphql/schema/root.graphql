@@ -75,6 +75,11 @@ enum CampaignStatus {
   ARCHIVED
 }
 
+enum CampaignDirection {
+  INBOUND
+  OUTBOUND
+}
+
 enum IntegrationStatus {
   CONNECTED
   NOT_CONNECTED

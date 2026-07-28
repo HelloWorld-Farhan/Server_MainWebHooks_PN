@@ -24,6 +24,11 @@ enum CampaignStatus {
   ARCHIVED
 }
 
+enum CampaignDirection {
+  INBOUND
+  OUTBOUND
+}
+
 enum PrimaryUseCase {
   LEAD_QUALIFICATION
   CUSTOMER_SUPPORT
@@ -1575,21 +1580,22 @@ model Campaign {
   /// Public ID resource segment (e.g. CP000001).
   resourceKey    String
   name           String
-  status         CampaignStatus @default(ACTIVE)
+  status         CampaignStatus    @default(ACTIVE)
+  direction      CampaignDirection @default(OUTBOUND)
   address        String?
   phone          String?
   email          String?
   notes          String?
-  customFields   Json           @default("{}")
+  customFields   Json              @default("{}")
   /// Per-campaign AI toggle. AI configuration is stored per campaign, not globally.
-  aiEnabled      Boolean        @default(false)
+  aiEnabled      Boolean           @default(false)
   /// Campaign-specific system prompt controlling the AI agent behavior.
   systemPrompt   String?
   /// Extensible AI settings bag (model, temperature, knowledgeBase, voice, etc.).
-  aiConfig       Json           @default("{}")
+  aiConfig       Json              @default("{}")
   lastActivityAt DateTime?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
 
   company      Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
   leads        Lead[]
@@ -1607,6 +1613,7 @@ model Campaign {
   @@index([companyId, name])
   @@index([companyId, lastActivityAt])
   @@index([companyId, aiEnabled])
+  @@index([companyId, direction])
   @@unique([companyId, resourceKey])
 }
 

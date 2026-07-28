@@ -18,6 +18,7 @@ type Campaign {
   id: ID!
   name: String!
   status: CampaignStatus!
+  direction: CampaignDirection!
   address: String
   phone: String
   email: String
@@ -100,6 +101,7 @@ input CampaignFilter {
 input CreateCampaignInput {
   name: String!
   status: CampaignStatus
+  direction: CampaignDirection
   address: String
   phone: String
   email: String
@@ -113,6 +115,7 @@ input CreateCampaignInput {
 input UpdateCampaignInput {
   name: String
   status: CampaignStatus
+  direction: CampaignDirection
   address: String
   phone: String
   email: String

@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import type { CampaignStatus, Prisma } from "@prisma/client";
+import type { CampaignDirection, CampaignStatus, Prisma } from "@prisma/client";
 
 import { NotFoundError, ValidationError } from "@/server/lib/errors";
 import prisma from "@/server/lib/prisma";
@@ -34,6 +34,7 @@ function mapBranch(
     id: r.id,
     name: r.name,
     status: r.status,
+    direction: r.direction ?? "OUTBOUND",
     address: r.address,
     phone: r.phone,
     email: r.email,
@@ -161,6 +162,7 @@ export class CampaignsService {
     input: {
       name: string;
       status?: CampaignStatus;
+      direction?: CampaignDirection;
       address?: string | null;
       phone?: string | null;
       email?: string | null;
@@ -187,6 +189,7 @@ export class CampaignsService {
     const row = await this.repo.create(ctx.companyId, {
       name,
       status: input.status,
+      direction: input.direction ?? "OUTBOUND",
       address: input.address ?? undefined,
       phone: input.phone ?? undefined,
       email: input.email ?? undefined,
@@ -280,6 +283,7 @@ export class CampaignsService {
     input: {
       name?: string;
       status?: CampaignStatus;
+      direction?: CampaignDirection;
       address?: string | null;
       phone?: string | null;
       email?: string | null;
@@ -296,6 +300,7 @@ export class CampaignsService {
     await this.repo.update(ctx.companyId, id, {
       name: input.name?.trim(),
       status: input.status,
+      direction: input.direction,
       address: input.address,
       phone: input.phone,
       email: input.email,

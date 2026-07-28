@@ -1,4 +1,5 @@
 export type CampaignStatus = "ACTIVE" | "INACTIVE" | "ARCHIVED";
+export type CampaignDirection = "INBOUND" | "OUTBOUND";
 
 export type ViewerRoleResult = {
   viewer: {
@@ -64,6 +65,7 @@ export type CampaignNode = {
   id: string;
   name: string;
   status: CampaignStatus;
+  direction: CampaignDirection;
   address: string | null;
   phone: string | null;
   email: string | null;
@@ -167,6 +169,7 @@ const BRANCH_FIELDS = `
   id
   name
   status
+  direction
   address
   phone
   email
