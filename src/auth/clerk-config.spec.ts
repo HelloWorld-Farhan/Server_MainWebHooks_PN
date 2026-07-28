@@ -12,20 +12,20 @@ describe('getClerkAuthorizedParties', () => {
     expect(
       getClerkAuthorizedParties({
         NODE_ENV: 'production',
-        MAIN_WEBSITE_URL: 'https://voice.propnexai.com/',
+        MAIN_WEBSITE_URL: 'https://propnexai.com/',
       }),
-    ).toEqual(['https://voice.propnexai.com']);
+    ).toEqual(['https://propnexai.com']);
   });
 
   it('supports and deduplicates additional frontend origins', () => {
     expect(
       getClerkAuthorizedParties({
         NODE_ENV: 'production',
-        MAIN_WEBSITE_URL: 'https://voice.propnexai.com',
+        MAIN_WEBSITE_URL: 'https://propnexai.com',
         CLERK_AUTHORIZED_PARTIES:
-          'https://voice.propnexai.com/, https://admin.propnexai.com',
+          'https://propnexai.com/, https://admin.propnexai.com',
       }),
-    ).toEqual(['https://voice.propnexai.com', 'https://admin.propnexai.com']);
+    ).toEqual(['https://propnexai.com', 'https://admin.propnexai.com']);
   });
 
   it('rejects missing production frontend origins', () => {
@@ -38,7 +38,7 @@ describe('getClerkAuthorizedParties', () => {
     expect(() =>
       getClerkAuthorizedParties({
         NODE_ENV: 'production',
-        MAIN_WEBSITE_URL: 'http://voice.propnexai.com',
+        MAIN_WEBSITE_URL: 'http://propnexai.com',
       }),
     ).toThrow('Production Clerk authorized parties must use https origins');
   });
