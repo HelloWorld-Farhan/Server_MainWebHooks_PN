@@ -93,7 +93,12 @@ export class CampaignRunnerService {
 
       if (contacts.length === 0) {
         // Cursor exhausted — all contacts were already dialed/sent to VoiceNSMS.
-        await this.completeIfQueueDrained(execution);
+        // Mark COMPLETED even if processedCount/totalContacts drifted (e.g. deleted
+        // contacts), so the UI can swap Stop → Start Again.
+        await campaignExecutionService.markCompleted(
+          execution.companyId,
+          execution.campaignId,
+        );
         return true;
       }
 
@@ -198,12 +203,25 @@ export class CampaignRunnerService {
 
       // Stop as soon as the last contact has been dialed (sent to VoiceNSMS),
       // without waiting for provider webhooks / call outcomes.
-      await this.completeIfQueueDrained({
-        companyId: execution.companyId,
-        campaignId: execution.campaignId,
-        processedCount,
-        totalContacts: execution.totalContacts,
-      });
+      const reachedEndOfContacts =
+        contacts.length < campaignExecutionConfig.batchSize;
+      if (reachedEndOfContacts) {
+        await campaignExecutionService.markCompleted(
+          execution.companyId,
+          execution.campaignId,
+        );
+      } else {
+        const totalContacts = await this.campaignsRepo.countContacts(
+          execution.companyId,
+          execution.campaignId,
+        );
+        await this.completeIfQueueDrained({
+          companyId: execution.companyId,
+          campaignId: execution.campaignId,
+          processedCount,
+          totalContacts,
+        });
+      }
 
       return true;
     } catch (error) {
