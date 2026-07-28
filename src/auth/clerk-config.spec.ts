@@ -1,4 +1,6 @@
-import { getClerkAuthorizedParties } from '@/auth/clerk-config';
+import { describe, expect, it } from '@jest/globals';
+
+import { getClerkAuthorizedParties } from './clerk-config';
 
 describe('getClerkAuthorizedParties', () => {
   it('adds localhost origins during development', () => {
