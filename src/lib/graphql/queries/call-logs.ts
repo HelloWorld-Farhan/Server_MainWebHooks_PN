@@ -1,10 +1,12 @@
 export const CALL_LOGS_PAGE_QUERY = `
   query CallLogsPage($after: String, $filter: CallLogFilter) {
     callLogs {
-      connection(first: 20, after: $after, filter: $filter) {
+      connection(first: 100, after: $after, filter: $filter) {
         edges {
           node {
             id
+            callLogId
+            publicId
             direction
             status
             outcome
@@ -15,6 +17,8 @@ export const CALL_LOGS_PAGE_QUERY = `
             cost
             creditsUsed
             provider
+            providerStatus
+            disconnectReason
             aiSummary
             sentiment
             lead {
@@ -116,6 +120,8 @@ export const CALL_DETAIL_QUERY = `
 
 export type CallLogsPageNode = {
   id: string;
+  callLogId?: string;
+  publicId?: string;
   direction: string;
   status: string;
   outcome: string | null;
@@ -126,6 +132,8 @@ export type CallLogsPageNode = {
   cost: number | null;
   creditsUsed: number | null;
   provider: string | null;
+  providerStatus?: string | null;
+  disconnectReason?: string | null;
   aiSummary: Record<string, unknown> | null;
   sentiment: Record<string, unknown> | null;
   lead: {

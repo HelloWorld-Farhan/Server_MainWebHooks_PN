@@ -34,6 +34,7 @@ export type CallLogFilter = {
   dateFrom?: Date;
   dateTo?: Date;
   search?: string;
+  callLogId?: string;
 };
 
 export class CallLogsRepository extends BaseRepository {
@@ -64,6 +65,22 @@ export class CallLogsRepository extends BaseRepository {
         { lead: { lastName: { contains: term, mode: 'insensitive' } } },
         { lead: { phone: { contains: term } } },
         { lead: { email: { contains: term, mode: 'insensitive' } } },
+        { callLogId: { contains: term, mode: 'insensitive' } },
+        { publicId: { contains: term, mode: 'insensitive' } },
+        { phoneNumber: { number: { contains: term } } },
+      ];
+    }
+
+    if (filter?.callLogId) {
+      const term = filter.callLogId.trim();
+      where.AND = [
+        ...(Array.isArray(where.AND) ? where.AND : []),
+        {
+          OR: [
+            { callLogId: { contains: term, mode: 'insensitive' } },
+            { publicId: { contains: term, mode: 'insensitive' } },
+          ],
+        },
       ];
     }
 
@@ -96,6 +113,8 @@ export class CallLogsRepository extends BaseRepository {
       select: {
         id: true,
         companyId: true,
+        callLogId: true,
+        publicId: true,
         leadId: true,
         aiAgentId: true,
         phoneNumberId: true,
@@ -111,6 +130,8 @@ export class CallLogsRepository extends BaseRepository {
         cost: true,
         creditsUsed: true,
         provider: true,
+        providerStatus: true,
+        disconnectReason: true,
         aiSummary: true,
         sentiment: true,
         createdAt: true,

@@ -8,6 +8,7 @@ input CallLogFilter {
   dateFrom: String
   dateTo: String
   search: String
+  callLogId: String
 }
 
 type CallLogsQueries {
@@ -40,6 +41,8 @@ type CallInternalNoteAuthor {
 
 type CallLog {
   id: ID!
+  callLogId: String!
+  publicId: String!
   direction: CallDirection!
   status: CallStatus!
   outcome: String
@@ -50,6 +53,8 @@ type CallLog {
   cost: Float
   creditsUsed: Int
   provider: String
+  providerStatus: String
+  disconnectReason: String
   aiSummary: JSON
   sentiment: JSON
   leadId: ID

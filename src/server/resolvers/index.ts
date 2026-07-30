@@ -31,6 +31,7 @@ function parseCallLogFilter(filter?: {
   dateFrom?: string;
   dateTo?: string;
   search?: string;
+  callLogId?: string;
 }) {
   if (!filter) return undefined;
   return {
@@ -43,6 +44,7 @@ function parseCallLogFilter(filter?: {
     dateFrom: filter.dateFrom ? new Date(filter.dateFrom) : undefined,
     dateTo: filter.dateTo ? new Date(filter.dateTo) : undefined,
     search: filter.search,
+    callLogId: filter.callLogId,
   };
 }
 
