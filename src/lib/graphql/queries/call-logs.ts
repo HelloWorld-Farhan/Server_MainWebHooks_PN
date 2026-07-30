@@ -5,10 +5,34 @@ export const CALL_LOGS_PAGE_QUERY = `
         edges {
           node {
             id
+            direction
+            status
+            outcome
             startedAt
+            durationSeconds
+            recordingUrl
+            transcriptUrl
+            cost
+            creditsUsed
+            provider
+            aiSummary
+            sentiment
+            lead {
+              id
+              firstName
+              lastName
+              phone
+              temperature
+              score
+            }
             aiAgent {
               id
               name
+            }
+            phoneNumber {
+              id
+              number
+              label
             }
             campaign {
               id
@@ -90,27 +114,53 @@ export const CALL_DETAIL_QUERY = `
   }
 `;
 
+export type CallLogsPageNode = {
+  id: string;
+  direction: string;
+  status: string;
+  outcome: string | null;
+  startedAt: string;
+  durationSeconds: number;
+  recordingUrl: string | null;
+  transcriptUrl: string | null;
+  cost: number | null;
+  creditsUsed: number | null;
+  provider: string | null;
+  aiSummary: Record<string, unknown> | null;
+  sentiment: Record<string, unknown> | null;
+  lead: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    phone: string | null;
+    temperature: string | null;
+    score: number;
+  } | null;
+  aiAgent: { id: string; name: string } | null;
+  phoneNumber: {
+    id: string;
+    number: string;
+    label: string | null;
+  } | null;
+  campaign: {
+    id: string;
+    name: string;
+    status: string;
+    customFields: Record<string, unknown> | null;
+    createdAt: string;
+    execution: {
+      status: string;
+      scheduledAt: string | null;
+      totalContacts: number;
+    } | null;
+  } | null;
+};
+
 export type CallLogsPageResult = {
   callLogs: {
     connection: {
       edges: {
-        node: {
-          id: string;
-          startedAt: string;
-          aiAgent: { id: string; name: string } | null;
-          campaign: {
-            id: string;
-            name: string;
-            status: string;
-            customFields: Record<string, unknown> | null;
-            createdAt: string;
-            execution: {
-              status: string;
-              scheduledAt: string | null;
-              totalContacts: number;
-            } | null;
-          } | null;
-        };
+        node: CallLogsPageNode;
         cursor: string;
       }[];
       pageInfo: { hasNextPage: boolean; endCursor: string | null };
