@@ -14,7 +14,7 @@ export class InboundWebhooksController {
       const callingNo = body.phone || body["Calling No"] || body.callingNo || body.calling_no || body.caller_id || "Unknown";
       const callDurationRaw = body.duration || body["Call Duration"] || body.callDuration || body.call_duration || 0;
       const statusRaw = body.status || body["Status"] || "COMPLETED";
-      const logId = body.callid || body.calledno || body["Log ID"] || body.logId || body.log_id || `webhook-${Date.now()}`;
+      const logId = body.log_id || body.logId || body["Log ID"] || body.callid || body.calledno || `webhook-${Date.now()}`;
 
       const company = await prisma.company.findFirst();
       if (!company) {
