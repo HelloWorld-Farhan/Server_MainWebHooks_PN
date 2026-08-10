@@ -11,10 +11,10 @@ export class InboundWebhooksController {
       const body = req.body || {};
       
       // Parse payload based on common VoiceNSMS/OBD field names or the provided screenshot headers
-      const callingNo = body["Calling No"] || body.callingNo || body.calling_no || body.caller_id || body.phone || "Unknown";
-      const callDurationRaw = body["Call Duration"] || body.callDuration || body.call_duration || body.duration || 0;
-      const statusRaw = body["Status"] || body.status || "COMPLETED";
-      const logId = body["Log ID"] || body.logId || body.log_id || `webhook-${Date.now()}`;
+      const callingNo = body.phone || body["Calling No"] || body.callingNo || body.calling_no || body.caller_id || "Unknown";
+      const callDurationRaw = body.duration || body["Call Duration"] || body.callDuration || body.call_duration || 0;
+      const statusRaw = body.status || body["Status"] || "COMPLETED";
+      const logId = body.callid || body.calledno || body["Log ID"] || body.logId || body.log_id || `webhook-${Date.now()}`;
 
       const company = await prisma.company.findFirst();
       if (!company) {
