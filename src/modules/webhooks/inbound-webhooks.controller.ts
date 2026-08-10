@@ -73,8 +73,19 @@ export class InboundWebhooksController {
         });
       }
 
-      const callLog = await prisma.callLog.create({
-        data: {
+      const callLog = await prisma.callLog.upsert({
+        where: {
+          companyId_callLogId: {
+            companyId: company.id,
+            callLogId: logId
+          }
+        },
+        update: {
+          status: status as any,
+          durationSeconds,
+          providerWebhook: body
+        },
+        create: {
           companyId: company.id,
           callLogId: logId,
           publicId: publicId,
