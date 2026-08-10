@@ -31,6 +31,8 @@ export async function resolveTenantContext(
   return buildTenantContext(userId, tenant.company.id, tenant.membership);
 }
 
+import prisma from "@/server/lib/prisma";
+
 export async function requireTenantContext(req: Request) {
   try {
     const apiKeyCtx = await tryAuthenticateApiKeyFromRequest(req);
