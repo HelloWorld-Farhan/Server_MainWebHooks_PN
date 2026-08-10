@@ -22,6 +22,8 @@ export class InboundWebhooksController {
       const callDurationRaw = body.duration || body["Call Duration"] || body.callDuration || body.call_duration || 0;
       const statusRaw = body.status || body["Status"] || "COMPLETED";
       const logId = body.log_id || body.logId || body["Log ID"] || body.callid || body.calledno || `webhook-${Date.now()}`;
+      const recordingUrl = body.recording_url || body.recordingUrl || body.recording || null;
+      const transcriptUrl = body.transcript_url || body.transcriptUrl || body.transcript || null;
 
       const company = await prisma.company.findFirst();
       if (!company) {
@@ -83,6 +85,8 @@ export class InboundWebhooksController {
         update: {
           status: status as any,
           durationSeconds,
+          recordingUrl: recordingUrl,
+          transcriptUrl: transcriptUrl,
           providerWebhook: body
         },
         create: {
@@ -93,6 +97,8 @@ export class InboundWebhooksController {
           status: status as any,
           startedAt: new Date(),
           durationSeconds,
+          recordingUrl: recordingUrl,
+          transcriptUrl: transcriptUrl,
           provider: "webhook",
           providerCallId: logId,
           providerWebhook: body,
