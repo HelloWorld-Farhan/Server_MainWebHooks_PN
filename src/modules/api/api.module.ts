@@ -22,6 +22,7 @@ import { PageCacheController } from '../page-cache/page-cache.controller';
 import { TelephonyController } from '../telephony/telephony.controller';
 import { ObdWebhooksController } from '../webhooks/obd-webhooks.controller';
 import { WebhooksController } from '../webhooks/webhooks.controller';
+import { InboundWebhooksController } from '../webhooks/inbound-webhooks.controller';
 
 @Module({
   imports: [GraphQLModule],
@@ -33,6 +34,7 @@ import { WebhooksController } from '../webhooks/webhooks.controller';
     ObdController,
     WebhooksController,
     ObdWebhooksController,
+    InboundWebhooksController,
     InternalController,
     ChannelsInternalController,
     IntegrationsController,
