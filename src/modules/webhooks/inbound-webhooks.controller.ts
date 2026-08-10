@@ -8,13 +8,22 @@ export class InboundWebhooksController {
   @Post()
   async handleInboundWebhook(@Req() req: Request, @Res() res: Response) {
     try {
+      const apiKey = req.headers["x-obd-api-key"] || req.headers["x-api-key"];
+      const expectedKey = process.env.INBOUND_WEBHOOK_SECRET || process.env.OBD_WEBHOOK_SECRET;
+      
+      if (!expectedKey || apiKey !== expectedKey) {
+        return res.status(401).json({ error: "Invalid OBD webhook API key" });
+      }
+
       const body = req.body || {};
       
       // Parse payload based on common VoiceNSMS/OBD field names or the provided screenshot headers
-      const callingNo = body["Calling No"] || body.callingNo || body.calling_no || body.caller_id || body.phone || "Unknown";
-      const callDurationRaw = body["Call Duration"] || body.callDuration || body.call_duration || body.duration || 0;
-      const statusRaw = body["Status"] || body.status || "COMPLETED";
-      const logId = body["Log ID"] || body.logId || body.log_id || `webhook-${Date.now()}`;
+      const callingNo = body.phone || body["Calling No"] || body.callingNo || body.calling_no || body.caller_id || "Unknown";
+      const callDurationRaw = body.duration || body["Call Duration"] || body.callDuration || body.call_duration || 0;
+      const statusRaw = body.status || body["Status"] || "COMPLETED";
+      const logId = body.log_id || body.logId || body["Log ID"] || body.callid || body.calledno || `webhook-${Date.now()}`;
+      const recordingUrl = body.recording_url || body.recordingUrl || body.recording || null;
+      const transcriptUrl = body.transcript_url || body.transcriptUrl || body.transcript || null;
 
       const company = await prisma.company.findFirst();
       if (!company) {
@@ -66,8 +75,21 @@ export class InboundWebhooksController {
         });
       }
 
-      const callLog = await prisma.callLog.create({
-        data: {
+      const callLog = await prisma.callLog.upsert({
+        where: {
+          companyId_callLogId: {
+            companyId: company.id,
+            callLogId: logId
+          }
+        },
+        update: {
+          status: status as any,
+          durationSeconds,
+          recordingUrl: recordingUrl,
+          transcriptUrl: transcriptUrl,
+          providerWebhook: body
+        },
+        create: {
           companyId: company.id,
           callLogId: logId,
           publicId: publicId,
@@ -75,6 +97,8 @@ export class InboundWebhooksController {
           status: status as any,
           startedAt: new Date(),
           durationSeconds,
+          recordingUrl: recordingUrl,
+          transcriptUrl: transcriptUrl,
           provider: "webhook",
           providerCallId: logId,
           providerWebhook: body,
