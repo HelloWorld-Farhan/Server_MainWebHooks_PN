@@ -7,7 +7,7 @@ import {
 } from "@/server/lib/clerk-errors";
 import { isClerkWebhooksEnabled } from "@/server/lib/clerk-config";
 import { companySlugFromName, mapClerkRoleToUserRole } from "@/server/lib/clerk-sync";
-import prisma from "@/server/lib/prisma";
+import { prisma } from "@/server/lib/prisma";
 import { TenantRepository } from "@/server/repositories/tenant.repository";
 import { cacheService } from "@/server/cache/cache.service";
 import {
@@ -879,7 +879,6 @@ export async function handleClerkWebhookEvent(
     case "user.updated": {
       const clerkUserId = data.id as string;
       if (!clerkUserId) return;
-
       await resolveOrMergeUserFromClerk(clerkUserId);
       break;
     }

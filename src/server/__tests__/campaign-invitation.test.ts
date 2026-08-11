@@ -65,6 +65,8 @@ describe("Campaign Invitation Flow", () => {
         contractId: "TX" + Math.random().toString(36).substring(2, 10).toUpperCase(),
         clerkOrganizationId: "org_mock_company",
         ownerUserId: user.clerkUserId,
+        cli: "CLI" + Math.random().toString(36).slice(2, 8),
+        companyCode: "CC" + Math.random().toString(36).slice(2, 8),
       },
     });
     companyId = company.id;
