@@ -47,7 +47,7 @@ export class InboundWebhooksController {
         status = "MISSED";
       }
 
-      const publicId = `INB-${logId.toString().substring(0, 10)}`;
+      const publicId = generatePublicId();
 
       // Find or create stage
       let stage = await prisma.leadPipelineStage.findFirst({
