@@ -19,8 +19,8 @@ export class InboundWebhooksController {
       
       // Parse payload based on common VoiceNSMS/OBD field names or the provided screenshot headers
       const callingNo = body.phone || body["Calling No"] || body.callingNo || body.calling_no || body.caller_id || "Unknown";
-      const callDurationRaw = body.duration || body["Call Duration"] || body.callDuration || body.call_duration || 0;
-      const statusRaw = body.status || body["Status"] || "COMPLETED";
+      const callDurationRaw = body.duration ?? body["Call Duration"] ?? body.callDuration ?? body.call_duration;
+      const statusRaw = body.status ?? body["Status"];
       const logId = body.log_id || body.logId || body["Log ID"] || body.callid || body.calledno || `webhook-${Date.now()}`;
       const recordingUrl = body.recording_url || body.recordingUrl || body.recording || null;
       const transcriptUrl = body.transcript_url || body.transcriptUrl || body.transcript || null;
@@ -31,20 +31,24 @@ export class InboundWebhooksController {
       }
 
       let durationSeconds = 0;
-      if (typeof callDurationRaw === "number") {
-        durationSeconds = callDurationRaw;
-      } else if (typeof callDurationRaw === "string") {
-        durationSeconds = parseInt(callDurationRaw, 10);
-        if (isNaN(durationSeconds)) durationSeconds = 0;
+      if (callDurationRaw !== undefined) {
+        if (typeof callDurationRaw === "number") {
+          durationSeconds = callDurationRaw;
+        } else if (typeof callDurationRaw === "string") {
+          durationSeconds = parseInt(callDurationRaw, 10);
+          if (isNaN(durationSeconds)) durationSeconds = 0;
+        }
       }
 
       // Map status
-      const normalizedStatus = statusRaw.toString().toUpperCase();
       let status = "COMPLETED";
-      if (normalizedStatus.includes("FAIL") || normalizedStatus.includes("ERROR") || normalizedStatus.includes("REJECT")) {
-        status = "FAILED";
-      } else if (normalizedStatus.includes("BUSY") || normalizedStatus.includes("NO ANSWER") || normalizedStatus.includes("NO_ANSWER") || normalizedStatus.includes("MISSED")) {
-        status = "MISSED";
+      if (statusRaw !== undefined) {
+        const normalizedStatus = statusRaw.toString().toUpperCase();
+        if (normalizedStatus.includes("FAIL") || normalizedStatus.includes("ERROR") || normalizedStatus.includes("REJECT")) {
+          status = "FAILED";
+        } else if (normalizedStatus.includes("BUSY") || normalizedStatus.includes("NO ANSWER") || normalizedStatus.includes("NO_ANSWER") || normalizedStatus.includes("MISSED")) {
+          status = "MISSED";
+        }
       }
 
       const publicId = `INB-${logId}`;
@@ -75,6 +79,14 @@ export class InboundWebhooksController {
         });
       }
 
+      const updateData: any = {};
+      if (statusRaw !== undefined) updateData.status = status;
+      if (callDurationRaw !== undefined) updateData.durationSeconds = durationSeconds;
+      if (recordingUrl) updateData.recordingUrl = recordingUrl;
+      if (transcriptUrl) updateData.transcriptUrl = transcriptUrl;
+      // Always keep a record of the latest webhook payload
+      updateData.providerWebhook = body;
+
       const callLog = await prisma.callLog.upsert({
         where: {
           companyId_callLogId: {
@@ -82,13 +94,7 @@ export class InboundWebhooksController {
             callLogId: logId
           }
         },
-        update: {
-          status: status as any,
-          durationSeconds,
-          recordingUrl: recordingUrl,
-          transcriptUrl: transcriptUrl,
-          providerWebhook: body
-        },
+        update: updateData,
         create: {
           companyId: company.id,
           callLogId: logId,
