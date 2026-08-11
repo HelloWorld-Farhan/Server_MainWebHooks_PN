@@ -111,6 +111,8 @@ export class CallsController {
           durationSeconds: c.durationSeconds,
           providerCallId: c.providerCallId,
           phoneNumberId: c.phoneNumberId,
+          recordingUrl: c.recordingUrl,
+          transcriptUrl: c.transcriptUrl,
           customerNumber: c.lead?.phone || "Unknown",
           assignedNumber: c.phoneNumber?.number || "Unknown",
           lead: c.lead ? {

@@ -348,6 +348,12 @@ enum SupportRequestStatus {
   RESOLVED
 }
 
+enum PendingApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 // ─── AI Dialer Enums ─────────────────────────────────────────────────────────
 
 enum CallingQueueStatus {
@@ -565,6 +571,16 @@ model Invitation {
 
   @@index([companyId, email])
   @@index([companyId, status])
+}
+
+model PendingApproval {
+  id          String                @id @default(auto()) @map("_id") @db.ObjectId
+  email       String                @unique
+  status      PendingApprovalStatus @default(PENDING)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  @@index([status])
 }
 
 // ─── Leads Management ────────────────────────────────────────────────────────
