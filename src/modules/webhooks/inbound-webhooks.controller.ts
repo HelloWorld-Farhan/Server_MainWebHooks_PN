@@ -1,7 +1,7 @@
 import { Controller, Post, Req, Res, Query } from "@nestjs/common";
 import type { Request, Response } from "express";
 import prisma from "@/server/lib/prisma";
-import { generatePublicId } from "@/server/lib/public-id";
+
 
 @Controller("api/webhooks/inbound")
 export class InboundWebhooksController {
@@ -47,7 +47,7 @@ export class InboundWebhooksController {
         status = "MISSED";
       }
 
-      const publicId = generatePublicId();
+      const publicId = `INB-${logId}`;
 
       // Find or create stage
       let stage = await prisma.leadPipelineStage.findFirst({
