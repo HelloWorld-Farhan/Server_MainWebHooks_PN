@@ -24,8 +24,23 @@ export class InboundWebhooksController {
       const logId = body.log_id || body.logId || body["Log ID"] || body.callid || body.calledno || `webhook-${Date.now()}`;
       const recordingUrl = body.recording_url || body.recordingUrl || body.recording || null;
       const transcriptUrl = body.transcript_url || body.transcriptUrl || body.transcript || null;
+      const agentNumber = body.callid || body.calledno || "Unknown";
 
-      const company = await prisma.company.findFirst();
+      // Default routing to the specific test email for inbound testing
+      let company: any = null;
+      const user = await prisma.user.findFirst({
+        where: { email: "testInbound@gmail.com" },
+        include: { memberships: true }
+      });
+      
+      if (user && user.memberships && user.memberships.length > 0) {
+        company = await prisma.company.findUnique({ where: { id: user.memberships[0].companyId } });
+      }
+      
+      if (!company) {
+        // Fallback to first company if test account is not found
+        company = await prisma.company.findFirst();
+      }
       if (!company) {
         return res.status(404).json({ error: "No company found" });
       }

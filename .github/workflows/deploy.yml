@@ -1,0 +1,26 @@
+name: Deploy to Hostinger VPS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HOSTINGER_HOST }}
+          username: ${{ secrets.HOSTINGER_USERNAME }}
+          key: ${{ secrets.HOSTINGER_SSH_KEY }}
+          script: |
+            # Update the path below to match where propnexai-main-server is located on your VPS
+            cd /root/propnexai-main-server || cd /var/www/propnexai-main-server
+            git stash
+            git pull origin main
+            npm install
+            npm run build
+            pm2 restart propnex-main-server

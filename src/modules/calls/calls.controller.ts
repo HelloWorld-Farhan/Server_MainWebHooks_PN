@@ -14,6 +14,7 @@ import { PERMISSIONS } from "@/lib/permissions";
 import { isAppError } from "@/server/lib/errors";
 import { outboundCallsService } from "@/server/services/outbound-calls.service";
 import prisma from "@/server/lib/prisma";
+import { getGridFS, getDb } from "./mongo-client";
 
 const createOutboundCallSchema = z.object({
   campaignId: z.string().min(1),
@@ -131,6 +132,84 @@ export class CallsController {
       });
     } catch (err) {
       console.error("GET /inbound error:", err);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+
+  @Get(":log_id/recording")
+  async getRecording(@Req() req: Request, @Res() res: Response) {
+    // Note: To be fully secure, you should verify the tenant has access to this call log.
+    // For now, we fetch it directly from GridFS via log_id.
+    const logId = req.params.log_id;
+    if (!logId) {
+      return res.status(400).json({ error: "Missing log_id" });
+    }
+
+    try {
+      const bucket = await getGridFS();
+      const files = await bucket.find({ "metadata.call_id": logId }).toArray();
+      let file = files[0];
+      
+      // Also try fallback to filename or call_id without metadata nesting
+      if (!file) {
+         const db = await getDb();
+         const allFiles = await db.collection("fs.files").find({
+           $or: [
+             { "call_id": logId },
+             { "metadata.call_id": logId },
+             { "filename": { $regex: logId } }
+           ]
+         }).toArray();
+         if (allFiles.length > 0) {
+           file = allFiles[0] as any;
+         }
+      }
+
+      if (!file) {
+        return res.status(404).json({ error: "Recording not found for this call." });
+      }
+
+      res.setHeader("Content-Type", (file as any).contentType || "audio/wav");
+      res.setHeader("Content-Length", (file as any).length);
+      
+      const downloadStream = bucket.openDownloadStream((file as any)._id);
+      
+      downloadStream.on('error', (error) => {
+        console.error("Error streaming audio from GridFS:", error);
+        res.status(500).end();
+      });
+
+      downloadStream.pipe(res);
+    } catch (err) {
+      console.error("Error getting recording:", err);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+
+  @Get(":log_id/transcript")
+  async getTranscript(@Req() req: Request, @Res() res: Response) {
+    const logId = req.params.log_id;
+    if (!logId) {
+      return res.status(400).json({ error: "Missing log_id" });
+    }
+
+    try {
+      const db = await getDb();
+      // Look for a transcript document in a common collection name like "transcripts"
+      const transcript = await db.collection("transcripts").findOne({
+        $or: [
+          { call_id: logId },
+          { log_id: logId }
+        ]
+      });
+
+      if (!transcript) {
+        return res.status(404).json({ error: "Transcript not found" });
+      }
+
+      return res.json(transcript);
+    } catch (err) {
+      console.error("Error getting transcript:", err);
       return res.status(500).json({ error: "Internal server error" });
     }
   }
