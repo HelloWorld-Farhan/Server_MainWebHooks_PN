@@ -140,7 +140,7 @@ export class CallsController {
           phoneNumberId: c.phoneNumberId,
           recordingUrl: c.recordingUrl,
           transcriptUrl: c.transcriptUrl,
-          credits: c.creditsUsed || 0,
+          creditsUsed: c.creditsUsed || 0,
           customerNumber: c.lead?.phone || "Unknown",
           assignedNumber: c.phoneNumber?.number || "Unknown",
           lead: c.lead ? {
