@@ -9,8 +9,8 @@ export class ObdWebhooksController {
   @Post()
   async handleObdWebhook(@Req() req: Request, @Res() res: Response) {
     try {
-      const apiKey = (req.headers["x-obd-api-key"] || req.headers["x-api-key"] || req.query.apiKey || req.query.key || req.query.api_key || "") as string;
-      // Authentication check removed as per user request to allow all webhooks through without 401 errors.
+      const apiKey = req.headers["x-obd-api-key"] as string | undefined;
+      obdWebhookService.assertAuthorized(apiKey);
 
       const result = await obdWebhookService.processWebhook(req.body);
       return res.json(result);
