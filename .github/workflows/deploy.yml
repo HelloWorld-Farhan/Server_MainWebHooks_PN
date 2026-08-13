@@ -20,6 +20,8 @@ jobs:
           cache: 'npm'
 
       - name: Install and Build on GitHub
+        env:
+          NODE_OPTIONS: "--max-old-space-size=4096"
         run: |
           npm ci
           npm run build
