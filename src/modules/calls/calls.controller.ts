@@ -71,7 +71,13 @@ export class CallsController {
     let userEmail = "";
     try {
       const jwtLib = await import("jsonwebtoken");
-      const payload = jwtLib.verify(token, process.env.JWT_SECRET || "default-secret-key") as any;
+      let payload;
+      try {
+        payload = jwtLib.verify(token, process.env.JWT_SECRET || "default-secret-key") as any;
+      } catch (err) {
+        // Fallback for tokens signed by propnex-server which is missing the JWT_SECRET in its .env
+        payload = jwtLib.verify(token, "default-secret-key") as any;
+      }
       userEmail = (req.headers["x-user-email"] as string) || payload.email || "";
     } catch (e) {
       // Try API key or Clerk auth as fallback
