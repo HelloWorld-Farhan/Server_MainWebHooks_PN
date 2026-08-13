@@ -43,6 +43,8 @@ jobs:
           password: ${{ secrets.HOSTINGER_PASSWORD }}
           script: |
             cd /var/www/propnexai-main-server
-            npm ci --omit=dev
+            npm ci
             npx prisma generate
             pm2 restart all || pm2 restart propnexai-main-server || pm2 restart propnex-main-server
+            sleep 3
+            pm2 logs --nostream --lines 50
