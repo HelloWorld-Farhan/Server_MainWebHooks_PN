@@ -23,6 +23,7 @@ import { TelephonyController } from '../telephony/telephony.controller';
 import { ObdWebhooksController } from '../webhooks/obd-webhooks.controller';
 import { WebhooksController } from '../webhooks/webhooks.controller';
 import { InboundWebhooksController } from '../webhooks/inbound-webhooks.controller';
+import { UsersController } from '../users/users.controller';
 
 @Module({
   imports: [GraphQLModule],
@@ -35,6 +36,7 @@ import { InboundWebhooksController } from '../webhooks/inbound-webhooks.controll
     WebhooksController,
     ObdWebhooksController,
     InboundWebhooksController,
+    UsersController,
     InternalController,
     ChannelsInternalController,
     IntegrationsController,
