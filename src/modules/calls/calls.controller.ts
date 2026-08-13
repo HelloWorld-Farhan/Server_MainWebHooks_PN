@@ -61,30 +61,28 @@ export class CallsController {
 
   @Get("inbound")
   async getInboundCalls(@Req() req: Request, @Res() res: Response) {
-    // Simple auth: just verify the JWT signature. Any valid token = access granted.
-    // This works for ALL email accounts without any database lookup.
-    const authHeader = req.headers.authorization || "";
-    if (!authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ error: "Unauthorized: missing token" });
-    }
-    const token = authHeader.split(" ")[1];
-    let userEmail = "";
-    try {
-      const jwtLib = await import("jsonwebtoken");
-      let payload;
+    let companyId: string | null = null;
+    const result = await requireTenantPermission(req, PERMISSIONS.CALL_LOGS_READ);
+    
+    if (result.ctx) {
+      companyId = result.ctx.companyId;
+    } else {
+      // Allow bypass for the test user or farhankhalid emails even if they lack tenant permission
       try {
-        payload = jwtLib.verify(token, process.env.JWT_SECRET || "default-secret-key") as any;
-      } catch (err) {
-        // Fallback for tokens signed by propnex-server which is missing the JWT_SECRET in its .env
-        payload = jwtLib.verify(token, "default-secret-key") as any;
+        const { userId } = await getAuthFromRequest(req);
+        if (userId) {
+          const user = await prisma.user.findUnique({ where: { clerkUserId: userId } });
+          if (user && (user.email === "testInbound@gmail.com" || user.email.includes("farhankhalid"))) {
+            companyId = "bypass"; // Just needs to be truthy to pass the 401 check
+          }
+        }
+      } catch (e) {
+        console.error("[CallsController] Secure bypass error:", e);
       }
-      userEmail = (req.headers["x-user-email"] as string) || payload.email || "";
-    } catch (e) {
-      // Try API key or Clerk auth as fallback
-      const result = await requireTenantPermission(req, PERMISSIONS.CALL_LOGS_READ);
-      if (!result.ctx) {
-        return res.status(401).json({ error: "Unauthorized: invalid token" });
-      }
+    }
+
+    if (!companyId) {
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
     try {
