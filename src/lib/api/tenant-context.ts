@@ -25,9 +25,25 @@ async function tryAuthenticateCustomJwt(req: Request): Promise<{ userId: string;
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET || "default-secret-key") as jwt.JwtPayload;
     if (payload && payload.sub) {
-      const user = await prisma.user.findUnique({ where: { id: payload.sub } });
-      if (user) {
-        return { userId: user.clerkUserId, orgId: null };
+      // First: try to find by Prisma user ID directly
+      const userById = await prisma.user.findUnique({ where: { id: payload.sub } });
+      if (userById) {
+        return { userId: userById.clerkUserId, orgId: null };
+      }
+
+      // Second: propnex-server stores MongoDB ObjectId as sub.
+      // Try finding by email which is also embedded in the JWT payload.
+      if (payload.email) {
+        const userByEmail = await prisma.user.findFirst({ where: { email: { equals: payload.email, mode: "insensitive" } } });
+        if (userByEmail) {
+          return { userId: userByEmail.clerkUserId, orgId: null };
+        }
+      }
+
+      // Third: try to find by clerkUserId matching sub (local_xxx format)
+      const userByClerk = await prisma.user.findFirst({ where: { clerkUserId: payload.sub } });
+      if (userByClerk) {
+        return { userId: userByClerk.clerkUserId, orgId: null };
       }
     }
   } catch (error) {
