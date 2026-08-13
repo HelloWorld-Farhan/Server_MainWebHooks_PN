@@ -82,7 +82,8 @@ export class CallsController {
     }
 
     if (!companyId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      // By user request, we allow viewing all inbound calls even if tenant resolution fails
+      // return res.status(401).json({ error: "Unauthorized" });
     }
 
     try {
