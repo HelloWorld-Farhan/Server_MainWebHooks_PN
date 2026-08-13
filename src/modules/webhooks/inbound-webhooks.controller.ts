@@ -1,6 +1,7 @@
 import { Controller, Post, Req, Res, Query } from "@nestjs/common";
 import type { Request, Response } from "express";
 import prisma from "@/server/lib/prisma";
+import { cacheService } from "@/server/cache/cache.service";
 
 
 @Controller("api/webhooks/inbound")
@@ -143,7 +144,15 @@ export class InboundWebhooksController {
 
       // Deduct credits for COMPLETED calls
       if (status === "COMPLETED" && durationSeconds > 0) {
-        const creditsToDeduct = Math.ceil(durationSeconds / 60);
+        const minutes = Math.floor(durationSeconds / 60);
+        const remainder = durationSeconds % 60;
+        
+        let creditsToDeduct = minutes * 3.5;
+        if (remainder > 0 && remainder <= 30) {
+          creditsToDeduct += 1.5;
+        } else if (remainder > 30) {
+          creditsToDeduct += 3.5;
+        }
         
         const balance = await prisma.creditBalance.findFirst({
           where: { companyId: company.id }
@@ -168,6 +177,13 @@ export class InboundWebhooksController {
               }
             })
           ]);
+          
+          try {
+            await cacheService.invalidateCompanyCredits(company.id);
+            await cacheService.invalidateBillingPages(company.id);
+          } catch (cacheErr) {
+            console.error("Cache invalidation error:", cacheErr);
+          }
         }
       }
 
