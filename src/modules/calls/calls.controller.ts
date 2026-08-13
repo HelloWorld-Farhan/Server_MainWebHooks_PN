@@ -108,19 +108,7 @@ export class CallsController {
         });
       }
 
-      // Restrict 079 calls to testInbound@gmail.com
-      if (userEmail !== "testInbound@gmail.com") {
-        where.AND.push({
-          OR: [
-            { phoneNumberId: null },
-            { phoneNumber: { number: { not: { startsWith: "079" } } } }
-          ]
-        });
-      }
 
-      if (where.AND.length === 0) {
-        delete where.AND;
-      }
 
       const [calls, total] = await Promise.all([
         prisma.callLog.findMany({
