@@ -61,44 +61,10 @@ export class CallsController {
 
   @Get("inbound")
   async getInboundCalls(@Req() req: Request, @Res() res: Response) {
-    let companyId: string | undefined;
-
-    // Try standard auth first
     const result = await requireTenantPermission(req, PERMISSIONS.CALL_LOGS_READ);
-    if (result.ctx) {
-      companyId = result.ctx.companyId;
-    } else {
-      console.error("[CallsController] requireTenantPermission failed:", JSON.stringify(result.error));
-      if (req.headers.authorization) {
-      try {
-        const { userId } = await getAuthFromRequest(req);
-        if (userId) {
-          const user = await prisma.user.findUnique({ where: { clerkUserId: userId } });
-          if (user && (user.email === "testInbound@gmail.com" || user.email.includes("farhankhalid"))) {
-            console.log("[CallsController] Clerk auth partially succeeded for testInbound. Bypassing tenant check...");
-            
-            // Look up the testInbound user to get their company ID
-            const testUser = await prisma.user.findUnique({ where: { email: "testInbound@gmail.com" } });
-            if (testUser) {
-              const membership = await prisma.companyMember.findFirst({ where: { userId: testUser.id } });
-              if (membership) {
-                companyId = membership.companyId;
-                console.log("[CallsController] Secure bypass successful for companyId:", companyId);
-              }
-            }
-          }
-        }
-      } catch (e) {
-        console.error("[CallsController] Secure bypass error:", e);
-      }
-    } else {
-      console.log("[CallsController] No authorization header found at all");
-    }
-    }
-
-    if (!companyId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
+    if (!handleTenantResult(res, result) || !result.ctx) return;
+    
+    const companyId = result.ctx.companyId;
 
     try {
       const page = parseInt(req.query.page as string) || 1;

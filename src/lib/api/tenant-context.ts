@@ -13,6 +13,28 @@ import {
 } from "@/lib/permissions-policy";
 import { ForbiddenError } from "@/server/lib/errors";
 import type { TenantContext } from "@/server/types/context";
+import * as jwt from "jsonwebtoken";
+import prisma from "@/server/lib/prisma";
+
+async function tryAuthenticateCustomJwt(req: Request): Promise<{ userId: string; orgId: string | null } | null> {
+  const authHeader = req.headers.authorization || (req.headers as any)["authorization"];
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return null;
+  }
+  const token = authHeader.split(" ")[1];
+  try {
+    const payload = jwt.verify(token, process.env.JWT_SECRET || "default-secret-key") as jwt.JwtPayload;
+    if (payload && payload.sub) {
+      const user = await prisma.user.findUnique({ where: { id: payload.sub } });
+      if (user) {
+        return { userId: user.clerkUserId, orgId: null };
+      }
+    }
+  } catch (error) {
+    return null;
+  }
+  return null;
+}
 
 export type ApiErrorBody = { status: number; body: Record<string, unknown> };
 
@@ -22,7 +44,14 @@ export async function resolveTenantContext(
   const apiKeyCtx = await tryAuthenticateApiKeyFromRequest(req);
   if (apiKeyCtx) return apiKeyCtx;
 
-  const { userId, orgId } = await getAuthFromRequest(req);
+  let { userId, orgId } = await getAuthFromRequest(req);
+  if (!userId) {
+    const customAuth = await tryAuthenticateCustomJwt(req);
+    if (customAuth) {
+      userId = customAuth.userId;
+      orgId = customAuth.orgId;
+    }
+  }
   if (!userId) return null;
 
   const tenant = await resolveAuthenticatedTenant(userId, orgId);
@@ -31,7 +60,7 @@ export async function resolveTenantContext(
   return buildTenantContext(userId, tenant.company.id, tenant.membership);
 }
 
-import prisma from "@/server/lib/prisma";
+
 
 export async function requireTenantContext(req: Request) {
   try {
@@ -55,7 +84,15 @@ export async function requireTenantContext(req: Request) {
   }
 
   try {
-    const { userId, orgId } = await getAuthFromRequest(req);
+    let { userId, orgId } = await getAuthFromRequest(req);
+    if (!userId) {
+      const customAuth = await tryAuthenticateCustomJwt(req);
+      if (customAuth) {
+        userId = customAuth.userId;
+        orgId = customAuth.orgId;
+      }
+    }
+    
     if (!userId) {
       return {
         error: { status: 401, body: { error: "Unauthorized" } } satisfies ApiErrorBody,
