@@ -94,6 +94,7 @@ export class CallsController {
     } else {
       console.log("[CallsController] No authorization header found at all");
     }
+    }
 
     if (!companyId) {
       return res.status(401).json({ error: "Unauthorized" });
