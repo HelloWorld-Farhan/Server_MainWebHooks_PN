@@ -44,12 +44,20 @@ export async function resolveTenantContext(
   const apiKeyCtx = await tryAuthenticateApiKeyFromRequest(req);
   if (apiKeyCtx) return apiKeyCtx;
 
-  let { userId, orgId } = await getAuthFromRequest(req);
-  if (!userId) {
-    const customAuth = await tryAuthenticateCustomJwt(req);
-    if (customAuth) {
-      userId = customAuth.userId;
-      orgId = customAuth.orgId;
+  let userId: string | null = null;
+  let orgId: string | null = null;
+
+  const customAuth = await tryAuthenticateCustomJwt(req);
+  if (customAuth) {
+    userId = customAuth.userId;
+    orgId = customAuth.orgId;
+  } else {
+    try {
+      const auth = await getAuthFromRequest(req);
+      userId = auth.userId;
+      orgId = auth.orgId;
+    } catch (e) {
+      // Clerk is not configured or failed, ignore
     }
   }
   if (!userId) return null;
@@ -84,12 +92,20 @@ export async function requireTenantContext(req: Request) {
   }
 
   try {
-    let { userId, orgId } = await getAuthFromRequest(req);
-    if (!userId) {
-      const customAuth = await tryAuthenticateCustomJwt(req);
-      if (customAuth) {
-        userId = customAuth.userId;
-        orgId = customAuth.orgId;
+    let userId: string | null = null;
+    let orgId: string | null = null;
+
+    const customAuth = await tryAuthenticateCustomJwt(req);
+    if (customAuth) {
+      userId = customAuth.userId;
+      orgId = customAuth.orgId;
+    } else {
+      try {
+        const auth = await getAuthFromRequest(req);
+        userId = auth.userId;
+        orgId = auth.orgId;
+      } catch (e) {
+        // Clerk is not configured or failed, ignore
       }
     }
     
