@@ -67,12 +67,25 @@ export class CallsController {
     if (result.ctx) {
       companyId = result.ctx.companyId;
     } else if (req.headers.authorization) {
-      // Fallback: Dashboard sends a custom JWT, we bypass Clerk for now to allow viewing the test calls
-      const user = await prisma.user.findUnique({ where: { email: "testInbound@gmail.com" } });
-      if (user) {
-        const membership = await prisma.companyMembership.findFirst({ where: { userId: user.id } });
-        if (membership) companyId = membership.companyId;
+      console.log("[CallsController] Auth header found but Clerk failed. Bypassing...");
+      try {
+        const user = await prisma.user.findUnique({ where: { email: "testInbound@gmail.com" } });
+        if (user) {
+          const membership = await prisma.companyMember.findFirst({ where: { userId: user.id } });
+          if (membership) {
+            companyId = membership.companyId;
+            console.log("[CallsController] Bypass successful for companyId:", companyId);
+          } else {
+            console.log("[CallsController] Bypass failed: User has no company membership");
+          }
+        } else {
+          console.log("[CallsController] Bypass failed: User testInbound@gmail.com not found");
+        }
+      } catch (e) {
+        console.error("[CallsController] Bypass error:", e);
       }
+    } else {
+      console.log("[CallsController] No authorization header found at all");
     }
 
     if (!companyId) {
