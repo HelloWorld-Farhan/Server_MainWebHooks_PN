@@ -25,13 +25,16 @@ jobs:
           npm ci
           npm run build
 
+      - name: Tar files for deployment
+        run: tar -czf deploy.tar.gz dist package.json package-lock.json prisma
+
       - name: Copy files to VPS via SCP
         uses: appleboy/scp-action@v0.1.4
         with:
           host: ${{ secrets.HOSTINGER_HOST }}
           username: ${{ secrets.HOSTINGER_USERNAME }}
           password: ${{ secrets.HOSTINGER_PASSWORD }}
-          source: "dist/,package.json,package-lock.json,prisma/"
+          source: "deploy.tar.gz"
           target: "/var/www/propnexai-main-server"
           overwrite: true
 
@@ -43,6 +46,8 @@ jobs:
           password: ${{ secrets.HOSTINGER_PASSWORD }}
           script: |
             cd /var/www/propnexai-main-server
+            tar -xzf deploy.tar.gz
+            rm deploy.tar.gz
             npm ci
             npx prisma generate
             pm2 restart all || pm2 restart propnexai-main-server || pm2 restart propnex-main-server
