@@ -10,17 +10,38 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy via SSH
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install and Build on GitHub
+        run: |
+          npm ci
+          npm run build
+
+      - name: Copy files to VPS via SCP
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.HOSTINGER_HOST }}
+          username: ${{ secrets.HOSTINGER_USERNAME }}
+          password: ${{ secrets.HOSTINGER_PASSWORD }}
+          source: "dist/,package.json,package-lock.json,prisma/"
+          target: "/var/www/propnexai-main-server"
+          overwrite: true
+
+      - name: Restart PM2 on VPS
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.HOSTINGER_HOST }}
           username: ${{ secrets.HOSTINGER_USERNAME }}
           password: ${{ secrets.HOSTINGER_PASSWORD }}
           script: |
-            # Update the path below to match where propnexai-main-server is located on your VPS
-            cd /root/propnexai-main-server || cd /var/www/propnexai-main-server
-            git stash
-            git pull origin main
-            npm install
-            npm run build
-            pm2 restart propnex-main-server
+            cd /var/www/propnexai-main-server
+            npm ci --omit=dev
+            npx prisma generate
+            pm2 restart all || pm2 restart propnexai-main-server || pm2 restart propnex-main-server
