@@ -116,7 +116,7 @@ export class InboundWebhooksController {
         
         creditsToDeduct = minutes * 3.5;
         if (remainder > 0 && remainder <= 30) {
-          creditsToDeduct += 1.5;
+          creditsToDeduct += 1.75;
         } else if (remainder > 30) {
           creditsToDeduct += 3.5;
         }
