@@ -13,44 +13,6 @@ import {
 } from "@/lib/permissions-policy";
 import { ForbiddenError } from "@/server/lib/errors";
 import type { TenantContext } from "@/server/types/context";
-import * as jwt from "jsonwebtoken";
-import prisma from "@/server/lib/prisma";
-
-async function tryAuthenticateCustomJwt(req: Request): Promise<{ userId: string; orgId: string | null } | null> {
-  const authHeader = req.headers.authorization || (req.headers as any)["authorization"];
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return null;
-  }
-  const token = authHeader.split(" ")[1];
-  try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET || "default-secret-key") as jwt.JwtPayload;
-    if (payload && payload.sub) {
-      // First: try to find by Prisma user ID directly
-      const userById = await prisma.user.findUnique({ where: { id: payload.sub } });
-      if (userById) {
-        return { userId: userById.clerkUserId, orgId: null };
-      }
-
-      // Second: propnex-server stores MongoDB ObjectId as sub.
-      // Try finding by email which is also embedded in the JWT payload.
-      if (payload.email) {
-        const userByEmail = await prisma.user.findFirst({ where: { email: { equals: payload.email, mode: "insensitive" } } });
-        if (userByEmail) {
-          return { userId: userByEmail.clerkUserId, orgId: null };
-        }
-      }
-
-      // Third: try to find by clerkUserId matching sub (local_xxx format)
-      const userByClerk = await prisma.user.findFirst({ where: { clerkUserId: payload.sub } });
-      if (userByClerk) {
-        return { userId: userByClerk.clerkUserId, orgId: null };
-      }
-    }
-  } catch (error) {
-    return null;
-  }
-  return null;
-}
 
 export type ApiErrorBody = { status: number; body: Record<string, unknown> };
 
@@ -60,22 +22,7 @@ export async function resolveTenantContext(
   const apiKeyCtx = await tryAuthenticateApiKeyFromRequest(req);
   if (apiKeyCtx) return apiKeyCtx;
 
-  let userId: string | null = null;
-  let orgId: string | null = null;
-
-  const customAuth = await tryAuthenticateCustomJwt(req);
-  if (customAuth) {
-    userId = customAuth.userId;
-    orgId = customAuth.orgId;
-  } else {
-    try {
-      const auth = await getAuthFromRequest(req);
-      userId = auth.userId;
-      orgId = auth.orgId;
-    } catch (e) {
-      // Clerk is not configured or failed, ignore
-    }
-  }
+  const { userId, orgId } = await getAuthFromRequest(req);
   if (!userId) return null;
 
   const tenant = await resolveAuthenticatedTenant(userId, orgId);
@@ -84,7 +31,7 @@ export async function resolveTenantContext(
   return buildTenantContext(userId, tenant.company.id, tenant.membership);
 }
 
-
+import prisma from "@/server/lib/prisma";
 
 export async function requireTenantContext(req: Request) {
   try {
@@ -108,23 +55,7 @@ export async function requireTenantContext(req: Request) {
   }
 
   try {
-    let userId: string | null = null;
-    let orgId: string | null = null;
-
-    const customAuth = await tryAuthenticateCustomJwt(req);
-    if (customAuth) {
-      userId = customAuth.userId;
-      orgId = customAuth.orgId;
-    } else {
-      try {
-        const auth = await getAuthFromRequest(req);
-        userId = auth.userId;
-        orgId = auth.orgId;
-      } catch (e) {
-        // Clerk is not configured or failed, ignore
-      }
-    }
-    
+    const { userId, orgId } = await getAuthFromRequest(req);
     if (!userId) {
       return {
         error: { status: 401, body: { error: "Unauthorized" } } satisfies ApiErrorBody,

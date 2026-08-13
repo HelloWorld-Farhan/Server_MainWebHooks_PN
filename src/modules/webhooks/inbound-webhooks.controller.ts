@@ -24,8 +24,34 @@ export class InboundWebhooksController {
       const logId = body.log_id || body.logId || body["Log ID"] || body.callid || body.calledno || `webhook-${Date.now()}`;
       const recordingUrl = body.recording_url || body.recordingUrl || body.recording || null;
       const transcriptUrl = body.transcript_url || body.transcriptUrl || body.transcript || null;
+      const agentNumber = body.callid || body.calledno || "Unknown";
 
-      const company = await prisma.company.findFirst();
+      // Map agent number to company
+      let company: any = null;
+      
+      if (agentNumber.includes("079")) {
+        const user = await prisma.user.findFirst({
+          where: { email: "testInbound@gmail.com" },
+          include: { memberships: true }
+        });
+        
+        if (user && user.memberships && user.memberships.length > 0) {
+          company = await prisma.company.findUnique({ where: { id: user.memberships[0].companyId } });
+        }
+      } else {
+        // Look up by agent number in PhoneNumber table
+        const phoneNumber = await prisma.phoneNumber.findFirst({
+          where: { number: { contains: agentNumber } }
+        });
+        if (phoneNumber) {
+          company = await prisma.company.findUnique({ where: { id: phoneNumber.companyId } });
+        }
+      }
+      
+      if (!company) {
+        // Fallback to first company if not found
+        company = await prisma.company.findFirst();
+      }
       if (!company) {
         return res.status(404).json({ error: "No company found" });
       }
@@ -79,11 +105,14 @@ export class InboundWebhooksController {
         });
       }
 
+      const finalRecordingUrl = recordingUrl || `/api/calls/${logId}/recording`;
+      const finalTranscriptUrl = transcriptUrl || `/api/calls/${logId}/transcript`;
+
       const updateData: any = {};
       if (statusRaw !== undefined) updateData.status = status;
       if (callDurationRaw !== undefined) updateData.durationSeconds = durationSeconds;
-      if (recordingUrl) updateData.recordingUrl = recordingUrl;
-      if (transcriptUrl) updateData.transcriptUrl = transcriptUrl;
+      updateData.recordingUrl = finalRecordingUrl;
+      updateData.transcriptUrl = finalTranscriptUrl;
       // Always keep a record of the latest webhook payload
       updateData.providerWebhook = body;
 
@@ -103,14 +132,44 @@ export class InboundWebhooksController {
           status: status as any,
           startedAt: new Date(),
           durationSeconds,
-          recordingUrl: recordingUrl,
-          transcriptUrl: transcriptUrl,
+          recordingUrl: finalRecordingUrl,
+          transcriptUrl: finalTranscriptUrl,
           provider: "webhook",
           providerCallId: logId,
           providerWebhook: body,
           leadId: lead.id
         }
       });
+
+      // Deduct credits for COMPLETED calls
+      if (status === "COMPLETED" && durationSeconds > 0) {
+        const creditsToDeduct = Math.ceil(durationSeconds / 60);
+        
+        const balance = await prisma.creditBalance.findFirst({
+          where: { companyId: company.id }
+        });
+        
+        if (balance) {
+          await prisma.$transaction([
+            prisma.creditBalance.update({
+              where: { id: balance.id },
+              data: {
+                creditsRemaining: { decrement: creditsToDeduct },
+                creditsUsed: { increment: creditsToDeduct }
+              }
+            }),
+            prisma.creditUsage.create({
+              data: {
+                companyId: company.id,
+                amount: creditsToDeduct,
+                reason: "CALL",
+                callLogId: callLog.id,
+                description: `Inbound call duration: ${durationSeconds}s`
+              }
+            })
+          ]);
+        }
+      }
 
       return res.status(200).json({ success: true, callLogId: callLog.id });
     } catch (error) {
