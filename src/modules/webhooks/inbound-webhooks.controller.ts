@@ -162,7 +162,7 @@ export class InboundWebhooksController {
               data: {
                 companyId: company.id,
                 amount: creditsToDeduct,
-                reason: "INBOUND_CALL",
+                reason: "CALL",
                 callLogId: callLog.id,
                 description: `Inbound call duration: ${durationSeconds}s`
               }
