@@ -801,7 +801,7 @@ model CallLog {
   engagement       Json?
   reactivationPlan Json?
   cost             Float?
-  creditsUsed      Int?
+  creditsUsed      Float?
   provider         String?
   providerStatus   String?
   providerCallId   String?
@@ -1298,8 +1298,8 @@ model ApiKeyCampaignAccess {
 model CreditBalance {
   id               String    @id @default(auto()) @map("_id") @db.ObjectId
   companyId        String    @unique @db.ObjectId
-  creditsRemaining Int       @default(0)
-  creditsUsed      Int       @default(0)
+  creditsRemaining Float     @default(0)
+  creditsUsed      Float     @default(0)
   planId           String?
   renewalAt        DateTime?
   createdAt        DateTime  @default(now())
@@ -1332,7 +1332,7 @@ model Role {
 model CreditUsage {
   id          String            @id @default(auto()) @map("_id") @db.ObjectId
   companyId   String            @db.ObjectId
-  amount      Int
+  amount      Float
   reason      CreditUsageReason
   callLogId   String?           @db.ObjectId
   description String?

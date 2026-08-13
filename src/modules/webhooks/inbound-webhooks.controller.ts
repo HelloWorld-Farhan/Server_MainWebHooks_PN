@@ -108,12 +108,26 @@ export class InboundWebhooksController {
 
       const finalRecordingUrl = recordingUrl || `/api/calls/${logId}/recording`;
       const finalTranscriptUrl = transcriptUrl || `/api/calls/${logId}/transcript`;
+      
+      let creditsToDeduct = 0;
+      if (status === "COMPLETED" && durationSeconds > 0) {
+        const minutes = Math.floor(durationSeconds / 60);
+        const remainder = durationSeconds % 60;
+        
+        creditsToDeduct = minutes * 3.5;
+        if (remainder > 0 && remainder <= 30) {
+          creditsToDeduct += 1.5;
+        } else if (remainder > 30) {
+          creditsToDeduct += 3.5;
+        }
+      }
 
       const updateData: any = {};
       if (statusRaw !== undefined) updateData.status = status;
       if (callDurationRaw !== undefined) updateData.durationSeconds = durationSeconds;
       updateData.recordingUrl = finalRecordingUrl;
       updateData.transcriptUrl = finalTranscriptUrl;
+      updateData.creditsUsed = creditsToDeduct;
       // Always keep a record of the latest webhook payload
       updateData.providerWebhook = body;
 
@@ -135,6 +149,7 @@ export class InboundWebhooksController {
           durationSeconds,
           recordingUrl: finalRecordingUrl,
           transcriptUrl: finalTranscriptUrl,
+          creditsUsed: creditsToDeduct,
           provider: "webhook",
           providerCallId: logId,
           providerWebhook: body,
@@ -143,16 +158,7 @@ export class InboundWebhooksController {
       });
 
       // Deduct credits for COMPLETED calls
-      if (status === "COMPLETED" && durationSeconds > 0) {
-        const minutes = Math.floor(durationSeconds / 60);
-        const remainder = durationSeconds % 60;
-        
-        let creditsToDeduct = minutes * 3.5;
-        if (remainder > 0 && remainder <= 30) {
-          creditsToDeduct += 1.5;
-        } else if (remainder > 30) {
-          creditsToDeduct += 3.5;
-        }
+      if (creditsToDeduct > 0) {
         
         const balance = await prisma.creditBalance.findFirst({
           where: { companyId: company.id }
