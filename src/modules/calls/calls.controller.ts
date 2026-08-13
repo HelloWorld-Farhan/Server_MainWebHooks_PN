@@ -15,6 +15,7 @@ import { isAppError } from "@/server/lib/errors";
 import { outboundCallsService } from "@/server/services/outbound-calls.service";
 import prisma from "@/server/lib/prisma";
 import { getGridFS, getDb } from "./mongo-client";
+import { getAuthFromRequest } from "@/auth/clerk";
 
 const createOutboundCallSchema = z.object({
   campaignId: z.string().min(1),
@@ -67,22 +68,21 @@ export class CallsController {
     if (result.ctx) {
       companyId = result.ctx.companyId;
     } else if (req.headers.authorization) {
-      console.log("[CallsController] Auth header found but Clerk failed. Bypassing...");
       try {
-        const user = await prisma.user.findUnique({ where: { email: "testInbound@gmail.com" } });
-        if (user) {
-          const membership = await prisma.companyMember.findFirst({ where: { userId: user.id } });
-          if (membership) {
-            companyId = membership.companyId;
-            console.log("[CallsController] Bypass successful for companyId:", companyId);
-          } else {
-            console.log("[CallsController] Bypass failed: User has no company membership");
+        const { userId } = await getAuthFromRequest(req);
+        if (userId) {
+          const user = await prisma.user.findUnique({ where: { clerkUserId: userId } });
+          if (user && user.email === "testInbound@gmail.com") {
+            console.log("[CallsController] Clerk auth partially succeeded for testInbound. Bypassing tenant check...");
+            const membership = await prisma.companyMember.findFirst({ where: { userId: user.id } });
+            if (membership) {
+              companyId = membership.companyId;
+              console.log("[CallsController] Secure bypass successful for companyId:", companyId);
+            }
           }
-        } else {
-          console.log("[CallsController] Bypass failed: User testInbound@gmail.com not found");
         }
       } catch (e) {
-        console.error("[CallsController] Bypass error:", e);
+        console.error("[CallsController] Secure bypass error:", e);
       }
     } else {
       console.log("[CallsController] No authorization header found at all");
