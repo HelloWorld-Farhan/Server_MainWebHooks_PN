@@ -15,7 +15,7 @@ jobs:
         with:
           host: ${{ secrets.HOSTINGER_HOST }}
           username: ${{ secrets.HOSTINGER_USERNAME }}
-          key: ${{ secrets.HOSTINGER_SSH_KEY }}
+          password: ${{ secrets.HOSTINGER_PASSWORD }}
           script: |
             # Update the path below to match where propnexai-main-server is located on your VPS
             cd /root/propnexai-main-server || cd /var/www/propnexai-main-server
