@@ -35,7 +35,7 @@ jobs:
           username: ${{ secrets.HOSTINGER_USERNAME }}
           password: ${{ secrets.HOSTINGER_PASSWORD }}
           source: "deploy.tar.gz"
-          target: "/var/www/propnexai-main-server"
+          target: "/root/propnexai-main-server"
           overwrite: true
 
       - name: Restart PM2 on VPS
@@ -45,7 +45,7 @@ jobs:
           username: ${{ secrets.HOSTINGER_USERNAME }}
           password: ${{ secrets.HOSTINGER_PASSWORD }}
           script: |
-            cd /var/www/propnexai-main-server
+            cd /root/propnexai-main-server
             tar -xzf deploy.tar.gz
             rm deploy.tar.gz
             npm ci
