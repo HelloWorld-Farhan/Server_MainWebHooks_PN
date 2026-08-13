@@ -66,6 +66,14 @@ export class CallsController {
     
     const companyId = result.ctx.companyId;
 
+    let userEmail = "";
+    if (result.ctx.userId) {
+      const user = await prisma.user.findUnique({ where: { clerkUserId: result.ctx.userId } });
+      if (user) {
+        userEmail = user.email;
+      }
+    }
+
     try {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 10;
@@ -77,6 +85,7 @@ export class CallsController {
       const where: any = {
         companyId: companyId,
         direction: "INBOUND",
+        AND: []
       };
 
       if (statusFilter && statusFilter !== "all") {
@@ -84,11 +93,27 @@ export class CallsController {
       }
 
       if (searchFilter) {
-        where.OR = [
-          { phoneNumber: { number: { contains: searchFilter, mode: "insensitive" } } },
-          { lead: { phone: { contains: searchFilter, mode: "insensitive" } } },
-          { publicId: { contains: searchFilter, mode: "insensitive" } }
-        ];
+        where.AND.push({
+          OR: [
+            { phoneNumber: { number: { contains: searchFilter, mode: "insensitive" } } },
+            { lead: { phone: { contains: searchFilter, mode: "insensitive" } } },
+            { publicId: { contains: searchFilter, mode: "insensitive" } }
+          ]
+        });
+      }
+
+      // Restrict 079 calls to testInbound@gmail.com
+      if (userEmail !== "testInbound@gmail.com") {
+        where.AND.push({
+          OR: [
+            { phoneNumberId: null },
+            { phoneNumber: { number: { not: { startsWith: "079" } } } }
+          ]
+        });
+      }
+
+      if (where.AND.length === 0) {
+        delete where.AND;
       }
 
       const [calls, total] = await Promise.all([
@@ -114,6 +139,7 @@ export class CallsController {
           phoneNumberId: c.phoneNumberId,
           recordingUrl: c.recordingUrl,
           transcriptUrl: c.transcriptUrl,
+          creditsUsed: Math.ceil((c.durationSeconds || 0) / 60),
           customerNumber: c.lead?.phone || "Unknown",
           assignedNumber: c.phoneNumber?.number || "Unknown",
           lead: c.lead ? {
