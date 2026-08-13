@@ -9,10 +9,11 @@ export class ObdWebhooksController {
   @Post()
   async handleObdWebhook(@Req() req: Request, @Res() res: Response) {
     try {
-      const apiKey = req.headers["x-obd-api-key"] || req.headers["x-api-key"] || req.query.apiKey || req.query.key || req.query.api_key;
-      const expectedKey = process.env.OBD_WEBHOOK_SECRET;
+      const apiKey = (req.headers["x-obd-api-key"] || req.headers["x-api-key"] || req.query.apiKey || req.query.key || req.query.api_key || "") as string;
+      const expectedKey = process.env.OBD_WEBHOOK_SECRET || "";
       
-      if (!expectedKey || apiKey !== expectedKey) {
+      if (!expectedKey || apiKey.trim() !== expectedKey.trim()) {
+        console.log(`OBD Webhook Auth Failed. Expected: '${expectedKey.trim()}', Got: '${apiKey.trim()}'`);
         return res.status(401).json({ error: "Invalid OBD webhook API key" });
       }
 
