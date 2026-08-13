@@ -50,6 +50,8 @@ jobs:
             rm deploy.tar.gz
             npm ci
             npx prisma generate
-            pm2 restart all || pm2 restart propnexai-main-server || pm2 restart propnex-main-server
+            cd /root/propnex-server && pm2 start npm --name "propnex-server" -- run start || pm2 restart propnex-server
+            cd /root/propnexai-main-server && pm2 start npm --name "propnexai-main-server" -- run start:prod || pm2 restart propnexai-main-server
+            pm2 save
             sleep 3
             pm2 logs --nostream --lines 50
