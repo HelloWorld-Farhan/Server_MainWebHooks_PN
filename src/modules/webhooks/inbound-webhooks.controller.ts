@@ -106,7 +106,7 @@ export class InboundWebhooksController {
         });
       }
 
-      const finalRecordingUrl = recordingUrl || `/api/calls/${logId}/recording`;
+      const finalRecordingUrl = recordingUrl || `https://schoolknot-inbound-1.onrender.com/api/recordings/${logId}`;
       const finalTranscriptUrl = transcriptUrl || `/api/calls/${logId}/transcript`;
       
       let creditsToDeduct = 0;
