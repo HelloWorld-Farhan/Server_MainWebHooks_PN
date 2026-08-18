@@ -277,11 +277,6 @@ export class CallLogsService {
       if (credits > 0) {
         const creditsRepo = new CreditsRepository(prisma);
         const balance = await creditsRepo.ensureBalance(ctx.companyId);
-        if (balance.creditsRemaining < credits) {
-          throw new ValidationError(
-            'Insufficient credits to complete call billing',
-          );
-        }
 
         await creditsService.debitForCall(
           ctx,
