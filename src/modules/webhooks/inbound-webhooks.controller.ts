@@ -9,7 +9,17 @@ export class InboundWebhooksController {
   @Post()
   async handleInboundWebhook(@Req() req: Request, @Res() res: Response) {
     try {
-      const apiKey = req.headers["x-obd-api-key"] || req.headers["x-api-key"];
+      const body = req.body || {};
+      const query = req.query || {};
+      
+      const apiKey = 
+        req.headers["x-obd-api-key"] || 
+        req.headers["x-api-key"] || 
+        body["x-obd-api-key"] || 
+        body["x-api-key"] ||
+        query["x-obd-api-key"] ||
+        query["x-api-key"];
+        
       const expectedKey = process.env.INBOUND_WEBHOOK_SECRET || process.env.OBD_WEBHOOK_SECRET;
       
       if (!expectedKey || apiKey !== expectedKey) {
