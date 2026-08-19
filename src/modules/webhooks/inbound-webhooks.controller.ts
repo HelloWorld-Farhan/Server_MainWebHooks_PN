@@ -25,8 +25,6 @@ export class InboundWebhooksController {
       if (!expectedKey || apiKey !== expectedKey) {
         return res.status(401).json({ error: "Invalid OBD webhook API key" });
       }
-
-      const body = req.body || {};
       
       // Parse payload based on common VoiceNSMS/OBD field names or the provided screenshot headers
       const callingNo = body.phone || body["Calling No"] || body.callingNo || body.calling_no || body.caller_id || "Unknown";
@@ -40,23 +38,13 @@ export class InboundWebhooksController {
       // Map agent number to company
       let company: any = null;
       
-      if (agentNumber.includes("079")) {
-        const user = await prisma.user.findFirst({
-          where: { email: "testInbound@gmail.com" },
-          include: { memberships: true }
-        });
-        
-        if (user && user.memberships && user.memberships.length > 0) {
-          company = await prisma.company.findUnique({ where: { id: user.memberships[0].companyId } });
-        }
-      } else {
-        // Look up by agent number in PhoneNumber table
-        const phoneNumber = await prisma.phoneNumber.findFirst({
-          where: { number: { contains: agentNumber } }
-        });
-        if (phoneNumber) {
-          company = await prisma.company.findUnique({ where: { id: phoneNumber.companyId } });
-        }
+      // Look up by agent number in PhoneNumber table
+      const phoneNumber = await prisma.phoneNumber.findFirst({
+        where: { number: { contains: agentNumber } }
+      });
+      
+      if (phoneNumber) {
+        company = await prisma.company.findUnique({ where: { id: phoneNumber.companyId } });
       }
       
       if (!company) {
