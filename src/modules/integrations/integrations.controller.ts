@@ -110,7 +110,7 @@ export class IntegrationsController {
     const oauthError = req.query.error as string | undefined;
 
     const websiteUrl =
-      process.env.MAIN_WEBSITE_URL ?? "http://localhost:3000";
+      process.env.MAIN_WEBSITE_URL ?? "http://200.234.34.240:3000";
     const settingsUrl = new URL("/settings", websiteUrl);
     settingsUrl.searchParams.set("tab", "integrations");
 

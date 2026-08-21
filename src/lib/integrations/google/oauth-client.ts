@@ -6,7 +6,7 @@ export function getOAuthClient() {
   const redirectUri =
     process.env.GOOGLE_OAUTH_REDIRECT_URI ??
     process.env.GOOGLE_REDIRECT_URI ??
-    "http://localhost:3000/api/integrations/google/oauth/callback";
+    "http://200.234.34.240:3000/api/integrations/google/oauth/callback";
 
   if (!clientId || !clientSecret) {
     throw new Error("Google OAuth credentials are not configured");

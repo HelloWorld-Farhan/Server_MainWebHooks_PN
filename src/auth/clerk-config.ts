@@ -1,6 +1,6 @@
 const DEVELOPMENT_AUTHORIZED_PARTIES = [
-  'http://localhost:3000',
-  'http://localhost:3004',
+  'http://200.234.34.240:3000',
+  'http://200.234.34.240:3001',
 ] as const;
 
 type ClerkAuthEnvironment = {

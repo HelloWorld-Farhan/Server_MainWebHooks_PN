@@ -1,6 +1,6 @@
-/** Absolute app origin, e.g. http://localhost:3000 */
+/** Absolute app origin, e.g. http://200.234.34.240:3000 */
 export function getAppOrigin(): string {
-  const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://200.234.34.240:3000";
   return base.replace(/\/$/, "");
 }
 
