@@ -35,7 +35,7 @@ import {
   logObdWebhook,
   logObdWebhookDuplicate,
 } from "@/server/telephony/telephony-logger";
-import { validateWebhookCallLogChain } from "@/server/telephony/webhook-validation";
+import { validateWebhookCallLogChain, type WebhookCallLogContext } from "@/server/telephony/webhook-validation";
 import { callService } from "@/server/services/call.service";
 import { retrySchedulerService } from "@/server/campaign-execution/retry/retry-scheduler.service";
 
@@ -101,7 +101,7 @@ export class ObdWebhookService {
       throw new NotFoundError("Call log not found for callid");
     }
 
-    validateWebhookCallLogChain(payload, callLog);
+    validateWebhookCallLogChain(payload, callLog as WebhookCallLogContext);
 
     const providerEventId = resolveProviderEventId(payload);
     const correlationId =
@@ -167,7 +167,7 @@ export class ObdWebhookService {
 
     if (isTerminal || !canTransition) {
       await this.callLogsRepo.appendProviderWebhookOnly(
-        callLog.companyId,
+        callLog.companyId as string,
         callLog.id,
         { providerWebhook },
       );
@@ -193,7 +193,7 @@ export class ObdWebhookService {
       payload.disconnect_reason ?? payload.disconnectReason ?? undefined;
 
     const webhookResult = await callService.handleProviderWebhook({
-      companyId: callLog.companyId,
+      companyId: callLog.companyId as string,
       callLogId: callLog.id,
       currentStatus: callLog.status,
       providerStatus: payload.status,
@@ -216,7 +216,7 @@ export class ObdWebhookService {
       callLog.campaignId
     ) {
       await retrySchedulerService.handleTerminalCall({
-        companyId: callLog.companyId,
+        companyId: callLog.companyId as string,
         callLogId: callLog.id,
         campaignId: callLog.campaignId,
         phone: callLog.phoneNumber?.number,

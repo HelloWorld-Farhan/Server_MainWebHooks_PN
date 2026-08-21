@@ -40,10 +40,11 @@ export class InboundWebhooksController {
       
       // Look up by agent number in PhoneNumber table
       const phoneNumber = await prisma.phoneNumber.findFirst({
-        where: { number: { contains: agentNumber } }
+        where: { number: { contains: agentNumber } },
+        orderBy: { createdAt: 'desc' }
       });
       
-      if (phoneNumber) {
+      if (phoneNumber && phoneNumber.companyId) {
         company = await prisma.company.findUnique({ where: { id: phoneNumber.companyId } });
       }
       
@@ -120,12 +121,28 @@ export class InboundWebhooksController {
         }
       }
 
+      const existingCall = await prisma.callLog.findUnique({
+        where: {
+          companyId_callLogId: { companyId: company.id, callLogId: logId }
+        }
+      });
+      
+      const alreadyCharged = existingCall?.creditsUsed ? existingCall.creditsUsed > 0 : false;
+      
+      // If already charged, do not deduct again
+      if (alreadyCharged) {
+        creditsToDeduct = 0;
+      }
+
       const updateData: any = {};
       if (statusRaw !== undefined) updateData.status = status;
       if (callDurationRaw !== undefined) updateData.durationSeconds = durationSeconds;
       updateData.recordingUrl = finalRecordingUrl;
       updateData.transcriptUrl = finalTranscriptUrl;
-      updateData.creditsUsed = creditsToDeduct;
+      // Only set creditsUsed if we are deducting now, or keep the existing one
+      if (!alreadyCharged) {
+        updateData.creditsUsed = creditsToDeduct;
+      }
       // Always keep a record of the latest webhook payload
       updateData.providerWebhook = body;
 
@@ -158,36 +175,50 @@ export class InboundWebhooksController {
       // Deduct credits for COMPLETED calls
       if (creditsToDeduct > 0) {
         
-        const balance = await prisma.creditBalance.findFirst({
+        let balance = await prisma.creditBalance.findFirst({
           where: { companyId: company.id }
         });
+
+        if (!balance) {
+          balance = await prisma.creditBalance.create({
+            data: {
+              companyId: company.id,
+              creditsRemaining: 0,
+              creditsUsed: 0
+            }
+          });
+        }
         
-        if (balance) {
-          await prisma.$transaction([
-            prisma.creditBalance.update({
-              where: { id: balance.id },
-              data: {
-                creditsRemaining: { decrement: creditsToDeduct },
-                creditsUsed: { increment: creditsToDeduct }
-              }
-            }),
-            prisma.creditUsage.create({
-              data: {
-                companyId: company.id,
-                amount: creditsToDeduct,
-                reason: "CALL",
-                callLogId: callLog.id,
-                description: `Inbound call duration: ${durationSeconds}s`
-              }
-            })
-          ]);
-          
-          try {
-            await cacheService.invalidateCompanyCredits(company.id);
-            await cacheService.invalidateBillingPages(company.id);
-          } catch (cacheErr) {
-            console.error("Cache invalidation error:", cacheErr);
-          }
+        const txOps = [
+          prisma.creditBalance.update({
+            where: { id: balance.id },
+            data: {
+              creditsRemaining: { decrement: creditsToDeduct },
+              creditsUsed: { increment: creditsToDeduct }
+            }
+          }),
+          prisma.creditUsage.create({
+            data: {
+              companyId: company.id,
+              amount: creditsToDeduct,
+              reason: "CALL",
+              callLogId: callLog.id,
+              description: `Inbound call duration: ${durationSeconds}s`
+            }
+          })
+        ];
+
+        // We DO NOT deduct from the parent company's creditsRemaining because the credits 
+        // were already deducted from the parent when they were allocated to the sub-company.
+        // Double-deducting here causes incorrect balances.
+
+        await prisma.$transaction(txOps);
+        
+        try {
+          await cacheService.invalidateCompanyCredits(company.id);
+          await cacheService.invalidateBillingPages(company.id);
+        } catch (cacheErr) {
+          console.error("Cache invalidation error:", cacheErr);
         }
       }
 

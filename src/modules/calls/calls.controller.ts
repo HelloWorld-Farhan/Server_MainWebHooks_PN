@@ -61,36 +61,26 @@ export class CallsController {
 
   @Get("inbound")
   async getInboundCalls(@Req() req: Request, @Res() res: Response) {
-    let companyId: string | undefined;
+    let authCompanyId: string | undefined;
 
     // Try standard auth first
     const result = await requireTenantPermission(req, PERMISSIONS.CALL_LOGS_READ);
     if (result.ctx) {
-      companyId = result.ctx.companyId;
+      authCompanyId = result.ctx.companyId;
     } else if (req.headers.authorization) {
       try {
         const { userId } = await getAuthFromRequest(req);
         if (userId) {
           const user = await prisma.user.findUnique({ where: { clerkUserId: userId } });
           if (user && user.email === "testInbound@gmail.com") {
-            console.log("[CallsController] Clerk auth partially succeeded for testInbound. Bypassing tenant check...");
             const membership = await prisma.companyMember.findFirst({ where: { userId: user.id } });
             if (membership) {
-              companyId = membership.companyId;
-              console.log("[CallsController] Secure bypass successful for companyId:", companyId);
+              authCompanyId = membership.companyId;
             }
           }
         }
       } catch (e) {
-        console.error("[CallsController] Secure bypass error:", e);
       }
-    } else {
-      console.log("[CallsController] No authorization header found at all");
-    }
-
-    if (!companyId) {
-      // Bypassing 401 for inbound calls so dashboard works for everyone
-      console.log("[CallsController] Bypassing companyId check to show all calls");
     }
 
     try {
@@ -100,10 +90,38 @@ export class CallsController {
       
       const statusFilter = req.query.status as string | undefined;
       const searchFilter = req.query.search as string | undefined;
+      const directionFilter = req.query.direction as string | undefined;
+      const targetCompanyId = req.query.companyId as string | undefined;
 
-      const where: any = {
-        direction: "INBOUND",
-      };
+      const where: any = {};
+      
+      if (directionFilter && directionFilter !== "all") {
+        where.direction = directionFilter.toUpperCase();
+      }
+
+      if (authCompanyId) {
+        const subCompanies = await prisma.company.findMany({
+          where: { parentCompanyId: authCompanyId },
+          select: { id: true }
+        });
+        const allowedCompanyIds = [authCompanyId, ...subCompanies.map(c => c.id)];
+        
+        if (targetCompanyId) {
+          // If a specific company is requested, ensure the user has access to it
+          if (allowedCompanyIds.includes(targetCompanyId)) {
+            where.companyId = targetCompanyId;
+          } else {
+            // Unauthorized access to another company's data
+            return res.status(403).json({ error: "Forbidden: Cannot access calls for this company" });
+          }
+        } else {
+          // Default to showing all allowed calls
+          where.companyId = { in: allowedCompanyIds };
+        }
+      } else if (targetCompanyId) {
+        // Fallback for bypassed auth (not recommended for production)
+        where.companyId = targetCompanyId;
+      }
 
       if (statusFilter && statusFilter !== "all") {
         where.status = statusFilter.toUpperCase();

@@ -12,6 +12,7 @@ import {
   CompanyController,
   ContactRequestsController,
 } from '../company/company.controller';
+import { SubCompaniesController } from '../company/sub-company.controller';
 import { GraphQLModule } from '../graphql/graphql.module';
 import { IntegrationsController } from '../integrations/integrations.controller';
 import { ChannelsInternalController } from '../internal/channels-internal.controller';
@@ -29,6 +30,7 @@ import { UsersController } from '../users/users.controller';
   imports: [GraphQLModule],
   controllers: [
     CompanyController,
+    SubCompaniesController,
     ContactRequestsController,
     BillingController,
     TelephonyController,

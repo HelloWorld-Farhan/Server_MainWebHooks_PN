@@ -12,10 +12,17 @@ datasource db {
 
 // ─── Enums ───────────────────────────────────────────────────────────────────
 
+enum TenantType {
+  SUPER_ADMIN
+  PARENT
+  CHILD
+}
+
 enum CompanyStatus {
   ACTIVE
   SUSPENDED
   ARCHIVED
+  PENDING
 }
 
 enum CampaignStatus {
@@ -409,6 +416,11 @@ model Company {
   name                String
   slug                String           @unique
   status              CompanyStatus    @default(ACTIVE)
+  blockedUntil        DateTime?
+  tenantType          TenantType       @default(PARENT)
+  parentCompanyId     String?          @db.ObjectId
+  parentCompany       Company?         @relation("CompanyToSubCompany", fields: [parentCompanyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  childCompanies      Company[]        @relation("CompanyToSubCompany")
   primaryUseCase      PrimaryUseCase?
   callVolume          CallVolumeRange?
   settings            Json             @default("{}")
@@ -487,6 +499,7 @@ model User {
   lastName    String?
   imageUrl    String?
   phone       String?
+  passwordHash String?
   status      UserStatus @default(ACTIVE)
   lastLoginAt DateTime?
   createdAt   DateTime   @default(now())
@@ -509,6 +522,7 @@ model User {
 
   @@index([status])
 }
+
 
 model CompanyMember {
   id               String           @id @default(auto()) @map("_id") @db.ObjectId
@@ -722,7 +736,8 @@ model LeadActivity {
 
 model PhoneNumber {
   id                 String            @id @default(auto()) @map("_id") @db.ObjectId
-  companyId          String            @db.ObjectId
+  companyId          String?           @db.ObjectId
+  assignedParentTenantId String?       @db.ObjectId
   /// Entity ID segment for public IDs (e.g. PH000001). Formerly resourceKey.
   phoneNumberId     String
   /// Full external ID (e.g. v1.PNX.CP000001.PH000001).
@@ -740,7 +755,7 @@ model PhoneNumber {
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
 
-  company            Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company            Company?         @relation(fields: [companyId], references: [id], onDelete: SetNull)
   campaign           Campaign?        @relation(fields: [campaignId], references: [id])
   inboundAgent       AiAgent?         @relation("InboundAgent", fields: [inboundAgentId], references: [id])
   outboundAgent      AiAgent?         @relation("OutboundAgent", fields: [outboundAgentId], references: [id])
@@ -779,7 +794,7 @@ model UploadedContact {
 
 model CallLog {
   id              String        @id @default(auto()) @map("_id") @db.ObjectId
-  companyId       String        @db.ObjectId
+  companyId       String?       @db.ObjectId
   /// Entity ID segment for public IDs (e.g. CL00000001). Formerly resourceKey.
   callLogId       String
   /// Full external ID (e.g. v1.PNX.CP000001.CL00000001).
@@ -823,7 +838,7 @@ model CallLog {
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
-  company       Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company       Company?           @relation(fields: [companyId], references: [id], onDelete: SetNull)
   lead          Lead?              @relation(fields: [leadId], references: [id])
   phoneNumber   PhoneNumber?       @relation(fields: [phoneNumberId], references: [id])
   aiAgent       AiAgent?           @relation(fields: [aiAgentId], references: [id])

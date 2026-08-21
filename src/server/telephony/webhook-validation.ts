@@ -10,7 +10,7 @@ import type { ObdWebhookPayload } from "@/server/telephony/dto/webhook-payload.d
 
 export type WebhookCallLogContext = {
   id: string;
-  companyId: string;
+  companyId: string | null;
   campaignId: string | null;
   publicId: string;
   status: import("@prisma/client").CallStatus;
@@ -19,12 +19,12 @@ export type WebhookCallLogContext = {
     id: string;
     number: string;
     campaignId: string | null;
-    companyId: string;
+    companyId: string | null;
   } | null;
   campaign: {
     id: string;
     resourceKey: string;
-    companyId: string;
+    companyId: string | null;
   } | null;
   company: {
     id: string;

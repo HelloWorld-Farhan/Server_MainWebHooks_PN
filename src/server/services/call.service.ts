@@ -110,7 +110,7 @@ export class CallService {
 
     let callLog: {
       id: string;
-      companyId: string;
+      companyId: string | null;
       publicId: string;
       createdAt: Date;
       phoneNumber: { number: string } | null;
@@ -133,7 +133,7 @@ export class CallService {
       return false;
     }
 
-    if (!callLog?.phoneNumber?.number) {
+    if (!callLog?.phoneNumber?.number || !callLog.companyId) {
       return false;
     }
 
