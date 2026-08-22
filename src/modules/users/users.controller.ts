@@ -312,7 +312,8 @@ export class UsersController {
         include: { memberships: { where: { status: "ACTIVE" } } }
       });
       
-      const companyId = dbUser?.memberships[0]?.companyId;
+      const targetCompanyId = req.query.companyId as string | undefined;
+      const companyId = targetCompanyId || dbUser?.memberships[0]?.companyId;
       if (!companyId) {
         return res.json({
           inboundCalls: 0,
@@ -340,38 +341,64 @@ export class UsersController {
         });
       }
 
-      const subCompanies = await prisma.company.findMany({
-        where: { parentCompanyId: company.id },
-        select: { id: true }
-      });
-      const companyIdsToQuery = [company.id, ...subCompanies.map(c => c.id)];
+      let companyIdsToQuery = [company.id];
+      if (!targetCompanyId) {
+         const subCompanies = await prisma.company.findMany({
+           where: { parentCompanyId: company.id },
+           select: { id: true }
+         });
+         companyIdsToQuery = [company.id, ...subCompanies.map((c: any) => c.id)];
+      }
 
-      const [inboundCalls, outboundCalls, activeAgents, creditBalances] = await Promise.all([
+      const now = new Date();
+      const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+
+      const [
+        inboundCalls,
+        outboundCalls,
+        activeAgents,
+        creditBalances,
+        pastInboundCalls,
+        pastOutboundCalls
+      ] = await Promise.all([
         prisma.callLog.count({
-          where: { companyId: { in: companyIdsToQuery }, direction: "INBOUND" }
+          where: { companyId: { in: companyIdsToQuery }, direction: "INBOUND", startedAt: { gte: startOfThisMonth } }
         }),
         prisma.callLog.count({
-          where: { companyId: { in: companyIdsToQuery }, direction: "OUTBOUND" }
+          where: { companyId: { in: companyIdsToQuery }, direction: "OUTBOUND", startedAt: { gte: startOfThisMonth } }
         }),
         prisma.aiAgent.count({
           where: { companyId: { in: companyIdsToQuery }, status: "ACTIVE" }
         }),
         prisma.creditBalance.findMany({
           where: { companyId: { in: companyIdsToQuery } }
+        }),
+        prisma.callLog.count({
+          where: { companyId: { in: companyIdsToQuery }, direction: "INBOUND", startedAt: { gte: startOfLastMonth, lte: endOfLastMonth } }
+        }),
+        prisma.callLog.count({
+          where: { companyId: { in: companyIdsToQuery }, direction: "OUTBOUND", startedAt: { gte: startOfLastMonth, lte: endOfLastMonth } }
         })
       ]);
 
-      const totalCreditsUsed = creditBalances.reduce((sum, cb) => sum + (cb.creditsUsed || 0), 0);
+      const totalCreditsUsed = creditBalances.reduce((sum: number, cb: any) => sum + (cb.creditsUsed || 0), 0);
+      
+      const calcTrend = (current: number, past: number) => {
+        if (past === 0) return current > 0 ? 100 : 0;
+        return Math.round(((current - past) / past) * 100);
+      };
 
       return res.json({
         inboundCalls,
         outboundCalls,
         activeAgents,
-        creditsUsed: totalCreditsUsed > 0 ? totalCreditsUsed : 0, // ensure we don't show negative if there's a weird balance
-        inboundTrend: 100,
-        outboundTrend: 0,
+        creditsUsed: totalCreditsUsed > 0 ? totalCreditsUsed : 0,
+        inboundTrend: calcTrend(inboundCalls, pastInboundCalls),
+        outboundTrend: calcTrend(outboundCalls, pastOutboundCalls),
         agentsTrend: 0,
-        creditsTrend: 0
+        creditsTrend: 0 // Credit trend is hard to calculate without historical snapshots of creditBalance, so we leave it at 0
       });
     } catch (error) {
       console.error("Dashboard stats error:", error);
