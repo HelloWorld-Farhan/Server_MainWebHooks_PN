@@ -50,29 +50,33 @@ export class InboundWebhooksController {
       const normalizedAgentNumber = normalizeNumber(agentNumber);
       const normalizedCallingNo = normalizeNumber(callingNo);
 
-      // Map agent number to company
-      let company: any = null;
+      // Map agent number to companies
+      let companies: any[] = [];
       
       // Look up by agent number in PhoneNumber table
-      const phoneNumber = await prisma.phoneNumber.findFirst({
+      const phoneNumbers = await prisma.phoneNumber.findMany({
         where: { 
           OR: [
             { number: { contains: agentNumber } },
             { number: { contains: normalizedAgentNumber } }
-          ]
-        },
-        orderBy: { createdAt: 'desc' }
+          ],
+          status: "ACTIVE"
+        }
       });
       
-      if (phoneNumber && phoneNumber.companyId) {
-        company = await prisma.company.findUnique({ where: { id: phoneNumber.companyId } });
+      if (phoneNumbers.length > 0) {
+        const companyIds = Array.from(new Set(phoneNumbers.map(p => p.companyId).filter(Boolean)));
+        if (companyIds.length > 0) {
+          companies = await prisma.company.findMany({ where: { id: { in: companyIds as string[] } } });
+        }
       }
       
-      if (!company) {
+      if (companies.length === 0) {
         // Fallback to first company if not found
-        company = await prisma.company.findFirst();
+        const firstCompany = await prisma.company.findFirst();
+        if (firstCompany) companies = [firstCompany];
       }
-      if (!company) {
+      if (companies.length === 0) {
         return res.status(404).json({ error: "No company found" });
       }
 
@@ -98,33 +102,6 @@ export class InboundWebhooksController {
       }
 
       const publicId = `INB-${logId}`;
-
-      // Find or create stage
-      let stage = await prisma.leadPipelineStage.findFirst({
-        where: { companyId: company.id, slug: "new" }
-      });
-      if (!stage) {
-        stage = await prisma.leadPipelineStage.create({
-          data: { companyId: company.id, name: "New", slug: "new", order: 1 }
-        });
-      }
-
-      // Find or create lead
-      let lead = await prisma.lead.findFirst({
-        where: { companyId: company.id, phone: normalizedCallingNo }
-      });
-      if (!lead) {
-        lead = await prisma.lead.create({
-          data: {
-            companyId: company.id,
-            phone: normalizedCallingNo,
-            firstName: "Incoming",
-            lastName: "Caller",
-            stageId: stage.id
-          }
-        });
-      }
-
       const finalRecordingUrl = recordingUrl || `/api/calls/${logId}/recording`;
       const finalTranscriptUrl = transcriptUrl || `/api/calls/${logId}/transcript`;
       
@@ -141,108 +118,139 @@ export class InboundWebhooksController {
         }
       }
 
-      const existingCall = await prisma.callLog.findUnique({
-        where: {
-          companyId_callLogId: { companyId: company.id, callLogId: logId }
-        }
-      });
-      
-      const alreadyCharged = existingCall?.creditsUsed ? existingCall.creditsUsed > 0 : false;
-      
-      // If already charged, do not deduct again
-      if (alreadyCharged) {
-        creditsToDeduct = 0;
-      }
+      let primaryCallLogId: string | undefined;
 
-      const updateData: any = {};
-      if (statusRaw !== undefined) updateData.status = status;
-      if (callDurationRaw !== undefined) updateData.durationSeconds = durationSeconds;
-      updateData.recordingUrl = finalRecordingUrl;
-      updateData.transcriptUrl = finalTranscriptUrl;
-      // Only set creditsUsed if we are deducting now, or keep the existing one
-      if (!alreadyCharged) {
-        updateData.creditsUsed = creditsToDeduct;
-      }
-      // Always keep a record of the latest webhook payload
-      updateData.providerWebhook = body;
-
-      const callLog = await prisma.callLog.upsert({
-        where: {
-          companyId_callLogId: {
-            companyId: company.id,
-            callLogId: logId
-          }
-        },
-        update: updateData,
-        create: {
-          companyId: company.id,
-          callLogId: logId,
-          publicId: publicId,
-          direction: "INBOUND",
-          status: status as any,
-          startedAt: new Date(),
-          durationSeconds,
-          recordingUrl: finalRecordingUrl,
-          transcriptUrl: finalTranscriptUrl,
-          creditsUsed: creditsToDeduct,
-          provider: "webhook",
-          providerCallId: logId,
-          providerWebhook: body,
-          leadId: lead.id
-        }
-      });
-
-      // Deduct credits for COMPLETED calls
-      if (creditsToDeduct > 0) {
-        
-        let balance = await prisma.creditBalance.findFirst({
-          where: { companyId: company.id }
+      // Process for ALL companies that have this number assigned
+      for (const company of companies) {
+        // Find or create stage
+        let stage = await prisma.leadPipelineStage.findFirst({
+          where: { companyId: company.id, slug: "new" }
         });
+        if (!stage) {
+          stage = await prisma.leadPipelineStage.create({
+            data: { companyId: company.id, name: "New", slug: "new", order: 1 }
+          });
+        }
 
-        if (!balance) {
-          balance = await prisma.creditBalance.create({
+        // Find or create lead
+        let lead = await prisma.lead.findFirst({
+          where: { companyId: company.id, phone: normalizedCallingNo }
+        });
+        if (!lead) {
+          lead = await prisma.lead.create({
             data: {
               companyId: company.id,
-              creditsRemaining: 0,
-              creditsUsed: 0
+              phone: normalizedCallingNo,
+              firstName: "Incoming",
+              lastName: "Caller",
+              stageId: stage.id
             }
           });
         }
+
+        const existingCall = await prisma.callLog.findUnique({
+          where: {
+            companyId_callLogId: { companyId: company.id, callLogId: logId }
+          }
+        });
         
-        const txOps = [
-          prisma.creditBalance.update({
-            where: { id: balance.id },
-            data: {
-              creditsRemaining: { decrement: creditsToDeduct },
-              creditsUsed: { increment: creditsToDeduct }
-            }
-          }),
-          prisma.creditUsage.create({
-            data: {
+        const alreadyCharged = existingCall?.creditsUsed ? existingCall.creditsUsed > 0 : false;
+        
+        let localCreditsToDeduct = creditsToDeduct;
+        // If already charged, do not deduct again
+        if (alreadyCharged) {
+          localCreditsToDeduct = 0;
+        }
+
+        const updateData: any = {};
+        if (statusRaw !== undefined) updateData.status = status;
+        if (callDurationRaw !== undefined) updateData.durationSeconds = durationSeconds;
+        updateData.recordingUrl = finalRecordingUrl;
+        updateData.transcriptUrl = finalTranscriptUrl;
+        // Only set creditsUsed if we are deducting now, or keep the existing one
+        if (!alreadyCharged) {
+          updateData.creditsUsed = localCreditsToDeduct;
+        }
+        // Always keep a record of the latest webhook payload
+        updateData.providerWebhook = body;
+
+        const callLog = await prisma.callLog.upsert({
+          where: {
+            companyId_callLogId: {
               companyId: company.id,
-              amount: creditsToDeduct,
-              reason: "CALL",
-              callLogId: callLog.id,
-              description: `Inbound call duration: ${durationSeconds}s`
+              callLogId: logId
             }
-          })
-        ];
+          },
+          update: updateData,
+          create: {
+            companyId: company.id,
+            callLogId: logId,
+            publicId: publicId,
+            direction: "INBOUND",
+            status: status as any,
+            startedAt: new Date(),
+            durationSeconds,
+            recordingUrl: finalRecordingUrl,
+            transcriptUrl: finalTranscriptUrl,
+            creditsUsed: localCreditsToDeduct,
+            provider: "webhook",
+            providerCallId: logId,
+            providerWebhook: body,
+            leadId: lead.id
+          }
+        });
 
-        // We DO NOT deduct from the parent company's creditsRemaining because the credits 
-        // were already deducted from the parent when they were allocated to the sub-company.
-        // Double-deducting here causes incorrect balances.
+        if (!primaryCallLogId) {
+          primaryCallLogId = callLog.id;
+        }
 
-        await prisma.$transaction(txOps);
-        
-        try {
-          await cacheService.invalidateCompanyCredits(company.id);
-          await cacheService.invalidateBillingPages(company.id);
-        } catch (cacheErr) {
-          console.error("Cache invalidation error:", cacheErr);
+        // Deduct credits for COMPLETED calls
+        if (localCreditsToDeduct > 0) {
+          let balance = await prisma.creditBalance.findFirst({
+            where: { companyId: company.id }
+          });
+
+          if (!balance) {
+            balance = await prisma.creditBalance.create({
+              data: {
+                companyId: company.id,
+                creditsRemaining: 0,
+                creditsUsed: 0
+              }
+            });
+          }
+          
+          const txOps = [
+            prisma.creditBalance.update({
+              where: { id: balance.id },
+              data: {
+                creditsRemaining: { decrement: localCreditsToDeduct },
+                creditsUsed: { increment: localCreditsToDeduct }
+              }
+            }),
+            prisma.creditUsage.create({
+              data: {
+                companyId: company.id,
+                amount: localCreditsToDeduct,
+                reason: "CALL",
+                callLogId: callLog.id,
+                description: `Inbound call duration: ${durationSeconds}s`
+              }
+            })
+          ];
+
+          await prisma.$transaction(txOps);
+          
+          try {
+            await cacheService.invalidateCompanyCredits(company.id);
+            await cacheService.invalidateBillingPages(company.id);
+          } catch (cacheErr) {
+            console.error("Cache invalidation error:", cacheErr);
+          }
         }
       }
 
-      return res.status(200).json({ success: true, callLogId: callLog.id });
+      return res.status(200).json({ success: true, callLogId: primaryCallLogId });
     } catch (error) {
       console.error("Inbound webhook error:", error);
       return res.status(500).json({ error: "Internal server error" });
