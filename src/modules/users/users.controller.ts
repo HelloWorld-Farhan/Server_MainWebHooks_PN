@@ -233,24 +233,27 @@ export class UsersController {
       let creditBalance: any = null;
 
       if (companyId) {
-        const [companyPhone, balance] = await Promise.all([
-          prisma.phoneNumber.findFirst({
-            where: {
-              OR: [
-                { companyId: companyId },
-                { assignedParentTenantId: companyId }
-              ],
-              status: "ACTIVE"
-            }
-          }),
-          prisma.creditBalance.findUnique({
-            where: { companyId }
-          })
-        ]);
-
-        if (companyPhone) {
-          assignedNumber = (companyPhone as any).number || companyPhone.phoneNumberId || "Unknown";
-        }
+          const [companyPhones, balance] = await Promise.all([
+            prisma.phoneNumber.findMany({
+              where: {
+                OR: [
+                  { companyId: companyId },
+                  { assignedParentTenantId: companyId }
+                ],
+              }
+            }),
+            prisma.company.findUnique({
+              where: { id: companyId },
+              select: { creditBalance: true, creditsUsed: true, allocatedCredits: true }
+            })
+          ]);
+  
+          if (companyPhones && companyPhones.length > 0) {
+            assignedNumber = companyPhones
+              .map((p: any) => p.number || p.phoneNumberId)
+              .filter(Boolean)
+              .join(", ");
+          }
         if (balance) {
           creditBalance = balance;
           
