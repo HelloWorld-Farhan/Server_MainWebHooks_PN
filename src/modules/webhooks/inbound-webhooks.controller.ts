@@ -35,32 +35,49 @@ export class InboundWebhooksController {
       const transcriptUrl = body.transcript_url || body.transcriptUrl || body.transcript || null;
       const agentNumber = body.callid || body.calledno || "Unknown";
 
-      const normalizeNumber = (num: string) => {
-        if (!num || num === "Unknown") return num;
-        let cleaned = num.replace(/\D/g, "");
-        if (cleaned.startsWith("9191") && cleaned.length >= 12) {
-          cleaned = cleaned.substring(2);
+      // Generate all possible number variants for robust DB lookup
+      const getNumberVariants = (num: string): string[] => {
+        if (!num || num === "Unknown") return [num];
+        const digits = num.replace(/\D/g, "");
+        const variants = new Set<string>([num, digits]);
+        
+        // Strip leading 91 (India country code) variants
+        if (digits.startsWith("9191") && digits.length >= 14) {
+          // e.g. 91919429390110 -> 919429390110 -> +919429390110
+          const stripped = digits.substring(2);
+          variants.add(stripped);
+          variants.add("+" + stripped);
         }
-        if (cleaned.startsWith("91") && cleaned.length >= 12) {
-          return "+" + cleaned;
+        if (digits.startsWith("91") && digits.length >= 12) {
+          // e.g. 91917969126581 -> +91917969126581, or 917969126581 -> +917969126581
+          variants.add("+" + digits);
+          // Also try stripping one 91 prefix
+          const stripped = digits.substring(2);
+          if (stripped.startsWith("91") && stripped.length >= 10) {
+            variants.add(stripped);
+            variants.add("+" + stripped);
+          }
         }
-        return num;
+        // Also add without + prefix version
+        variants.forEach(v => { if (v.startsWith("+")) variants.add(v.substring(1)); });
+        
+        return Array.from(variants);
       };
 
-      const normalizedAgentNumber = normalizeNumber(agentNumber);
-      const normalizedCallingNo = normalizeNumber(callingNo);
+      const agentVariants = getNumberVariants(agentNumber);
+      const callingVariants = getNumberVariants(callingNo);
+      // Use the most normalized form as canonical
+      const normalizedCallingNo = callingVariants.find(v => v.startsWith("+")) || callingVariants[0];
+      const normalizedAgentNumber = agentVariants.find(v => v.startsWith("+")) || agentVariants[0];
 
       // Map agent number to companies
       let companies: any[] = [];
       let resolvedPhoneNumber: any = null;
       
-      // Look up by agent number in PhoneNumber table
+      // Look up by agent number in PhoneNumber table — try ALL variants
       const phoneNumbers = await prisma.phoneNumber.findMany({
         where: { 
-          OR: [
-            { number: { contains: agentNumber } },
-            { number: { contains: normalizedAgentNumber } }
-          ],
+          OR: agentVariants.map(v => ({ number: { contains: v } })),
           status: "ACTIVE"
         }
       });
