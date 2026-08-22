@@ -337,15 +337,21 @@ export class UsersController {
         });
       }
 
+      const subCompanies = await prisma.company.findMany({
+        where: { parentCompanyId: company.id },
+        select: { id: true }
+      });
+      const companyIdsToQuery = [company.id, ...subCompanies.map(c => c.id)];
+
       const [inboundCalls, outboundCalls, activeAgents, creditBalance] = await Promise.all([
         prisma.callLog.count({
-          where: { companyId: company.id, direction: "INBOUND" }
+          where: { companyId: { in: companyIdsToQuery }, direction: "INBOUND" }
         }),
         prisma.callLog.count({
-          where: { companyId: company.id, direction: "OUTBOUND" }
+          where: { companyId: { in: companyIdsToQuery }, direction: "OUTBOUND" }
         }),
         prisma.aiAgent.count({
-          where: { companyId: company.id, status: "ACTIVE" }
+          where: { companyId: { in: companyIdsToQuery }, status: "ACTIVE" }
         }),
         prisma.creditBalance.findUnique({
           where: { companyId: company.id }
@@ -462,7 +468,7 @@ export class UsersController {
       }
 
       const targetCompanyId = req.query.companyId as string | undefined;
-      let companyIdToQuery = authCompanyId;
+      let companyIdsToQuery = [authCompanyId];
 
       if (targetCompanyId) {
         const subCompanies = await prisma.company.findMany({
@@ -472,10 +478,16 @@ export class UsersController {
         const allowedCompanyIds = [authCompanyId, ...subCompanies.map(c => c.id)];
         
         if (allowedCompanyIds.includes(targetCompanyId)) {
-          companyIdToQuery = targetCompanyId;
+          companyIdsToQuery = [targetCompanyId];
         } else {
           return res.status(403).json({ error: "Forbidden: Cannot access calls for this company" });
         }
+      } else {
+        const subCompanies = await prisma.company.findMany({
+          where: { parentCompanyId: authCompanyId },
+          select: { id: true }
+        });
+        companyIdsToQuery = [authCompanyId, ...subCompanies.map(c => c.id)];
       }
 
       const page = parseInt(req.query.page as string) || 1;
@@ -488,10 +500,10 @@ export class UsersController {
 
       const [total, data] = await Promise.all([
         prisma.callLog.count({
-          where: { companyId: companyIdToQuery, direction: direction as any }
+          where: { companyId: { in: companyIdsToQuery }, direction: direction as any }
         }),
         prisma.callLog.findMany({
-          where: { companyId: companyIdToQuery, direction: direction as any },
+          where: { companyId: { in: companyIdsToQuery }, direction: direction as any },
           orderBy: { startedAt: "desc" },
           skip,
           take: limit,
