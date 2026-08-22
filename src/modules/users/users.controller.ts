@@ -343,7 +343,7 @@ export class UsersController {
       });
       const companyIdsToQuery = [company.id, ...subCompanies.map(c => c.id)];
 
-      const [inboundCalls, outboundCalls, activeAgents, creditBalance] = await Promise.all([
+      const [inboundCalls, outboundCalls, activeAgents, creditBalances] = await Promise.all([
         prisma.callLog.count({
           where: { companyId: { in: companyIdsToQuery }, direction: "INBOUND" }
         }),
@@ -353,16 +353,18 @@ export class UsersController {
         prisma.aiAgent.count({
           where: { companyId: { in: companyIdsToQuery }, status: "ACTIVE" }
         }),
-        prisma.creditBalance.findUnique({
-          where: { companyId: company.id }
+        prisma.creditBalance.findMany({
+          where: { companyId: { in: companyIdsToQuery } }
         })
       ]);
+
+      const totalCreditsUsed = creditBalances.reduce((sum, cb) => sum + (cb.creditsUsed || 0), 0);
 
       return res.json({
         inboundCalls,
         outboundCalls,
         activeAgents,
-        creditsUsed: creditBalance?.creditsUsed || 0,
+        creditsUsed: totalCreditsUsed > 0 ? totalCreditsUsed : 0, // ensure we don't show negative if there's a weird balance
         inboundTrend: 100,
         outboundTrend: 0,
         agentsTrend: 0,
@@ -398,9 +400,15 @@ export class UsersController {
       const companyId = dbUser?.memberships[0]?.companyId;
       if (!companyId) return res.json([]);
 
-      // Fetch latest 5 calls
+      const subCompanies = await prisma.company.findMany({
+        where: { parentCompanyId: companyId },
+        select: { id: true }
+      });
+      const companyIdsToQuery = [companyId, ...subCompanies.map(c => c.id)];
+
+      // Fetch latest 5 calls across parent and subcompanies
       const recentCalls = await prisma.callLog.findMany({
-        where: { companyId },
+        where: { companyId: { in: companyIdsToQuery } },
         orderBy: { createdAt: "desc" },
         take: 5
       });
@@ -478,7 +486,12 @@ export class UsersController {
         const allowedCompanyIds = [authCompanyId, ...subCompanies.map(c => c.id)];
         
         if (allowedCompanyIds.includes(targetCompanyId)) {
-          companyIdsToQuery = [targetCompanyId];
+          // If the target is the auth company itself, aggregate it with its sub-companies
+          if (targetCompanyId === authCompanyId) {
+            companyIdsToQuery = allowedCompanyIds;
+          } else {
+            companyIdsToQuery = [targetCompanyId];
+          }
         } else {
           return res.status(403).json({ error: "Forbidden: Cannot access calls for this company" });
         }
