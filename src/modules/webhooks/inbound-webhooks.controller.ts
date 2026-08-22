@@ -35,12 +35,22 @@ export class InboundWebhooksController {
       const transcriptUrl = body.transcript_url || body.transcriptUrl || body.transcript || null;
       const agentNumber = body.callid || body.calledno || "Unknown";
 
+      let normalizedAgentNumber = agentNumber.replace(/\D/g, "");
+      if (normalizedAgentNumber.startsWith("9191") && normalizedAgentNumber.length > 12) {
+        normalizedAgentNumber = normalizedAgentNumber.substring(2);
+      }
+
       // Map agent number to company
       let company: any = null;
       
       // Look up by agent number in PhoneNumber table
       const phoneNumber = await prisma.phoneNumber.findFirst({
-        where: { number: { contains: agentNumber } },
+        where: { 
+          OR: [
+            { number: { contains: agentNumber } },
+            { number: { contains: normalizedAgentNumber } }
+          ]
+        },
         orderBy: { createdAt: 'desc' }
       });
       
