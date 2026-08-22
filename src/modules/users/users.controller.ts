@@ -254,8 +254,8 @@ export class UsersController {
               .filter(Boolean);
             assignedNumber = Array.from(new Set(numbers)).join(", ");
           }
-        if (balance) {
-          creditBalance = balance;
+        if (balance && balance.creditBalance) {
+          creditBalance = balance.creditBalance;
           
           // If this is a parent company, we DO NOT aggregate the creditsRemaining from its sub-companies
           // The parent dashboard should only show the unallocated parent credits.
