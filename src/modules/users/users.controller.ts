@@ -244,7 +244,7 @@ export class UsersController {
             }),
             prisma.company.findUnique({
               where: { id: companyId },
-              select: { creditBalance: true, creditsUsed: true, allocatedCredits: true }
+              select: { creditBalance: true }
             })
           ]);
   
