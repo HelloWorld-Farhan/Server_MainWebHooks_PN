@@ -89,22 +89,7 @@ export class InboundWebhooksController {
           companies = await prisma.company.findMany({ where: { id: { in: companyIds as string[] } } });
         }
 
-        // If any found company is a sub-company (has parentCompanyId),
-        // also include the parent company so both get an inbound call log.
-        const parentIds = companies
-          .filter((c: any) => c.parentCompanyId)
-          .map((c: any) => c.parentCompanyId as string);
-
-        if (parentIds.length > 0) {
-          const parentCompanies = await prisma.company.findMany({
-            where: { id: { in: parentIds } }
-          });
-          for (const parent of parentCompanies) {
-            if (!companies.find((c: any) => c.id === parent.id)) {
-              companies.push(parent);
-            }
-          }
-        }
+        // Removed duplicate parent insertion logic to prevent double-charging and duplicate CallLogs.
       }
       
       if (companies.length === 0) {
