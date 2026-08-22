@@ -249,10 +249,10 @@ export class UsersController {
           ]);
   
           if (companyPhones && companyPhones.length > 0) {
-            assignedNumber = companyPhones
+            const numbers = companyPhones
               .map((p: any) => p.number || p.phoneNumberId)
-              .filter(Boolean)
-              .join(", ");
+              .filter(Boolean);
+            assignedNumber = Array.from(new Set(numbers)).join(", ");
           }
         if (balance) {
           creditBalance = balance;
