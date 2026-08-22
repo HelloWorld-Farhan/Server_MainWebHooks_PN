@@ -566,6 +566,7 @@ export class UsersController {
           orderBy: { startedAt: "desc" },
           skip,
           take: limit,
+          distinct: ['callLogId'],
           include: { phoneNumber: true, lead: true },
         })
       ]);
