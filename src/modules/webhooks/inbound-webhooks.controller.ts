@@ -52,6 +52,7 @@ export class InboundWebhooksController {
 
       // Map agent number to companies
       let companies: any[] = [];
+      let resolvedPhoneNumber: any = null;
       
       // Look up by agent number in PhoneNumber table
       const phoneNumbers = await prisma.phoneNumber.findMany({
@@ -65,9 +66,27 @@ export class InboundWebhooksController {
       });
       
       if (phoneNumbers.length > 0) {
+        resolvedPhoneNumber = phoneNumbers[0];
         const companyIds = Array.from(new Set(phoneNumbers.map(p => p.companyId).filter(Boolean)));
         if (companyIds.length > 0) {
           companies = await prisma.company.findMany({ where: { id: { in: companyIds as string[] } } });
+        }
+
+        // If any found company is a sub-company (has parentCompanyId),
+        // also include the parent company so both get an inbound call log.
+        const parentIds = companies
+          .filter((c: any) => c.parentCompanyId)
+          .map((c: any) => c.parentCompanyId as string);
+
+        if (parentIds.length > 0) {
+          const parentCompanies = await prisma.company.findMany({
+            where: { id: { in: parentIds } }
+          });
+          for (const parent of parentCompanies) {
+            if (!companies.find((c: any) => c.id === parent.id)) {
+              companies.push(parent);
+            }
+          }
         }
       }
       
@@ -79,6 +98,7 @@ export class InboundWebhooksController {
       if (companies.length === 0) {
         return res.status(404).json({ error: "No company found" });
       }
+
 
       let durationSeconds = 0;
       if (callDurationRaw !== undefined) {
@@ -171,6 +191,9 @@ export class InboundWebhooksController {
         if (!alreadyCharged) {
           updateData.creditsUsed = localCreditsToDeduct;
         }
+        if (resolvedPhoneNumber?.id) {
+          updateData.phoneNumberId = resolvedPhoneNumber.id;
+        }
         // Always keep a record of the latest webhook payload
         updateData.providerWebhook = body;
 
@@ -196,7 +219,8 @@ export class InboundWebhooksController {
             provider: "webhook",
             providerCallId: logId,
             providerWebhook: body,
-            leadId: lead.id
+            leadId: lead.id,
+            ...(resolvedPhoneNumber?.id ? { phoneNumberId: resolvedPhoneNumber.id } : {})
           }
         });
 

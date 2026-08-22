@@ -541,12 +541,28 @@ export class UsersController {
         direction = "INBOUND";
       }
 
+      // Also fetch all phoneNumberIds currently assigned to queried companies
+      // so that historical calls on reassigned numbers are included
+      const assignedPhoneNumbers = await prisma.phoneNumber.findMany({
+        where: { companyId: { in: companyIdsToQuery } },
+        select: { id: true }
+      });
+      const assignedPhoneNumberIds = assignedPhoneNumbers.map((p: { id: string }) => p.id);
+
+      const callWhere = {
+        direction: direction as any,
+        OR: [
+          { companyId: { in: companyIdsToQuery } },
+          ...(assignedPhoneNumberIds.length > 0
+            ? [{ phoneNumberId: { in: assignedPhoneNumberIds } }]
+            : [])
+        ]
+      };
+
       const [total, data] = await Promise.all([
-        prisma.callLog.count({
-          where: { companyId: { in: companyIdsToQuery }, direction: direction as any }
-        }),
+        prisma.callLog.count({ where: callWhere }),
         prisma.callLog.findMany({
-          where: { companyId: { in: companyIdsToQuery }, direction: direction as any },
+          where: callWhere,
           orderBy: { startedAt: "desc" },
           skip,
           take: limit,
