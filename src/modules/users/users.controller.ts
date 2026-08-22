@@ -550,6 +550,7 @@ export class UsersController {
           orderBy: { startedAt: "desc" },
           skip,
           take: limit,
+          include: { phoneNumber: true, lead: true },
         })
       ]);
 
