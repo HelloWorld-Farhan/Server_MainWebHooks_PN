@@ -35,10 +35,20 @@ export class InboundWebhooksController {
       const transcriptUrl = body.transcript_url || body.transcriptUrl || body.transcript || null;
       const agentNumber = body.callid || body.calledno || "Unknown";
 
-      let normalizedAgentNumber = agentNumber.replace(/\D/g, "");
-      if (normalizedAgentNumber.startsWith("9191") && normalizedAgentNumber.length > 12) {
-        normalizedAgentNumber = normalizedAgentNumber.substring(2);
-      }
+      const normalizeNumber = (num: string) => {
+        if (!num || num === "Unknown") return num;
+        let cleaned = num.replace(/\D/g, "");
+        if (cleaned.startsWith("9191") && cleaned.length >= 12) {
+          cleaned = cleaned.substring(2);
+        }
+        if (cleaned.startsWith("91") && cleaned.length >= 12) {
+          return "+" + cleaned;
+        }
+        return num;
+      };
+
+      const normalizedAgentNumber = normalizeNumber(agentNumber);
+      const normalizedCallingNo = normalizeNumber(callingNo);
 
       // Map agent number to company
       let company: any = null;
@@ -101,13 +111,13 @@ export class InboundWebhooksController {
 
       // Find or create lead
       let lead = await prisma.lead.findFirst({
-        where: { companyId: company.id, phone: callingNo }
+        where: { companyId: company.id, phone: normalizedCallingNo }
       });
       if (!lead) {
         lead = await prisma.lead.create({
           data: {
             companyId: company.id,
-            phone: callingNo,
+            phone: normalizedCallingNo,
             firstName: "Incoming",
             lastName: "Caller",
             stageId: stage.id
