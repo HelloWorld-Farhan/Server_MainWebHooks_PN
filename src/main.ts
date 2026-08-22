@@ -69,7 +69,7 @@ async function bootstrap() {
   SwaggerModule.setup("api/docs", app, document);
 
   const port = process.env.PORT ?? 3004;
-  await app.listen(port);
+  await app.listen(port, "0.0.0.0");
 
   // Bound how long a request can hang (e.g. a stuck downstream call) so it
   // fails with a proper 5xx the client can retry against, instead of hanging.
