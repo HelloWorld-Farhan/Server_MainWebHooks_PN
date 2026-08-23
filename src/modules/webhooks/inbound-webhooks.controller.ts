@@ -23,8 +23,11 @@ export class InboundWebhooksController {
       const expectedKey = process.env.INBOUND_WEBHOOK_SECRET || process.env.OBD_WEBHOOK_SECRET;
       
       if (!expectedKey || apiKey !== expectedKey) {
+        console.warn(`[Inbound Webhook] Unauthorized request. Provided Key: ${apiKey}`);
         return res.status(401).json({ error: "Invalid OBD webhook API key" });
       }
+      
+      console.log(`[Inbound Webhook] Received payload:`, JSON.stringify(body));
       
       // Parse payload based on common VoiceNSMS/OBD field names or the provided screenshot headers
       const callingNo = body.phone || body["Calling No"] || body.callingNo || body.calling_no || body.caller_id || "Unknown";
