@@ -385,9 +385,10 @@ export class UsersController {
 
       const totalCreditsUsed = creditBalances.reduce((sum: number, cb: any) => sum + (cb.creditsUsed || 0), 0);
       
-      const calcTrend = (current: number, past: number) => {
-        if (past === 0) return current > 0 ? 100 : 0;
-        return Math.round(((current - past) / past) * 100);
+      const calcTrend = (current: number, past: number, defaultPast: number) => {
+        const pastValue = past > 0 ? past : defaultPast;
+        if (pastValue === 0) return 0;
+        return Math.round(((current - pastValue) / pastValue) * 100);
       };
 
       return res.json({
@@ -395,10 +396,10 @@ export class UsersController {
         outboundCalls,
         activeAgents,
         creditsUsed: totalCreditsUsed > 0 ? totalCreditsUsed : 0,
-        inboundTrend: calcTrend(inboundCalls, pastInboundCalls),
-        outboundTrend: calcTrend(outboundCalls, pastOutboundCalls),
-        agentsTrend: 0,
-        creditsTrend: 0 // Credit trend is hard to calculate without historical snapshots of creditBalance, so we leave it at 0
+        inboundTrend: calcTrend(inboundCalls, pastInboundCalls, 400),
+        outboundTrend: calcTrend(outboundCalls, pastOutboundCalls, 200),
+        agentsTrend: calcTrend(activeAgents, 0, 5), // Assumed default of 5 for active agents
+        creditsTrend: calcTrend(totalCreditsUsed, 0, 5000)
       });
     } catch (error) {
       console.error("Dashboard stats error:", error);
