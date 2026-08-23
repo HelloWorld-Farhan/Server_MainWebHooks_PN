@@ -28,6 +28,7 @@ export class InboundWebhooksController {
       }
       
       console.log(`[Inbound Webhook] Received payload:`, JSON.stringify(body));
+      console.log(`[Inbound Webhook] Key fields - agentNumber(callid/calledno): ${body.callid || body.calledno}, callerNo(phone): ${body.phone || body.callingNo}, status: ${body.status}`);
       
       // Parse payload based on common VoiceNSMS/OBD field names or VoiceLink's nested 'call' object
       const callObj = body.call || {};
@@ -46,6 +47,23 @@ export class InboundWebhooksController {
         const digits = num.replace(/\D/g, "");
         const variants = new Set<string>([num, digits]);
         
+        // Handle Indian local format: 0XXXXXXXXXX (10 digits with leading 0)
+        if (digits.startsWith("0") && digits.length === 11) {
+          // e.g. 07969007102 → 7969007102 → 917969007102 → +917969007102
+          const without0 = digits.substring(1); // 7969007102
+          variants.add(without0);
+          variants.add("91" + without0);         // 917969007102
+          variants.add("+91" + without0);        // +917969007102
+          variants.add("9191" + without0);       // rare double-prefix
+        }
+
+        // Handle 10-digit Indian mobile: 9XXXXXXXXX
+        if (!digits.startsWith("91") && digits.length === 10) {
+          variants.add("91" + digits);
+          variants.add("+91" + digits);
+          variants.add("0" + digits);
+        }
+
         // Strip leading 91 (India country code) variants
         if (digits.startsWith("9191") && digits.length >= 14) {
           // e.g. 91919429390110 -> 919429390110 -> +919429390110
@@ -58,9 +76,11 @@ export class InboundWebhooksController {
           variants.add("+" + digits);
           // Also try stripping one 91 prefix
           const stripped = digits.substring(2);
-          if (stripped.startsWith("91") && stripped.length >= 10) {
+          if (stripped.length >= 10) {
             variants.add(stripped);
             variants.add("+" + stripped);
+            variants.add("91" + stripped);
+            variants.add("+91" + stripped);
           }
         }
         // Also add without + prefix version
