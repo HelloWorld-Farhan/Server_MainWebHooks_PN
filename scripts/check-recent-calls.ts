@@ -1,30 +1,16 @@
 import { PrismaClient } from "@prisma/client";
-
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log("Checking recent call logs...");
-  const recentLogs = await prisma.callLog.findMany({
-    orderBy: { createdAt: "desc" },
-    take: 5,
-    include: {
-      company: {
-        select: {
-          name: true,
-          tenantType: true
-        }
-      },
-      phoneNumber: {
-        select: {
-          number: true
-        }
-      }
-    }
+  const calls = await prisma.callLog.findMany({
+    orderBy: { startedAt: 'desc' },
+    take: 10
   });
 
-  console.log(JSON.stringify(recentLogs, null, 2));
+  console.log("Recent calls:");
+  for (const c of calls) {
+    console.log(`- ID: ${c.id}, Time: ${c.startedAt}, LogID: ${c.callLogId}`);
+  }
 }
 
-main()
-  .catch(console.error)
-  .finally(() => prisma.$disconnect());
+main().finally(() => prisma.$disconnect());

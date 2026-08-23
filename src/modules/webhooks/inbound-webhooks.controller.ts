@@ -117,20 +117,28 @@ export class InboundWebhooksController {
         }
       }
 
-      // Map status
+
+      // Map status from VoiceLink/provider to our DB enum
       let status = "COMPLETED";
       if (statusRaw !== undefined) {
         const normalizedStatus = statusRaw.toString().toUpperCase();
-        if (normalizedStatus.includes("FAIL") || normalizedStatus.includes("ERROR") || normalizedStatus.includes("REJECT")) {
+        if (normalizedStatus.includes("RING") || normalizedStatus.includes("INITIAT") || normalizedStatus.includes("QUEUE") || normalizedStatus.includes("DISPATCH")) {
+          status = "RINGING";
+        } else if (normalizedStatus.includes("ANSWER") || normalizedStatus.includes("CONNECT") || normalizedStatus.includes("ACTIVE") || normalizedStatus.includes("IN_PROGRESS")) {
+          status = "ANSWERED";
+        } else if (normalizedStatus.includes("FAIL") || normalizedStatus.includes("ERROR") || normalizedStatus.includes("REJECT") || normalizedStatus.includes("CANCEL")) {
           status = "FAILED";
-        } else if (normalizedStatus.includes("BUSY") || normalizedStatus.includes("NO ANSWER") || normalizedStatus.includes("NO_ANSWER") || normalizedStatus.includes("MISSED")) {
+        } else if (normalizedStatus.includes("BUSY") || normalizedStatus.includes("NO ANSWER") || normalizedStatus.includes("NO_ANSWER") || normalizedStatus.includes("MISSED") || normalizedStatus.includes("VOICEMAIL")) {
           status = "MISSED";
         }
+        // else keep COMPLETED for COMPLETED/ENDED/HANGUP
       }
 
       const publicId = `INB-${logId}`;
       const finalRecordingUrl = recordingUrl || `/api/calls/${logId}/recording`;
       const finalTranscriptUrl = transcriptUrl || `/api/calls/${logId}/transcript`;
+      
+      const isCallLive = status === "RINGING" || status === "ANSWERED";
       
       let creditsToDeduct = 0;
       if (status === "COMPLETED" && durationSeconds > 0) {
@@ -184,18 +192,21 @@ export class InboundWebhooksController {
         const alreadyCharged = existingCall?.creditsUsed ? existingCall.creditsUsed > 0 : false;
         
         let localCreditsToDeduct = creditsToDeduct;
-        // If already charged, do not deduct again
-        if (alreadyCharged) {
+        // Never charge for live calls, and don't double-charge completed calls
+        if (alreadyCharged || isCallLive) {
           localCreditsToDeduct = 0;
         }
 
         const updateData: any = {};
         if (statusRaw !== undefined) updateData.status = status;
-        if (callDurationRaw !== undefined) updateData.durationSeconds = durationSeconds;
-        updateData.recordingUrl = finalRecordingUrl;
-        updateData.transcriptUrl = finalTranscriptUrl;
+        // Only update duration/recording on non-live events so we don't overwrite with 0
+        if (!isCallLive) {
+          if (callDurationRaw !== undefined) updateData.durationSeconds = durationSeconds;
+          updateData.recordingUrl = finalRecordingUrl;
+          updateData.transcriptUrl = finalTranscriptUrl;
+        }
         // Only set creditsUsed if we are deducting now, or keep the existing one
-        if (!alreadyCharged) {
+        if (!alreadyCharged && !isCallLive) {
           updateData.creditsUsed = localCreditsToDeduct;
         }
         if (resolvedPhoneNumber?.id) {
@@ -219,9 +230,9 @@ export class InboundWebhooksController {
             direction: "INBOUND",
             status: status as any,
             startedAt: new Date(),
-            durationSeconds,
-            recordingUrl: finalRecordingUrl,
-            transcriptUrl: finalTranscriptUrl,
+            durationSeconds: isCallLive ? 0 : durationSeconds,
+            recordingUrl: isCallLive ? null : finalRecordingUrl,
+            transcriptUrl: isCallLive ? null : finalTranscriptUrl,
             creditsUsed: localCreditsToDeduct,
             provider: "webhook",
             providerCallId: logId,
