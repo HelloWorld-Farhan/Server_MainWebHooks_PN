@@ -57,18 +57,22 @@ export class SubCompaniesController {
       });
 
       // Format them to match what the frontend expects
-      const formatted = subCompanies.map((c: any) => ({
-        _id: c.id,
-        companyName: c.name,
-        companyEmail: "", 
-        contactPhone: c.phoneNumbers?.[0]?.number || "",
-        status: c.status.toLowerCase(),
-        createdAt: c.createdAt.toISOString(),
-        creditsUsed: c.creditBalance?.creditsUsed || 0,
-        creditsRemaining: c.creditBalance?.creditsRemaining || 0,
-        inboundCalls: c.callLogs?.length || 0,
-        outboundCalls: (c._count?.callLogs || 0) - (c.callLogs?.length || 0)
-      }));
+      const formatted = subCompanies.map((c: any) => {
+        const allNumbers: string[] = (c.phoneNumbers || []).map((p: any) => p.number).filter(Boolean);
+        return {
+          _id: c.id,
+          companyName: c.name,
+          companyEmail: "", 
+          contactPhone: allNumbers[0] || "",     // first number (backward compat)
+          assignedNumbers: allNumbers,            // ALL numbers
+          status: c.status.toLowerCase(),
+          createdAt: c.createdAt.toISOString(),
+          creditsUsed: c.creditBalance?.creditsUsed || 0,
+          creditsRemaining: c.creditBalance?.creditsRemaining || 0,
+          inboundCalls: c.callLogs?.length || 0,
+          outboundCalls: (c._count?.callLogs || 0) - (c.callLogs?.length || 0)
+        };
+      });
 
       return res.json(formatted);
     } catch (err) {
