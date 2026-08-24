@@ -242,7 +242,7 @@ export class SubCompaniesController {
           }
 
           // Deduct from parent
-          await tx.creditBalance.update({
+          const updatedParent = await tx.creditBalance.update({
             where: { id: parentCredit.id },
             data: { creditsRemaining: { decrement: amount } }
           });
@@ -259,6 +259,26 @@ export class SubCompaniesController {
               creditsRemaining: { increment: amount }
             }
           });
+
+          // Zero-credit warning check for parent
+          if (parentCredit.creditsRemaining > 0 && updatedParent.creditsRemaining <= 0) {
+            process.nextTick(async () => {
+              try {
+                const fullCompany = await this.prisma.company.findUnique({
+                  where: { id: parentCompanyId },
+                  include: { members: { where: { role: "OWNER", status: "ACTIVE" }, include: { user: true } } },
+                });
+                const user = fullCompany?.members?.[0]?.user;
+                if (user && user.email) {
+                  await notificationService.sendCreditZeroWarningEmail({
+                    email: user.email,
+                    name: user.firstName ? `${user.firstName} ${user.lastName}`.trim() : user.email.split("@")[0],
+                  });
+                }
+              } catch (e) { console.error("Failed to process parent zero warning:", e); }
+            });
+          }
+
           return childCredit;
         } else {
           // REDUCE logic
@@ -279,6 +299,26 @@ export class SubCompaniesController {
               data: { creditsRemaining: { increment: amount } }
             });
           }
+
+          // Zero-credit warning check for child
+          if (childCreditCheck.creditsRemaining > 0 && childCredit.creditsRemaining <= 0) {
+            process.nextTick(async () => {
+              try {
+                const fullCompany = await this.prisma.company.findUnique({
+                  where: { id: childCompanyId },
+                  include: { members: { where: { role: "OWNER", status: "ACTIVE" }, include: { user: true } } },
+                });
+                const user = fullCompany?.members?.[0]?.user;
+                if (user && user.email) {
+                  await notificationService.sendSubCompanyCreditZeroWarningEmail({
+                    email: user.email,
+                    companyName: fullCompany.name,
+                  });
+                }
+              } catch (e) { console.error("Failed to process child zero warning:", e); }
+            });
+          }
+
           return childCredit;
         }
       });
