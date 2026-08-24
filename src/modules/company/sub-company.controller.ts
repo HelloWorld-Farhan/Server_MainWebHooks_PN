@@ -264,7 +264,7 @@ export class SubCompaniesController {
           if (parentCredit.creditsRemaining > 0 && updatedParent.creditsRemaining <= 0) {
             process.nextTick(async () => {
               try {
-                const fullCompany = await this.prisma.company.findUnique({
+                const fullCompany = await prisma.company.findUnique({
                   where: { id: parentCompanyId },
                   include: { members: { where: { role: "OWNER", status: "ACTIVE" }, include: { user: true } } },
                 });
@@ -304,7 +304,7 @@ export class SubCompaniesController {
           if (childCreditCheck.creditsRemaining > 0 && childCredit.creditsRemaining <= 0) {
             process.nextTick(async () => {
               try {
-                const fullCompany = await this.prisma.company.findUnique({
+                const fullCompany = await prisma.company.findUnique({
                   where: { id: childCompanyId },
                   include: { members: { where: { role: "OWNER", status: "ACTIVE" }, include: { user: true } } },
                 });
