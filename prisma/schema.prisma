@@ -748,6 +748,7 @@ model PhoneNumber {
   campaignId         String?           @db.ObjectId
   inboundAgentId     String?           @db.ObjectId
   outboundAgentId    String?           @db.ObjectId
+  direction          CallDirection?
   status             PhoneNumberStatus @default(ACTIVE)
   inboundCallsCount  Int               @default(0)
   outboundCallsCount Int               @default(0)
