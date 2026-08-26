@@ -246,9 +246,10 @@ export class InboundWebhooksController {
           }
         });
         
-        // If not found, and it's outbound, check if there's a PENDING log for this lead to adopt
         let callLogIdToUse = logId;
-        if (!existingCall && direction === "OUTBOUND") {
+        if (existingCall) {
+          callLogIdToUse = existingCall.callLogId;
+        } else if (direction === "OUTBOUND") {
           const pendingCall = await prisma.callLog.findFirst({
             where: {
               companyId: company.id,
