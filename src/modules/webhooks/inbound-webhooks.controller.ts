@@ -99,13 +99,28 @@ export class InboundWebhooksController {
       let companies: any[] = [];
       let resolvedPhoneNumber: any = null;
       
-      // Look up by agent number in PhoneNumber table — try ALL variants
-      const phoneNumbers = await prisma.phoneNumber.findMany({
+      // Look up by agent number (INBOUND) and calling number (OUTBOUND) in PhoneNumber table
+      let direction = "INBOUND";
+      
+      let phoneNumbers = await prisma.phoneNumber.findMany({
         where: { 
           OR: agentVariants.map(v => ({ number: { contains: v } })),
           status: "ACTIVE"
         }
       });
+      
+      // If agentNumber didn't match a DID, try callingNo (Outbound calls have DID in the from/callingNo field)
+      if (phoneNumbers.length === 0) {
+        phoneNumbers = await prisma.phoneNumber.findMany({
+          where: { 
+            OR: callingVariants.map(v => ({ number: { contains: v } })),
+            status: "ACTIVE"
+          }
+        });
+        if (phoneNumbers.length > 0) {
+          direction = "OUTBOUND";
+        }
+      }
       
       if (phoneNumbers.length > 0) {
         resolvedPhoneNumber = phoneNumbers[0];
@@ -113,8 +128,6 @@ export class InboundWebhooksController {
         if (companyIds.length > 0) {
           companies = await prisma.company.findMany({ where: { id: { in: companyIds as string[] } } });
         }
-
-        // Removed duplicate parent insertion logic to prevent double-charging and duplicate CallLogs.
       }
       
       if (companies.length === 0) {
@@ -187,27 +200,50 @@ export class InboundWebhooksController {
           });
         }
 
+        const customerNumber = direction === "OUTBOUND" ? normalizedAgentNumber : normalizedCallingNo;
+
         // Find or create lead
         let lead = await prisma.lead.findFirst({
-          where: { companyId: company.id, phone: normalizedCallingNo }
+          where: { companyId: company.id, phone: customerNumber }
         });
         if (!lead) {
           lead = await prisma.lead.create({
             data: {
               companyId: company.id,
-              phone: normalizedCallingNo,
-              firstName: "Incoming",
-              lastName: "Caller",
+              phone: customerNumber,
+              firstName: direction === "OUTBOUND" ? "Outbound" : "Incoming",
+              lastName: direction === "OUTBOUND" ? "Contact" : "Caller",
               stageId: stage.id
             }
           });
         }
 
-        const existingCall = await prisma.callLog.findUnique({
+        let existingCall = await prisma.callLog.findUnique({
           where: {
             companyId_callLogId: { companyId: company.id, callLogId: logId }
           }
         });
+        
+        // If not found, and it's outbound, check if there's a PENDING log for this lead to adopt
+        let callLogIdToUse = logId;
+        if (!existingCall && direction === "OUTBOUND") {
+          const pendingCall = await prisma.callLog.findFirst({
+            where: {
+              companyId: company.id,
+              leadId: lead.id,
+              direction: "OUTBOUND",
+              status: "PENDING"
+            },
+            orderBy: { startedAt: 'desc' }
+          });
+          
+          if (pendingCall) {
+            existingCall = pendingCall;
+            callLogIdToUse = pendingCall.callLogId; // Keep the original PENDING ID
+            // Optionally we can update the CallLog to use the Voicelink ID, but since 
+            // the UI already knows the PENDING ID, it's safer to keep it and update its status.
+          }
+        }
         
         const alreadyCharged = existingCall?.creditsUsed ? existingCall.creditsUsed > 0 : false;
         
@@ -239,15 +275,15 @@ export class InboundWebhooksController {
           where: {
             companyId_callLogId: {
               companyId: company.id,
-              callLogId: logId
+              callLogId: callLogIdToUse
             }
           },
           update: updateData,
           create: {
             companyId: company.id,
-            callLogId: logId,
+            callLogId: logId, // If creating new, use Voicelink's ID
             publicId: publicId,
-            direction: "INBOUND",
+            direction: direction as any,
             status: status as any,
             startedAt: new Date(),
             durationSeconds: isCallLive ? 0 : durationSeconds,
