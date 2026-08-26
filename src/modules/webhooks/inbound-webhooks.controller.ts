@@ -113,7 +113,7 @@ export class InboundWebhooksController {
         const exactCompany = await prisma.company.findUnique({ where: { id: payloadCompanyId } });
         if (exactCompany) {
           companies = [exactCompany];
-          direction = customParams.callType === "outbound" ? "OUTBOUND" : "INBOUND";
+          direction = customParams.callType === "outbound" || callObj.direction === "outbound" ? "OUTBOUND" : "INBOUND";
         }
       }
 
