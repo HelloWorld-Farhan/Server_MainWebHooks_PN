@@ -130,6 +130,24 @@ export class InboundWebhooksController {
         }
       }
       
+      // If we still don't have a company (meaning DID was not registered), check if there's a PENDING outbound call
+      if (companies.length === 0) {
+        const allVariants = [...agentVariants, ...callingVariants];
+        const pendingOutbound = await prisma.callLog.findFirst({
+          where: {
+            direction: "OUTBOUND",
+            status: "PENDING",
+            lead: { phone: { in: allVariants } }
+          },
+          include: { company: true }
+        });
+        
+        if (pendingOutbound && pendingOutbound.company) {
+          direction = "OUTBOUND";
+          companies = [pendingOutbound.company];
+        }
+      }
+
       if (companies.length === 0) {
         // Fallback to first company if not found
         const firstCompany = await prisma.company.findFirst();
