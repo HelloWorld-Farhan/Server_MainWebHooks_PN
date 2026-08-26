@@ -19,6 +19,7 @@ import { ChannelsInternalController } from '../internal/channels-internal.contro
 import { InternalController } from '../internal/internal.controller';
 import { InvitationsController } from '../invitations/invitations.controller';
 import { ObdController } from '../obd/obd.controller';
+import { VoicelinkController } from '../obd/voicelink.controller';
 import { PageCacheController } from '../page-cache/page-cache.controller';
 import { TelephonyController } from '../telephony/telephony.controller';
 import { ObdWebhooksController } from '../webhooks/obd-webhooks.controller';
@@ -35,6 +36,7 @@ import { UsersController } from '../users/users.controller';
     BillingController,
     TelephonyController,
     ObdController,
+    VoicelinkController,
     WebhooksController,
     ObdWebhooksController,
     InboundWebhooksController,
