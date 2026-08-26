@@ -7,8 +7,7 @@ async function main() {
   
   const result = await prisma.callLog.updateMany({
     where: {
-      status: { in: ["RINGING", "ANSWERED", "PENDING"] },
-      startedAt: { lt: fiveMinsAgo }
+      status: { in: ["RINGING", "ANSWERED", "PENDING"] }
     },
     data: {
       status: "FAILED",
