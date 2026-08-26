@@ -236,9 +236,13 @@ export class InboundWebhooksController {
           });
         }
 
-        let existingCall = await prisma.callLog.findUnique({
+        let existingCall = await prisma.callLog.findFirst({
           where: {
-            companyId_callLogId: { companyId: company.id, callLogId: logId }
+            companyId: company.id,
+            OR: [
+              { callLogId: logId },
+              { providerCallId: logId }
+            ]
           }
         });
         
@@ -288,6 +292,11 @@ export class InboundWebhooksController {
         }
         // Always keep a record of the latest webhook payload
         updateData.providerWebhook = body;
+        
+        // Link the provider's call ID if we adopted a pending call
+        if (logId) {
+          updateData.providerCallId = logId;
+        }
 
         const callLog = await prisma.callLog.upsert({
           where: {
