@@ -89,27 +89,65 @@ export const campaignExecutionWorker = redisConnection
               }
 
               activeCallCount++;
-              
-              batchPromises.push((async () => {
-                try {
-                  const controller = new AbortController();
-                  const timeoutId = setTimeout(() => controller.abort(), 15000);
-                  const res = await fetch(`${VOICELINK_API_URL}/v1/add_lead`, {
-                    method: "POST",
-                    headers: {
-                      "Content-Type": "application/json",
-                      "Accept": "application/json",
-                      Authorization: `Bearer ${token}`,
-                    },
-                    body: JSON.stringify({
-                      did_number: didNumber,
-                      customer_number: lead.phone.replace(/\D/g, "").slice(-10),
-                      country_code: "91",
-                      custom_parameters: JSON.stringify({ name: lead.name, companyId }),
-                    }),
-                    signal: controller.signal as any,
-                  });
-                  clearTimeout(timeoutId);
+                            batchPromises.push((async () => {
+                  try {
+                    // Create or find a lead to attach to the CallLog, essential for webhook matching
+                    let leadRecordId = lead.id;
+                    if (!leadRecordId) {
+                      const corePhone = lead.phone.replace(/\D/g, "").slice(-10);
+                      const foundLead = await prisma.lead.findFirst({
+                        where: { companyId, phone: { contains: corePhone } }
+                      });
+                      if (foundLead) {
+                        leadRecordId = foundLead.id;
+                      } else {
+                        let stage = await prisma.leadPipelineStage.findFirst({ where: { companyId, slug: "new" } });
+                        if (!stage) {
+                          stage = await prisma.leadPipelineStage.create({ data: { companyId, name: "New", slug: "new", order: 1 } });
+                        }
+                        const newLead = await prisma.lead.create({
+                          data: { companyId, phone: lead.phone, firstName: lead.name || "Outbound", lastName: "Contact", stageId: stage.id }
+                        });
+                        leadRecordId = newLead.id;
+                      }
+                    }
+
+                    // Create the PENDING CallLog so the webhook can find it regardless of DID ownership
+                    const publicId = `OUT-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+                    await prisma.callLog.create({
+                      data: {
+                        publicId,
+                        callLogId: publicId, // Webhook logic preserves this if it finds the pending call
+                        direction: "OUTBOUND",
+                        status: "PENDING",
+                        startedAt: new Date(),
+                        companyId,
+                        campaignId: campaignId === "manual" ? null : campaignId,
+                        durationSeconds: 0,
+                        provider: "voicelink",
+                        leadId: leadRecordId
+                      }
+                    });
+
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 15000);
+                    const res = await fetch(`${VOICELINK_API_URL}/v1/add_lead`, {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                        "Accept": "application/json",
+                        Authorization: `Bearer ${token}`,
+                      },
+                      body: JSON.stringify({
+                        did_number: didNumber,
+                        customer_number: lead.phone.replace(/\D/g, "").slice(-10),
+                        country_code: "91",
+                        // Pass as object, not stringified string inside JSON!
+                        custom_parameters: { name: lead.name, companyId },
+                      }),
+                      signal: controller.signal as any,
+                    });
+                    clearTimeout(timeoutId);
                   
                   if (!res.ok) {
                     const errText = await res.text();

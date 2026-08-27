@@ -47,9 +47,26 @@ export class InboundWebhooksController {
         const digits = num.replace(/\D/g, "");
         const variants = new Set<string>([num, digits]);
         
+        // Handle double zero country code format: 0091XXXXXXXXXX
+        if (digits.startsWith("00")) {
+          const stripped = digits.substring(2);
+          variants.add(stripped);
+          variants.add("+" + stripped);
+          if (stripped.startsWith("91")) {
+            const national = stripped.substring(2);
+            variants.add(national);
+            variants.add("0" + national);
+          }
+        } else if (digits.startsWith("0")) {
+          // e.g. 07969007102 -> 7969007102
+          const stripped = digits.substring(1);
+          variants.add(stripped);
+          variants.add("+" + stripped);
+        }
+
         // Handle Indian local format: 0XXXXXXXXXX (10 digits with leading 0)
         if (digits.startsWith("0") && digits.length === 11) {
-          // e.g. 07969007102 → 7969007102 → 917969007102 → +917969007102
+          // e.g. 07969007102 -> 7969007102 -> 917969007102 -> +917969007102
           const without0 = digits.substring(1); // 7969007102
           variants.add(without0);
           variants.add("91" + without0);         // 917969007102
@@ -117,56 +134,57 @@ export class InboundWebhooksController {
         }
       }
 
-      // Look up by agent number (INBOUND) and calling number (OUTBOUND) in PhoneNumber table if company not found
-      let phoneNumbers = await prisma.phoneNumber.findMany({
-        where: { 
-          OR: agentVariants.map(v => ({ number: { contains: v } })),
-          status: "ACTIVE",
-          ...(companies.length > 0 ? { companyId: { in: companies.map(c => c.id) } } : {})
-        }
-      });
+      const allVariants = [...agentVariants, ...callingVariants];
       
-      // If agentNumber didn't match a DID, try callingNo (Outbound calls have DID in the from/callingNo field)
-      if (phoneNumbers.length === 0) {
-        phoneNumbers = await prisma.phoneNumber.findMany({
-          where: { 
-            OR: callingVariants.map(v => ({ number: { contains: v } })),
-            status: "ACTIVE",
-            ...(companies.length > 0 ? { companyId: { in: companies.map(c => c.id) } } : {})
-          }
+      // If we don't have a company mapped from the payload, check globally for a PENDING outbound call FIRST.
+      // This ensures that shared DIDs (e.g. from parent tenant) map correctly to the sub-company that initiated the campaign.
+      if (companies.length === 0) {
+        const pendingOutbound = await prisma.callLog.findFirst({
+          where: {
+            direction: "OUTBOUND",
+            status: "PENDING",
+            lead: { phone: { in: allVariants } }
+          },
+          include: { company: true }
         });
-        if (phoneNumbers.length > 0 && companies.length === 0) {
+        
+        if (pendingOutbound && pendingOutbound.company) {
           direction = "OUTBOUND";
+          companies = [pendingOutbound.company];
         }
       }
-      
-      if (phoneNumbers.length > 0) {
-        resolvedPhoneNumber = phoneNumbers[0];
-        if (companies.length === 0) {
-          const companyIds = Array.from(new Set(phoneNumbers.map(p => p.companyId).filter(Boolean)));
+
+      // If STILL no company found (not an outbound pending call), look up by agent number (INBOUND) and calling number (OUTBOUND) in PhoneNumber table
+      let phoneNumbers: any[] = [];
+      if (companies.length === 0) {
+        phoneNumbers = await prisma.phoneNumber.findMany({
+          where: { 
+            OR: agentVariants.map(v => ({ number: { contains: v } })),
+            status: "ACTIVE"
+          }
+        });
+        
+        // If agentNumber didn't match a DID, try callingNo (Outbound calls have DID in the from/callingNo field)
+        if (phoneNumbers.length === 0) {
+          phoneNumbers = await prisma.phoneNumber.findMany({
+            where: { 
+              OR: callingVariants.map(v => ({ number: { contains: v } })),
+              status: "ACTIVE"
+            }
+          });
+          if (phoneNumbers.length > 0) {
+            direction = "OUTBOUND";
+          }
+        }
+        
+        if (phoneNumbers.length > 0) {
+          resolvedPhoneNumber = phoneNumbers[0];
+          const companyIds = Array.from(new Set(phoneNumbers.map((p: any) => p.companyId).filter(Boolean)));
           if (companyIds.length > 0) {
             companies = await prisma.company.findMany({ where: { id: { in: companyIds as string[] } } });
           }
         }
       }
-        
-        // If we still don't have a company (meaning DID was not registered), check if there's a PENDING outbound call
-        if (companies.length === 0) {
-          const allVariants = [...agentVariants, ...callingVariants];
-          const pendingOutbound = await prisma.callLog.findFirst({
-            where: {
-              direction: "OUTBOUND",
-              status: "PENDING",
-              lead: { phone: { in: allVariants } }
-            },
-            include: { company: true }
-          });
-          
-          if (pendingOutbound && pendingOutbound.company) {
-            direction = "OUTBOUND";
-            companies = [pendingOutbound.company];
-          }
-        }
 
       if (companies.length === 0) {
         // Fallback to first company if not found
