@@ -16,6 +16,7 @@ import { outboundCallsService } from "@/server/services/outbound-calls.service";
 import prisma from "@/server/lib/prisma";
 import { getGridFS, getDb } from "./mongo-client";
 import { getAuthFromRequest } from "@/auth/clerk";
+import { scheduleDelayedCall } from "@/server/queues/delayed-calls.queue";
 
 const createOutboundCallSchema = z.object({
   campaignId: z.string().min(1),
@@ -277,7 +278,7 @@ export class CallsController {
       const delay = Math.max(0, scheduleTime - Date.now());
 
       // We need to lazily import the queue to avoid circular/init issues if Redis isn't up
-      const { scheduleDelayedCall } = await import("../../server/queues/delayed-calls.queue");
+      // Fixed: Using static import because dynamic import fails in TS build on GitHub Actions
 
       for (const lead of leads) {
         if (!lead.phone) continue;
