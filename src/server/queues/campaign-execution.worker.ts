@@ -127,7 +127,7 @@ export const campaignExecutionWorker = redisConnection
                  
                  for (const [phone, count] of Array.from(activeCalls.entries())) {
                    const corePhone = phone.replace(/\D/g, "").slice(-10);
-                   const matchingCalls = dbCalls.filter(c => c.customerNumber?.includes(corePhone));
+                   const matchingCalls = dbCalls.filter(c => c.customerPhone?.includes(corePhone));
                    
                    const activeMatching = matchingCalls.filter(c => ["pending", "ringing", "answered", "in-progress"].includes(c.status?.toLowerCase() || ""));
                    

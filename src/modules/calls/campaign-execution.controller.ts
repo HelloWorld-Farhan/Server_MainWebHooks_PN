@@ -1,5 +1,5 @@
 import { Controller, Post, Get, Body, Query, Req, Res } from "@nestjs/common";
-import { Request, Response } from "express";
+import type { Request, Response } from "express";
 import { requireTenantPermission } from "@/lib/api/tenant-context";
 import { handleTenantResult } from "@/lib/api/http";
 import { PERMISSIONS } from "@/lib/permissions";
