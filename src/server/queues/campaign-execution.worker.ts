@@ -68,49 +68,62 @@ export const campaignExecutionWorker = redisConnection
           while (currentIndex < leads.length || activeCallCount > 0) {
             
             // Check if we can start more calls based on channel limits
+            const batchPromises = [];
+            
             while (activeCallCount < channels && currentIndex < leads.length) {
               const lead = leads[currentIndex];
               currentIndex++;
+              activeCallCount++; // Optimistically assume it will start
               
-              try {
-                const res = await fetch(`${VOICELINK_API_URL}/v1/add_lead`, {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    "Accept": "application/json",
-                    Authorization: `Bearer ${token}`,
-                  },
-                  body: JSON.stringify({
-                    did_number: didNumber,
-                    customer_number: lead.phone.replace(/\D/g, "").slice(-10),
-                    country_code: "91",
-                    custom_parameters: JSON.stringify({ name: lead.name, companyId }),
-                  }),
-                });
-                
-                if (!res.ok) {
-                  const errText = await res.text();
-                  console.error(`Failed to push lead ${lead.phone} to Voicelink:`, errText);
-                  await markAsFailed(lead.phone, didNumber);
+              batchPromises.push((async () => {
+                try {
+                  const res = await fetch(`${VOICELINK_API_URL}/v1/add_lead`, {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      "Accept": "application/json",
+                      Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({
+                      did_number: didNumber,
+                      customer_number: lead.phone.replace(/\D/g, "").slice(-10),
+                      country_code: "91",
+                      custom_parameters: JSON.stringify({ name: lead.name, companyId }),
+                    }),
+                  });
                   
+                  if (!res.ok) {
+                    const errText = await res.text();
+                    console.error(`Failed to push lead ${lead.phone} to Voicelink:`, errText);
+                    await markAsFailed(lead.phone, didNumber);
+                    
+                    await updateRedisState((prev) => {
+                       const updatedLeads = (prev.leads || []).map((l: any) => l.phone === lead.phone ? { ...l, called: true, isFailed: true } : l);
+                       return { ...prev, leads: updatedLeads, failedCalls: updatedLeads.filter((l: any) => l.isFailed).length, completedCalls: prev.completedCalls + 1 };
+                    });
+                    
+                    // Decrement since it failed to start
+                    activeCallCount--;
+                    completedCount++;
+                  } else {
+                    activeCalls.set(lead.phone, (activeCalls.get(lead.phone) || 0) + 1);
+                  }
+                } catch (err: any) {
+                  console.error(`Failed to push lead ${lead.phone}:`, err.message);
+                  await markAsFailed(lead.phone, didNumber);
                   await updateRedisState((prev) => {
-                     const updatedLeads = (prev.leads || []).map((l: any) => l.phone === lead.phone ? { ...l, called: true, isFailed: true } : l);
-                     return { ...prev, leads: updatedLeads, failedCalls: updatedLeads.filter((l: any) => l.isFailed).length, completedCalls: prev.completedCalls + 1 };
-                  });
+                       const updatedLeads = (prev.leads || []).map((l: any) => l.phone === lead.phone ? { ...l, called: true, isFailed: true } : l);
+                       return { ...prev, leads: updatedLeads, failedCalls: updatedLeads.filter((l: any) => l.isFailed).length, completedCalls: prev.completedCalls + 1 };
+                    });
+                  
+                  activeCallCount--;
                   completedCount++;
-                } else {
-                  activeCalls.set(lead.phone, (activeCalls.get(lead.phone) || 0) + 1);
-                  activeCallCount++;
                 }
-              } catch (err: any) {
-                console.error(`Failed to push lead ${lead.phone}:`, err.message);
-                await markAsFailed(lead.phone, didNumber);
-                await updateRedisState((prev) => {
-                     const updatedLeads = (prev.leads || []).map((l: any) => l.phone === lead.phone ? { ...l, called: true, isFailed: true } : l);
-                     return { ...prev, leads: updatedLeads, failedCalls: updatedLeads.filter((l: any) => l.isFailed).length, completedCalls: prev.completedCalls + 1 };
-                  });
-                completedCount++;
-              }
+              })());
+            }
+            
+            if (batchPromises.length > 0) {
+              await Promise.all(batchPromises);
             }
             
             // Polling loop
