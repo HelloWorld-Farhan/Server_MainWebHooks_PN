@@ -122,12 +122,13 @@ export const campaignExecutionWorker = redisConnection
                  const dbCalls = await prisma.callLog.findMany({
                    where: { companyId, direction: "OUTBOUND" },
                    orderBy: { createdAt: 'desc' },
-                   take: 50
+                   take: 50,
+                   include: { lead: true }
                  });
                  
                  for (const [phone, count] of Array.from(activeCalls.entries())) {
                    const corePhone = phone.replace(/\D/g, "").slice(-10);
-                   const matchingCalls = dbCalls.filter(c => c.customerPhone?.includes(corePhone));
+                   const matchingCalls = dbCalls.filter(c => c.lead?.phone?.includes(corePhone));
                    
                    const activeMatching = matchingCalls.filter(c => ["pending", "ringing", "answered", "in-progress"].includes(c.status?.toLowerCase() || ""));
                    
