@@ -6,30 +6,39 @@ import prisma from "@/server/lib/prisma";
 const VOICELINK_API_URL = "https://app.voicelink.co.in/api";
 
 async function loginToVoicelink() {
-  const loginRes = await fetch(`${VOICELINK_API_URL}/v1/auth/login`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Accept": "application/json",
-    },
-    body: JSON.stringify({
-      username: "propnex",
-      password: "PropnexAi2025@#",
-    }),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+  try {
+    const loginRes = await fetch(`${VOICELINK_API_URL}/v1/auth/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+      },
+      body: JSON.stringify({
+        username: "propnex",
+        password: "PropnexAi2025@#",
+      }),
+      signal: controller.signal as any,
+    });
+    clearTimeout(timeoutId);
 
-  if (!loginRes.ok) {
-    throw new Error("Failed to authenticate with Voicelink");
+    if (!loginRes.ok) {
+      throw new Error("Failed to authenticate with Voicelink");
+    }
+
+    const loginData = await loginRes.json();
+    const token = loginData.data?.access_token || loginData.access_token;
+
+    if (!token) {
+      throw new Error("Invalid authentication response from Voicelink");
+    }
+
+    return token;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    throw error;
   }
-
-  const loginData = await loginRes.json();
-  const token = loginData.data?.access_token || loginData.access_token;
-
-  if (!token) {
-    throw new Error("Invalid authentication response from Voicelink");
-  }
-
-  return token;
 }
 
 export const campaignExecutionWorker = redisConnection
@@ -43,13 +52,15 @@ export const campaignExecutionWorker = redisConnection
           const token = await loginToVoicelink();
 
           let activeCalls = new Map<string, number>();
+          let activeCallTimeouts = new Map<string, number>();
           let activeCallCount = 0;
           let completedCount = 0;
           let currentIndex = 0;
+          
+          const CALL_TIMEOUT_MS = 120000;
 
           const markAsFailed = async (phone: string, assignedNumber: string) => {
             try {
-              // Usually we would insert this into the DB, but since we just want to update the Redis state:
               console.error(`Marked ${phone} as failed immediately`);
             } catch (e) {
               console.error("Failed to mark call as failed in DB", e);
@@ -67,16 +78,22 @@ export const campaignExecutionWorker = redisConnection
 
           while (currentIndex < leads.length || activeCallCount > 0) {
             
-            // Check if we can start more calls based on channel limits
             const batchPromises: Promise<void>[] = [];
             
             while (activeCallCount < channels && currentIndex < leads.length) {
               const lead = leads[currentIndex];
               currentIndex++;
-              activeCallCount++; // Optimistically assume it will start
+              
+              if (lead.isInvalid) {
+                continue;
+              }
+
+              activeCallCount++;
               
               batchPromises.push((async () => {
                 try {
+                  const controller = new AbortController();
+                  const timeoutId = setTimeout(() => controller.abort(), 15000);
                   const res = await fetch(`${VOICELINK_API_URL}/v1/add_lead`, {
                     method: "POST",
                     headers: {
@@ -90,7 +107,9 @@ export const campaignExecutionWorker = redisConnection
                       country_code: "91",
                       custom_parameters: JSON.stringify({ name: lead.name, companyId }),
                     }),
+                    signal: controller.signal as any,
                   });
+                  clearTimeout(timeoutId);
                   
                   if (!res.ok) {
                     const errText = await res.text();
@@ -102,11 +121,11 @@ export const campaignExecutionWorker = redisConnection
                        return { ...prev, leads: updatedLeads, failedCalls: updatedLeads.filter((l: any) => l.isFailed).length, completedCalls: prev.completedCalls + 1 };
                     });
                     
-                    // Decrement since it failed to start
                     activeCallCount--;
                     completedCount++;
                   } else {
                     activeCalls.set(lead.phone, (activeCalls.get(lead.phone) || 0) + 1);
+                    activeCallTimeouts.set(lead.phone, Date.now());
                   }
                 } catch (err: any) {
                   console.error(`Failed to push lead ${lead.phone}:`, err.message);
@@ -126,12 +145,10 @@ export const campaignExecutionWorker = redisConnection
               await Promise.all(batchPromises);
             }
             
-            // Polling loop
             if (activeCallCount > 0) {
                await new Promise(resolve => setTimeout(resolve, 3000));
                
                try {
-                 // Fetch latest outbound calls directly from Prisma
                  const dbCalls = await prisma.callLog.findMany({
                    where: { companyId, direction: "OUTBOUND" },
                    orderBy: { createdAt: 'desc' },
@@ -141,18 +158,23 @@ export const campaignExecutionWorker = redisConnection
                  
                  for (const [phone, count] of Array.from(activeCalls.entries())) {
                    const corePhone = phone.replace(/\D/g, "").slice(-10);
-                   const matchingCalls = dbCalls.filter(c => c.lead?.phone?.includes(corePhone));
+                   
+                   const matchingCalls = dbCalls.filter(c => c.lead?.phone?.includes(corePhone) && c.createdAt.getTime() > (activeCallTimeouts.get(phone) || 0) - 10000);
                    
                    const activeMatching = matchingCalls.filter(c => ["pending", "ringing", "answered", "in-progress"].includes(c.status?.toLowerCase() || ""));
                    
-                   if (activeMatching.length < count) {
-                     const finishedCount = count - activeMatching.length;
+                   const timeElapsed = Date.now() - (activeCallTimeouts.get(phone) || 0);
+                   const hasTimedOut = timeElapsed > CALL_TIMEOUT_MS;
+                   
+                   if (activeMatching.length < count || hasTimedOut) {
+                     const finishedCount = hasTimedOut ? count : (count - activeMatching.length);
                      
                      const newlyFinished = matchingCalls.filter(c => !["pending", "ringing", "answered", "in-progress"].includes(c.status?.toLowerCase() || ""));
                      const newlyFailedCount = newlyFinished.filter(c => ["failed", "missed", "busy", "no-answer"].includes(c.status?.toLowerCase() || "")).length;
                      
-                     if (activeMatching.length === 0) {
+                     if (hasTimedOut || activeMatching.length === 0) {
                        activeCalls.delete(phone);
+                       activeCallTimeouts.delete(phone);
                      } else {
                        activeCalls.set(phone, activeMatching.length);
                      }
@@ -162,7 +184,7 @@ export const campaignExecutionWorker = redisConnection
                      await updateRedisState(prev => {
                        const updatedLeads = (prev.leads || []).map((l: any) => {
                          if (l.phone === phone) {
-                           const isFailed = newlyFailedCount > 0;
+                           const isFailed = (newlyFailedCount > 0) || (hasTimedOut && newlyFinished.length === 0);
                            return { ...l, called: true, isFailed };
                          }
                          return l;
@@ -187,7 +209,6 @@ export const campaignExecutionWorker = redisConnection
             }
           }
 
-          // Complete campaign
           await updateRedisState(prev => ({
             ...prev,
             status: "completed",
