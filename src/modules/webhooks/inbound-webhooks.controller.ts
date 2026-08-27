@@ -121,7 +121,8 @@ export class InboundWebhooksController {
       let phoneNumbers = await prisma.phoneNumber.findMany({
         where: { 
           OR: agentVariants.map(v => ({ number: { contains: v } })),
-          status: "ACTIVE"
+          status: "ACTIVE",
+          ...(companies.length > 0 ? { companyId: { in: companies.map(c => c.id) } } : {})
         }
       });
       
@@ -130,7 +131,8 @@ export class InboundWebhooksController {
         phoneNumbers = await prisma.phoneNumber.findMany({
           where: { 
             OR: callingVariants.map(v => ({ number: { contains: v } })),
-            status: "ACTIVE"
+            status: "ACTIVE",
+            ...(companies.length > 0 ? { companyId: { in: companies.map(c => c.id) } } : {})
           }
         });
         if (phoneNumbers.length > 0 && companies.length === 0) {
