@@ -258,4 +258,45 @@ export class CallsController {
       return res.status(500).json({ error: "Internal server error" });
     }
   }
+
+  @Post("reschedule")
+  async rescheduleCalls(@Req() req: Request, @Res() res: Response) {
+    const result = await requireTenantPermission(
+      req,
+      PERMISSIONS.CALL_LOGS_WRITE,
+    );
+    if (!handleTenantResult(res, result) || !result.ctx) return;
+
+    try {
+      const { campaignId, leads, scheduledAt, didNumber } = req.body;
+      if (!campaignId || !leads || !Array.isArray(leads) || !scheduledAt || !didNumber) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      const scheduleTime = new Date(scheduledAt).getTime();
+      const delay = Math.max(0, scheduleTime - Date.now());
+
+      // We need to lazily import the queue to avoid circular/init issues if Redis isn't up
+      const { scheduleDelayedCall } = await import("../../server/queues/delayed-calls.queue");
+
+      for (const lead of leads) {
+        if (!lead.phone) continue;
+        
+        await scheduleDelayedCall({
+          type: "NEW",
+          ctx: result.ctx,
+          didNumber,
+          newInput: {
+            campaignId,
+            phoneNumber: lead.phone
+          }
+        }, delay);
+      }
+
+      return res.json({ success: true, queuedCount: leads.length, delayMs: delay });
+    } catch (err: any) {
+      console.error("Reschedule error:", err);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
 }
