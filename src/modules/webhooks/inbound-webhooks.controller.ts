@@ -118,34 +118,35 @@ export class InboundWebhooksController {
       }
 
       // Look up by agent number (INBOUND) and calling number (OUTBOUND) in PhoneNumber table if company not found
-      if (companies.length === 0) {
-        let phoneNumbers = await prisma.phoneNumber.findMany({
+      let phoneNumbers = await prisma.phoneNumber.findMany({
+        where: { 
+          OR: agentVariants.map(v => ({ number: { contains: v } })),
+          status: "ACTIVE"
+        }
+      });
+      
+      // If agentNumber didn't match a DID, try callingNo (Outbound calls have DID in the from/callingNo field)
+      if (phoneNumbers.length === 0) {
+        phoneNumbers = await prisma.phoneNumber.findMany({
           where: { 
-            OR: agentVariants.map(v => ({ number: { contains: v } })),
+            OR: callingVariants.map(v => ({ number: { contains: v } })),
             status: "ACTIVE"
           }
         });
-        
-        // If agentNumber didn't match a DID, try callingNo (Outbound calls have DID in the from/callingNo field)
-        if (phoneNumbers.length === 0) {
-          phoneNumbers = await prisma.phoneNumber.findMany({
-            where: { 
-              OR: callingVariants.map(v => ({ number: { contains: v } })),
-              status: "ACTIVE"
-            }
-          });
-          if (phoneNumbers.length > 0) {
-            direction = "OUTBOUND";
-          }
+        if (phoneNumbers.length > 0 && companies.length === 0) {
+          direction = "OUTBOUND";
         }
-        
-        if (phoneNumbers.length > 0) {
-          resolvedPhoneNumber = phoneNumbers[0];
+      }
+      
+      if (phoneNumbers.length > 0) {
+        resolvedPhoneNumber = phoneNumbers[0];
+        if (companies.length === 0) {
           const companyIds = Array.from(new Set(phoneNumbers.map(p => p.companyId).filter(Boolean)));
           if (companyIds.length > 0) {
             companies = await prisma.company.findMany({ where: { id: { in: companyIds as string[] } } });
           }
         }
+      }
         
         // If we still don't have a company (meaning DID was not registered), check if there's a PENDING outbound call
         if (companies.length === 0) {
@@ -268,10 +269,11 @@ export class InboundWebhooksController {
         if (existingCall) {
           callLogIdToUse = existingCall.callLogId;
         } else if (direction === "OUTBOUND") {
+          const allVariants = [...agentVariants, ...callingVariants];
           const pendingCall = await prisma.callLog.findFirst({
             where: {
               companyId: company.id,
-              leadId: lead.id,
+              lead: { phone: { in: allVariants } },
               direction: "OUTBOUND",
               status: "PENDING"
             },
