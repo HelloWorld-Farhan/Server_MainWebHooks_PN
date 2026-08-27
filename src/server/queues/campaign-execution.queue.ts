@@ -37,9 +37,22 @@ export async function startCampaignJob(data: CampaignExecutionJobData, delayMs?:
     leads: data.leads
   }));
 
+  // Remove any existing job for this company to prevent BullMQ deduplication from blocking it
+  const existingJobId = `campaign-${data.companyId}`;
+  try {
+    const existingJob = await campaignExecutionQueue.getJob(existingJobId);
+    if (existingJob) {
+      await existingJob.remove();
+    }
+  } catch (e) {
+    console.error("Error removing existing campaign job:", e);
+  }
+
   await campaignExecutionQueue.add(`campaign-${data.companyId}-${Date.now()}`, data, {
-    jobId: `campaign-${data.companyId}`, // Ensures only 1 campaign runs per company
-    delay: delayMs ? Math.max(0, delayMs) : undefined
+    jobId: existingJobId, // Ensures only 1 campaign runs per company, but we removed the old one
+    delay: delayMs ? Math.max(0, delayMs) : undefined,
+    removeOnComplete: true,
+    removeOnFail: true
   });
 }
 
