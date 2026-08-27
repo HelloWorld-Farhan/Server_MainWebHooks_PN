@@ -7,6 +7,7 @@ import {
 } from './api.controllers';
 import { BillingController } from '../billing/billing.controller';
 import { CallsController } from '../calls/calls.controller';
+import { OutboundCampaignExecutionController } from '../calls/campaign-execution.controller';
 import { CampaignExecutionController } from '../campaigns/campaign-execution.controller';
 import {
   CompanyController,
@@ -50,6 +51,7 @@ import { UsersController } from '../users/users.controller';
     ContactPhonesController,
     PageCacheController,
     CallsController,
+    OutboundCampaignExecutionController,
     CampaignExecutionController,
   ],
 })

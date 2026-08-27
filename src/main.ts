@@ -11,6 +11,7 @@ import { PrismaExceptionFilter } from "./common/filters/prisma-exception.filter"
 import { LoggingInterceptor } from "./common/interceptors/logging.interceptor";
 
 import "./server/queues/delayed-calls.worker";
+import "./server/queues/campaign-execution.worker";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bodyParser: false });
