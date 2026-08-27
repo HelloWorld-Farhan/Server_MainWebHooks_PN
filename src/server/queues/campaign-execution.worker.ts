@@ -68,7 +68,7 @@ export const campaignExecutionWorker = redisConnection
           while (currentIndex < leads.length || activeCallCount > 0) {
             
             // Check if we can start more calls based on channel limits
-            const batchPromises = [];
+            const batchPromises: Promise<void>[] = [];
             
             while (activeCallCount < channels && currentIndex < leads.length) {
               const lead = leads[currentIndex];

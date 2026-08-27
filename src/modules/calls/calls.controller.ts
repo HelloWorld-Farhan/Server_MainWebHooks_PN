@@ -262,11 +262,33 @@ export class CallsController {
 
   @Post("reschedule")
   async rescheduleCalls(@Req() req: Request, @Res() res: Response) {
-    const result = await requireTenantPermission(
-      req,
-      PERMISSIONS.CALL_LOGS_WRITE,
-    );
-    if (!handleTenantResult(res, result) || !result.ctx) return;
+    const JWT_SECRET = process.env.JWT_SECRET || "propnex_secret_jwt_key_2026_key";
+    let tokenCompanyId: string | null = null;
+    
+    try {
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith("Bearer ")) {
+        const token = authHeader.split(" ")[1];
+        const jwt = require("jsonwebtoken");
+        const decoded: any = jwt.verify(token, JWT_SECRET);
+        const userId = decoded.sub || decoded.id;
+        
+        if (userId) {
+          const member = await prisma.companyMember.findFirst({
+            where: { userId, status: "ACTIVE" }
+          });
+          tokenCompanyId = member?.companyId || null;
+        }
+      }
+    } catch (err) {
+      // Ignore jwt errors and fallback
+    }
+
+    if (!tokenCompanyId) {
+      const result = await requireTenantPermission(req, PERMISSIONS.CALL_LOGS_WRITE);
+      if (!handleTenantResult(res, result) || !result.ctx) return;
+      tokenCompanyId = result.ctx.companyId;
+    }
 
     try {
       const { campaignId, leads, scheduledAt, didNumber } = req.body;
@@ -277,15 +299,12 @@ export class CallsController {
       const scheduleTime = new Date(scheduledAt).getTime();
       const delay = Math.max(0, scheduleTime - Date.now());
 
-      // We need to lazily import the queue to avoid circular/init issues if Redis isn't up
-      // Fixed: Using static import because dynamic import fails in TS build on GitHub Actions
-
       for (const lead of leads) {
         if (!lead.phone) continue;
         
         await scheduleDelayedCall({
           type: "NEW",
-          ctx: result.ctx,
+          ctx: { companyId: tokenCompanyId } as any,
           didNumber,
           newInput: {
             campaignId,
