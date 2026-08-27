@@ -205,11 +205,16 @@ export class InboundWebhooksController {
         // else keep COMPLETED for COMPLETED/ENDED/HANGUP
       }
 
+      const isCallLive = status === "RINGING" || status === "ANSWERED";
+
+      // If a call is finished but has 0 duration, it should be marked as FAILED or MISSED
+      if (!isCallLive && durationSeconds === 0) {
+        status = "FAILED";
+      }
+
       const publicId = `INB-${logId}`;
       const finalRecordingUrl = recordingUrl || `/api/calls/${logId}/recording`;
       const finalTranscriptUrl = transcriptUrl || `/api/calls/${logId}/transcript`;
-      
-      const isCallLive = status === "RINGING" || status === "ANSWERED";
       
       let creditsToDeduct = 0;
       if (status === "COMPLETED" && durationSeconds > 0) {
