@@ -2,7 +2,7 @@ import Redis from "ioredis";
 
 // Initialize a shared Redis connection for BullMQ
 // Requires REDIS_URL or UPSTASH_REDIS_URL to be set in .env
-const redisUrl = process.env.UPSTASH_REDIS_URL || process.env.REDIS_URL;
+const redisUrl = process.env.UPSTASH_REDIS_URL || process.env.REDIS_URL || "rediss://default:gQAAAAAAAuf8AAIgcDJhYmVlZjc5YzYxZTU0NzczYTdhZjU3ZGIxN2VkNjIzOA@set-feline-190460.upstash.io:6379";
 
 export const redisConnection = redisUrl 
   ? new Redis(redisUrl, {
