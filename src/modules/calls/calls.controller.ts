@@ -17,6 +17,7 @@ import prisma from "@/server/lib/prisma";
 import { getGridFS, getDb } from "./mongo-client";
 import { getAuthFromRequest } from "@/auth/clerk";
 import { scheduleDelayedCall } from "@/server/queues/delayed-calls.queue";
+import { startCampaignJob } from "@/server/queues/campaign-execution.queue";
 
 const createOutboundCallSchema = z.object({
   campaignId: z.string().min(1),
@@ -299,19 +300,16 @@ export class CallsController {
       const scheduleTime = new Date(scheduledAt).getTime();
       const delay = Math.max(0, scheduleTime - Date.now());
 
-      for (const lead of leads) {
-        if (!lead.phone) continue;
-        
-        await scheduleDelayedCall({
-          type: "NEW",
-          ctx: { companyId: tokenCompanyId } as any,
+      await startCampaignJob(
+        {
+          companyId: tokenCompanyId,
+          campaignId: campaignId || "manual",
           didNumber,
-          newInput: {
-            campaignId,
-            phoneNumber: lead.phone
-          }
-        }, delay);
-      }
+          leads: leads.filter(l => !!l.phone),
+          channels: req.body.channels || 2
+        },
+        delay
+      );
 
       return res.json({ success: true, queuedCount: leads.length, delayMs: delay });
     } catch (err: any) {

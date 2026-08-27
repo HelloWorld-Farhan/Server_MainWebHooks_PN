@@ -21,14 +21,14 @@ export const campaignExecutionQueue = redisConnection
     })
   : null;
 
-export async function startCampaignJob(data: CampaignExecutionJobData) {
+export async function startCampaignJob(data: CampaignExecutionJobData, delayMs?: number) {
   if (!campaignExecutionQueue) {
     throw new Error("Redis not configured. Cannot start campaign.");
   }
   
   // Set initial state in Redis
   await redisConnection!.set(`campaign-state:${data.companyId}`, JSON.stringify({
-    status: "running",
+    status: delayMs ? "scheduled" : "running",
     totalContacts: data.leads.length,
     completedCalls: 0,
     successfulCalls: 0,
@@ -37,7 +37,8 @@ export async function startCampaignJob(data: CampaignExecutionJobData) {
   }));
 
   await campaignExecutionQueue.add(`campaign-${data.companyId}-${Date.now()}`, data, {
-    jobId: `campaign-${data.companyId}` // Ensures only 1 campaign runs per company
+    jobId: `campaign-${data.companyId}`, // Ensures only 1 campaign runs per company
+    delay: delayMs ? Math.max(0, delayMs) : undefined
   });
 }
 
