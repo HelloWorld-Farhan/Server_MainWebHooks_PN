@@ -35,8 +35,10 @@ export async function scheduleDelayedCall(data: DelayedCallJobData, delayMs: num
     return;
   }
   
-  await delayedCallsQueue.add(`call-${data.didNumber}-${Date.now()}`, data, {
+  const uniqueId = Math.random().toString(36).substring(2, 9);
+  const jobId = `call-${data.didNumber}-${Date.now()}-${uniqueId}`;
+  await delayedCallsQueue.add(jobId, data, {
     delay: Math.max(0, delayMs),
-    jobId: `call-${data.didNumber}-${Date.now()}` // Unique job ID
+    jobId
   });
 }
