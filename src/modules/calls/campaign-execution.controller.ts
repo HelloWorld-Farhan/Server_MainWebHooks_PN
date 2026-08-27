@@ -32,20 +32,32 @@ export class OutboundCampaignExecutionController {
   
   @Post("start")
   async startCampaign(@Req() req: Request, @Res() res: Response) {
-    const companyId = await getCompanyIdFromToken(req);
-    if (!companyId) {
+    const tokenCompanyId = await getCompanyIdFromToken(req);
+    if (!tokenCompanyId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
     try {
-      const { campaignId, didNumber, leads, channels } = req.body;
+      const { campaignId, didNumber, leads, channels, companyId: requestedCompanyId } = req.body;
+      
+      let finalCompanyId = tokenCompanyId;
+      if (requestedCompanyId && requestedCompanyId !== tokenCompanyId) {
+        // Verify user has access to this sub-company
+        const subCompany = await prisma.company.findFirst({
+          where: { id: requestedCompanyId, parentCompanyId: tokenCompanyId }
+        });
+        if (!subCompany) {
+          return res.status(403).json({ error: "Forbidden: Not a valid sub-company" });
+        }
+        finalCompanyId = requestedCompanyId;
+      }
       
       if (!didNumber || !leads || leads.length === 0) {
         return res.status(400).json({ error: "Missing required parameters" });
       }
 
       await startCampaignJob({
-        companyId,
+        companyId: finalCompanyId,
         campaignId: campaignId || "manual",
         didNumber,
         leads,
@@ -61,13 +73,25 @@ export class OutboundCampaignExecutionController {
 
   @Get("status")
   async getStatus(@Req() req: Request, @Res() res: Response) {
-    const companyId = await getCompanyIdFromToken(req);
-    if (!companyId) {
+    const tokenCompanyId = await getCompanyIdFromToken(req);
+    if (!tokenCompanyId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
     try {
-      const state = await getCampaignState(companyId);
+      const requestedCompanyId = req.query.companyId as string | undefined;
+      let finalCompanyId = tokenCompanyId;
+      if (requestedCompanyId && requestedCompanyId !== tokenCompanyId) {
+        const subCompany = await prisma.company.findFirst({
+          where: { id: requestedCompanyId, parentCompanyId: tokenCompanyId }
+        });
+        if (!subCompany) {
+          return res.status(403).json({ error: "Forbidden: Not a valid sub-company" });
+        }
+        finalCompanyId = requestedCompanyId;
+      }
+
+      const state = await getCampaignState(finalCompanyId);
       return res.json({ success: true, data: state });
     } catch (e: any) {
       console.error("Failed to fetch campaign state", e);
