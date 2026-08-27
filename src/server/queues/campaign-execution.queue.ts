@@ -28,6 +28,7 @@ export async function startCampaignJob(data: CampaignExecutionJobData, delayMs?:
   
   // Set initial state in Redis
   await redisConnection!.set(`campaign-state:${data.companyId}`, JSON.stringify({
+    campaignId: data.campaignId,
     status: delayMs ? "scheduled" : "running",
     totalContacts: data.leads.length,
     completedCalls: 0,
@@ -46,4 +47,9 @@ export async function getCampaignState(companyId: string) {
   if (!redisConnection) return null;
   const state = await redisConnection.get(`campaign-state:${companyId}`);
   return state ? JSON.parse(state) : null;
+}
+
+export async function clearCampaignState(companyId: string) {
+  if (!redisConnection) return;
+  await redisConnection.del(`campaign-state:${companyId}`);
 }
