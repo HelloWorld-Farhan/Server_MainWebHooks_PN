@@ -298,6 +298,10 @@ export class InboundWebhooksController {
 
         const updateData: any = {};
         if (statusRaw !== undefined) updateData.status = status;
+        
+        if (existingCall && existingCall.status === "PENDING" && isCallLive) {
+          updateData.startedAt = new Date();
+        }
         // Only update duration/recording on non-live events so we don't overwrite with 0
         if (!isCallLive) {
           if (callDurationRaw !== undefined) updateData.durationSeconds = durationSeconds;
