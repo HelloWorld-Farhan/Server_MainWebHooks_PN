@@ -17,7 +17,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     response.status(500).json({
       statusCode: 500,
-      error: "Something went wrong. Please try again.",
+      error: exception instanceof Error ? exception.message : "Something went wrong. Please try again.",
       code: "INTERNAL_ERROR",
     });
   }
