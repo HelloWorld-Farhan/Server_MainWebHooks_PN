@@ -1,17 +1,41 @@
-import { Controller, Post, Get, Body, Query, Req, Res } from "@nestjs/common";
+import { Controller, Post, Get, Req, Res } from "@nestjs/common";
 import type { Request, Response } from "express";
-import { requireTenantPermission } from "@/lib/api/tenant-context";
-import { handleTenantResult } from "@/lib/api/http";
-import { PERMISSIONS } from "@/lib/permissions";
+import * as jwt from "jsonwebtoken";
+import prisma from "@/server/lib/prisma";
 import { startCampaignJob, getCampaignState } from "@/server/queues/campaign-execution.queue";
+
+const JWT_SECRET = process.env.JWT_SECRET || "propnex_secret_jwt_key_2026_key";
+
+async function getCompanyIdFromToken(req: Request): Promise<string | null> {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) return null;
+  
+  const token = authHeader.split(" ")[1];
+  try {
+    const decoded: any = jwt.verify(token, JWT_SECRET);
+    const userId = decoded.sub || decoded.id;
+    
+    if (!userId) return null;
+    
+    const member = await prisma.companyMember.findFirst({
+      where: { userId, status: "ACTIVE" }
+    });
+    
+    return member?.companyId || null;
+  } catch (err) {
+    return null;
+  }
+}
 
 @Controller("api/campaign-execution")
 export class OutboundCampaignExecutionController {
   
   @Post("start")
   async startCampaign(@Req() req: Request, @Res() res: Response) {
-    const result = await requireTenantPermission(req, PERMISSIONS.CALL_LOGS_WRITE);
-    if (!handleTenantResult(res, result) || !result.ctx) return;
+    const companyId = await getCompanyIdFromToken(req);
+    if (!companyId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
 
     try {
       const { campaignId, didNumber, leads, channels } = req.body;
@@ -21,7 +45,7 @@ export class OutboundCampaignExecutionController {
       }
 
       await startCampaignJob({
-        companyId: result.ctx.companyId,
+        companyId,
         campaignId: campaignId || "manual",
         didNumber,
         leads,
@@ -37,11 +61,13 @@ export class OutboundCampaignExecutionController {
 
   @Get("status")
   async getStatus(@Req() req: Request, @Res() res: Response) {
-    const result = await requireTenantPermission(req, PERMISSIONS.CALL_LOGS_READ);
-    if (!handleTenantResult(res, result) || !result.ctx) return;
+    const companyId = await getCompanyIdFromToken(req);
+    if (!companyId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
 
     try {
-      const state = await getCampaignState(result.ctx.companyId);
+      const state = await getCampaignState(companyId);
       return res.json({ success: true, data: state });
     } catch (e: any) {
       console.error("Failed to fetch campaign state", e);
