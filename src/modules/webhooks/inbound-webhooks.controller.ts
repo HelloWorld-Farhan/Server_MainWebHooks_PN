@@ -165,7 +165,6 @@ export class InboundWebhooksController {
             companies = [pendingOutbound.company];
           }
         }
-      }
 
       if (companies.length === 0) {
         // Fallback to first company if not found
