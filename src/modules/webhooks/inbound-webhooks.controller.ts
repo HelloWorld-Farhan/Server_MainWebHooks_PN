@@ -161,7 +161,8 @@ export class InboundWebhooksController {
         phoneNumbers = await prisma.phoneNumber.findMany({
           where: { 
             OR: agentVariants.map(v => ({ number: { contains: v } })),
-            status: "ACTIVE"
+            status: "ACTIVE",
+            direction: { not: "OUTBOUND" }
           }
         });
         
@@ -188,12 +189,8 @@ export class InboundWebhooksController {
       }
 
       if (companies.length === 0) {
-        // Fallback to first company if not found
-        const firstCompany = await prisma.company.findFirst();
-        if (firstCompany) companies = [firstCompany];
-      }
-      if (companies.length === 0) {
-        return res.status(404).json({ error: "No company found" });
+        console.warn(`Webhook rejected: No matching company found for inbound call to ${agentNumber} from ${callingNumber}`);
+        return res.status(404).json({ error: "No company found for this number" });
       }
 
 
