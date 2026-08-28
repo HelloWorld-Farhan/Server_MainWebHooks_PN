@@ -240,13 +240,16 @@ export class ObdWebhookService {
                 lead.called = true;
                 lead.isFailed = webhookResult.mappedStatus !== "COMPLETED" && webhookResult.mappedStatus !== "ANSWERED";
                 
+                // completedCalls tracks ALL processed calls (success + failed)
+                state.completedCalls = (state.completedCalls || 0) + 1;
+                
                 if (lead.isFailed) {
                   state.failedCalls = (state.failedCalls || 0) + 1;
                 } else {
-                  state.completedCalls = (state.completedCalls || 0) + 1;
+                  state.successfulCalls = (state.successfulCalls || 0) + 1;
                 }
                 
-                if ((state.completedCalls || 0) + (state.failedCalls || 0) >= (state.totalContacts || 0)) {
+                if (state.completedCalls >= (state.totalContacts || 0)) {
                   state.status = "completed";
                 }
                 
