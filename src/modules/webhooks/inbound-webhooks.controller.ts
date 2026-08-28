@@ -294,14 +294,16 @@ export class InboundWebhooksController {
           callLogIdToUse = existingCall.callLogId;
         } else if (direction === "OUTBOUND") {
           // Strategy 1: Direct match via pendingCallId embedded in customParameters (fastest & race-condition-free)
+          // NOTE: Do NOT filter by status=PENDING here — VoiceLink sometimes delivers call.completed BEFORE
+          // call.ringing (out of order), meaning the record may already be FAILED by the time ringing arrives.
           const pendingCallIdFromParams = customParams?.pendingCallId;
           if (pendingCallIdFromParams) {
             const byId = await prisma.callLog.findFirst({
               where: {
                 companyId: company.id,
                 callLogId: pendingCallIdFromParams,
-                direction: "OUTBOUND",
-                status: "PENDING"
+                direction: "OUTBOUND"
+                // No status filter — allow matching even if already FAILED (out-of-order webhooks)
               }
             });
             if (byId) {
@@ -310,7 +312,7 @@ export class InboundWebhooksController {
             }
           }
           
-          // Strategy 2: Fallback to phone variant matching if direct ID lookup failed
+          // Strategy 2: Fallback to phone variant matching (also without status filter for same reason)
           if (!existingCall) {
             const allVariants = [...agentVariants, ...callingVariants];
             const pendingCall = await prisma.callLog.findFirst({
@@ -318,7 +320,7 @@ export class InboundWebhooksController {
                 companyId: company.id,
                 lead: { phone: { in: allVariants } },
                 direction: "OUTBOUND",
-                status: "PENDING"
+                status: { in: ["PENDING", "RINGING", "ANSWERED"] }
               },
               orderBy: { startedAt: 'desc' }
             });
