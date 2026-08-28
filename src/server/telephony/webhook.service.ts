@@ -38,6 +38,8 @@ import {
 import { validateWebhookCallLogChain, type WebhookCallLogContext } from "@/server/telephony/webhook-validation";
 import { callService } from "@/server/services/call.service";
 import { retrySchedulerService } from "@/server/campaign-execution/retry/retry-scheduler.service";
+import { redisConnection } from "@/server/queues/redis.client";
+import { CampaignGateway } from "@/modules/websockets/campaign.gateway";
 
 export type ObdWebhookProcessResult = {
   received: true;
@@ -223,6 +225,43 @@ export class ObdWebhookService {
         mappedStatus: webhookResult.mappedStatus,
         correlationId,
       });
+
+      // Update WebSocket State instantly
+      if (callLog.companyId && callLog.phoneNumber?.number) {
+        try {
+          const stateStr = await redisConnection!.get(`campaign-state:${callLog.companyId}`);
+          if (stateStr) {
+            const state = JSON.parse(stateStr);
+            if (state.leads) {
+              const leadIndex = state.leads.findIndex((l: any) => l.phone === callLog.phoneNumber?.number && !l.called);
+              const lead = leadIndex !== -1 ? state.leads[leadIndex] : state.leads.find((l: any) => l.phone === callLog.phoneNumber?.number);
+              
+              if (lead) {
+                lead.called = true;
+                lead.isFailed = webhookResult.mappedStatus !== "COMPLETED" && webhookResult.mappedStatus !== "ANSWERED";
+                
+                if (lead.isFailed) {
+                  state.failedCalls = (state.failedCalls || 0) + 1;
+                } else {
+                  state.completedCalls = (state.completedCalls || 0) + 1;
+                }
+                
+                if ((state.completedCalls || 0) + (state.failedCalls || 0) >= (state.totalContacts || 0)) {
+                  state.status = "completed";
+                }
+                
+                await redisConnection!.set(`campaign-state:${callLog.companyId}`, JSON.stringify(state));
+                const gateway = CampaignGateway.getInstance();
+                if (gateway) {
+                  gateway.broadcastCampaignUpdate(callLog.companyId as string, state);
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.error("Failed to update websocket state for webhook", e);
+        }
+      }
     }
 
     logObdWebhook({
