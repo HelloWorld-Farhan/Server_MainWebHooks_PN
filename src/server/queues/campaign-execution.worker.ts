@@ -144,9 +144,6 @@ export const campaignExecutionWorker = redisConnection
                     // Create the PENDING CallLog so the webhook can find it regardless of DID ownership
                     const publicId = `OUT-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
                     
-                    // Validate campaignId as a 24-character hex string for MongoDB ObjectId
-                    const isValidObjectId = /^[0-9a-fA-F]{24}$/.test(campaignId);
-                    
                     await prisma.callLog.create({
                       data: {
                         publicId,
@@ -155,7 +152,7 @@ export const campaignExecutionWorker = redisConnection
                         status: "PENDING",
                         startedAt: new Date(),
                         companyId,
-                        campaignId: isValidObjectId ? campaignId : null,
+                        campaignId: campaignId,
                         durationSeconds: 0,
                         provider: "voicelink",
                         leadId: leadRecordId

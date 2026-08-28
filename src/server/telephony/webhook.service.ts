@@ -233,8 +233,15 @@ export class ObdWebhookService {
           if (stateStr) {
             const state = JSON.parse(stateStr);
             if (state.leads) {
-              const leadIndex = state.leads.findIndex((l: any) => l.phone === callLog.phoneNumber?.number && !l.called);
-              const lead = leadIndex !== -1 ? state.leads[leadIndex] : state.leads.find((l: any) => l.phone === callLog.phoneNumber?.number);
+              const coreLogPhone = callLog.phoneNumber?.number?.replace(/\D/g, "").slice(-10);
+              const leadIndex = state.leads.findIndex((l: any) => {
+                const coreLeadPhone = l.phone?.replace(/\D/g, "").slice(-10);
+                return coreLeadPhone === coreLogPhone && !l.called;
+              });
+              const lead = leadIndex !== -1 ? state.leads[leadIndex] : state.leads.find((l: any) => {
+                const coreLeadPhone = l.phone?.replace(/\D/g, "").slice(-10);
+                return coreLeadPhone === coreLogPhone;
+              });
               
               if (lead) {
                 lead.called = true;
