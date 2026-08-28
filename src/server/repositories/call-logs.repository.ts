@@ -330,6 +330,7 @@ export class CallLogsRepository extends BaseRepository {
         phoneNumber: {
           select: { id: true, number: true, campaignId: true, companyId: true },
         },
+        lead: { select: { id: true, phone: true } },
       },
     });
   }

@@ -227,21 +227,22 @@ export class ObdWebhookService {
       });
 
       // Update WebSocket State instantly
-      if (callLog.companyId && callLog.phoneNumber?.number) {
+      if (callLog.companyId && (callLog.phoneNumber?.number || callLog.lead?.phone || (payload as any).call?.to)) {
         try {
           const stateStr = await redisConnection!.get(`campaign-state:${callLog.companyId}`);
           if (stateStr) {
             const state = JSON.parse(stateStr);
-            if (state.leads) {
-              const coreLogPhone = callLog.phoneNumber?.number?.replace(/\D/g, "").slice(-10);
-              const leadIndex = state.leads.findIndex((l: any) => {
-                const coreLeadPhone = l.phone?.replace(/\D/g, "").slice(-10);
-                return coreLeadPhone === coreLogPhone && !l.called;
-              });
-              const lead = leadIndex !== -1 ? state.leads[leadIndex] : state.leads.find((l: any) => {
-                const coreLeadPhone = l.phone?.replace(/\D/g, "").slice(-10);
-                return coreLeadPhone === coreLogPhone;
-              });
+              if (state.leads) {
+                const callPhoneToMatch = callLog.lead?.phone || (payload as any).call?.to || (payload as any).call?.from || "";
+                const coreLogPhone = callPhoneToMatch.replace(/\D/g, "").slice(-10);
+                const leadIndex = state.leads.findIndex((l: any) => {
+                  const coreLeadPhone = l.phone?.replace(/\D/g, "").slice(-10);
+                  return coreLeadPhone === coreLogPhone && !l.called;
+                });
+                const lead = leadIndex !== -1 ? state.leads[leadIndex] : state.leads.find((l: any) => {
+                  const coreLeadPhone = l.phone?.replace(/\D/g, "").slice(-10);
+                  return coreLeadPhone === coreLogPhone;
+                });
               
               if (lead) {
                 lead.called = true;
