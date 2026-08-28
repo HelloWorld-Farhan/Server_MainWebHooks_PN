@@ -189,7 +189,7 @@ export class InboundWebhooksController {
       }
 
       if (companies.length === 0) {
-        console.warn(`Webhook rejected: No matching company found for inbound call to ${agentNumber} from ${callingNumber}`);
+        console.warn(`Webhook rejected: No matching company found for inbound call to ${agentNumber} from ${callingNo}`);
         return res.status(404).json({ error: "No company found for this number" });
       }
 
