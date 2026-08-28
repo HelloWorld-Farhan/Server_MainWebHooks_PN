@@ -77,6 +77,26 @@ export const campaignExecutionWorker = redisConnection
           };
 
           while (currentIndex < leads.length || activeCallCount > 0) {
+            // Check if the user force-stopped (cleared) the campaign
+            const currentStateStr = await redisConnection!.get(`campaign-state:${companyId}`);
+            if (!currentStateStr) {
+              console.log(`Campaign force stopped for company: ${companyId}. Aborting worker.`);
+              
+              // Clean up any remaining PENDING calls in DB to FAILED so they aren't stuck
+              try {
+                 await prisma.callLog.updateMany({
+                   where: {
+                     companyId,
+                     direction: "OUTBOUND",
+                     status: "PENDING"
+                   },
+                   data: { status: "FAILED", durationSeconds: 0 }
+                 });
+              } catch (e) {
+                 console.error("Cleanup error on force stop", e);
+              }
+              break;
+            }
             
             const batchPromises: Promise<void>[] = [];
             
