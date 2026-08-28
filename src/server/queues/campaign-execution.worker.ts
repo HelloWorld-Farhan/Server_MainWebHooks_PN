@@ -172,11 +172,11 @@ export const campaignExecutionWorker = redisConnection
                         Authorization: `Bearer ${token}`,
                       },
                       body: JSON.stringify({
-                        did_number: didNumber,
-                        customer_number: lead.phone.replace(/\D/g, "").slice(-10),
-                        country_code: "91",
-                        custom_parameters: JSON.stringify({ name: lead.name, companyId }),
-                      }),
+                          did_number: didNumber,
+                          customer_number: lead.phone.replace(/\D/g, "").slice(-10),
+                          country_code: "91",
+                          custom_parameters: JSON.stringify({ name: lead.name, companyId, pendingCallId: publicId }),
+                        }),
                       signal: controller.signal as any,
                     });
                     clearTimeout(timeoutId);

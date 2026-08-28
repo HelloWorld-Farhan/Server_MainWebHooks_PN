@@ -293,24 +293,43 @@ export class InboundWebhooksController {
         if (existingCall) {
           callLogIdToUse = existingCall.callLogId;
         } else if (direction === "OUTBOUND") {
-          const allVariants = [...agentVariants, ...callingVariants];
-          const pendingCall = await prisma.callLog.findFirst({
-            where: {
-              companyId: company.id,
-              lead: { phone: { in: allVariants } },
-              direction: "OUTBOUND",
-              status: "PENDING"
-            },
-            orderBy: { startedAt: 'desc' }
-          });
+          // Strategy 1: Direct match via pendingCallId embedded in customParameters (fastest & race-condition-free)
+          const pendingCallIdFromParams = customParams?.pendingCallId;
+          if (pendingCallIdFromParams) {
+            const byId = await prisma.callLog.findFirst({
+              where: {
+                companyId: company.id,
+                callLogId: pendingCallIdFromParams,
+                direction: "OUTBOUND",
+                status: "PENDING"
+              }
+            });
+            if (byId) {
+              existingCall = byId;
+              callLogIdToUse = byId.callLogId;
+            }
+          }
           
-          if (pendingCall) {
-            existingCall = pendingCall;
-            callLogIdToUse = pendingCall.callLogId; // Keep the original PENDING ID
-            // Optionally we can update the CallLog to use the Voicelink ID, but since 
-            // the UI already knows the PENDING ID, it's safer to keep it and update its status.
+          // Strategy 2: Fallback to phone variant matching if direct ID lookup failed
+          if (!existingCall) {
+            const allVariants = [...agentVariants, ...callingVariants];
+            const pendingCall = await prisma.callLog.findFirst({
+              where: {
+                companyId: company.id,
+                lead: { phone: { in: allVariants } },
+                direction: "OUTBOUND",
+                status: "PENDING"
+              },
+              orderBy: { startedAt: 'desc' }
+            });
+            
+            if (pendingCall) {
+              existingCall = pendingCall;
+              callLogIdToUse = pendingCall.callLogId;
+            }
           }
         }
+
         
         const alreadyCharged = existingCall?.creditsUsed ? existingCall.creditsUsed > 0 : false;
         
