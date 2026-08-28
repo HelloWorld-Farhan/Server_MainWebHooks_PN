@@ -29,22 +29,29 @@ export async function startCampaignJob(data: CampaignExecutionJobData, delayMs?:
     throw new Error("Redis not configured. Cannot start campaign.");
   }
   
-  // Remove any existing job for this company to prevent BullMQ deduplication from blocking it
   const existingJobId = `campaign-${data.companyId}`;
   try {
     const existingJob = await campaignExecutionQueue.getJob(existingJobId);
     if (existingJob) {
+      const state = await existingJob.getState();
+      if (state === "active" || state === "waiting" || state === "delayed") {
+        throw new Error("A campaign is already running or scheduled for this company.");
+      }
       await existingJob.remove();
     }
-  } catch (e) {
-    console.error("Error removing existing campaign job:", e);
+  } catch (e: any) {
+    if (e.message.includes("already running")) {
+      throw e;
+    }
+    console.error("Error checking existing campaign job:", e);
   }
 
   // Deduplicate leads by phone to prevent multiple calls to the same number
   const uniqueLeadsMap = new Map();
   for (const lead of data.leads) {
     if (lead?.phone) {
-      uniqueLeadsMap.set(lead.phone, lead);
+      const corePhone = lead.phone.replace(/\D/g, "").slice(-10);
+      uniqueLeadsMap.set(corePhone, lead);
     }
   }
   const deduplicatedLeads = Array.from(uniqueLeadsMap.values());
