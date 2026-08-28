@@ -134,16 +134,15 @@ export class InboundWebhooksController {
         }
       }
 
-      const allVariants = [...agentVariants, ...callingVariants];
-      
-      // If we don't have a company mapped from the payload, check globally for a PENDING outbound call FIRST.
-      // This ensures that shared DIDs (e.g. from parent tenant) map correctly to the sub-company that initiated the campaign.
-      if (companies.length === 0) {
+      // If we didn't explicitly detect outbound from the payload flags, check if there's a PENDING outbound call
+      if (direction === "INBOUND") {
+        const allVariants = [...agentVariants, ...callingVariants];
         const pendingOutbound = await prisma.callLog.findFirst({
           where: {
             direction: "OUTBOUND",
             status: "PENDING",
-            lead: { phone: { in: allVariants } }
+            lead: { phone: { in: allVariants } },
+            ...(companies.length > 0 ? { companyId: { in: companies.map(c => c.id) } } : {})
           },
           orderBy: { startedAt: 'desc' },
           include: { company: true }
@@ -151,7 +150,9 @@ export class InboundWebhooksController {
         
         if (pendingOutbound && pendingOutbound.company) {
           direction = "OUTBOUND";
-          companies = [pendingOutbound.company];
+          if (companies.length === 0) {
+            companies = [pendingOutbound.company];
+          }
         }
       }
 
