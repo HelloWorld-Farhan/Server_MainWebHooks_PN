@@ -212,13 +212,28 @@ export const campaignExecutionWorker = redisConnection
                      
                      const newlyFinished = matchingCalls.filter(c => !["pending", "ringing", "answered", "in-progress"].includes(c.status?.toLowerCase() || ""));
                      const newlyFailedCount = newlyFinished.filter(c => ["failed", "missed", "busy", "no-answer"].includes(c.status?.toLowerCase() || "")).length;
-                     
-                     if (hasTimedOut || activeMatching.length === 0) {
-                       activeCalls.delete(phone);
-                       activeCallTimeouts.delete(phone);
-                     } else {
-                       activeCalls.set(phone, activeMatching.length);
-                     }
+                                          if (hasTimedOut || activeMatching.length === 0) {
+                         activeCalls.delete(phone);
+                         activeCallTimeouts.delete(phone);
+                         
+                         // Clean up stuck calls in the database
+                         if (hasTimedOut) {
+                           try {
+                             await prisma.callLog.updateMany({
+                               where: {
+                                 companyId,
+                                 lead: { phone: { contains: corePhone } },
+                                 status: { in: ["PENDING", "RINGING"] }
+                               },
+                               data: { status: "FAILED", durationSeconds: 0 }
+                             });
+                           } catch (err) {
+                             console.error("Failed to clean up timed out calls in db", err);
+                           }
+                         }
+                       } else {
+                         activeCalls.set(phone, activeMatching.length);
+                       }
                      activeCallCount -= finishedCount;
                      completedCount += finishedCount;
                      

@@ -306,7 +306,8 @@ export class CallsController {
           campaignId: campaignId || "manual",
           didNumber,
           leads: leads.filter(l => !!l.phone),
-          channels: req.body.channels || 2
+          channels: req.body.channels || 2,
+          isReactivation: true
         },
         delay
       );

@@ -145,6 +145,7 @@ export class InboundWebhooksController {
             status: "PENDING",
             lead: { phone: { in: allVariants } }
           },
+          orderBy: { startedAt: 'desc' },
           include: { company: true }
         });
         

@@ -9,6 +9,7 @@ export type CampaignExecutionJobData = {
   didNumber: string;
   leads: any[];
   channels: number;
+  isReactivation?: boolean;
 };
 
 export const campaignExecutionQueue = redisConnection 
@@ -26,17 +27,6 @@ export async function startCampaignJob(data: CampaignExecutionJobData, delayMs?:
     throw new Error("Redis not configured. Cannot start campaign.");
   }
   
-  // Set initial state in Redis
-  await redisConnection!.set(`campaign-state:${data.companyId}`, JSON.stringify({
-    campaignId: data.campaignId,
-    status: delayMs ? "scheduled" : "running",
-    totalContacts: data.leads.length,
-    completedCalls: 0,
-    successfulCalls: 0,
-    failedCalls: 0,
-    leads: data.leads
-  }));
-
   // Remove any existing job for this company to prevent BullMQ deduplication from blocking it
   const existingJobId = `campaign-${data.companyId}`;
   try {
@@ -47,6 +37,28 @@ export async function startCampaignJob(data: CampaignExecutionJobData, delayMs?:
   } catch (e) {
     console.error("Error removing existing campaign job:", e);
   }
+
+  // Deduplicate leads by phone to prevent multiple calls to the same number
+  const uniqueLeadsMap = new Map();
+  for (const lead of data.leads) {
+    if (lead?.phone) {
+      uniqueLeadsMap.set(lead.phone, lead);
+    }
+  }
+  const deduplicatedLeads = Array.from(uniqueLeadsMap.values());
+  data.leads = deduplicatedLeads;
+
+  // Set initial state in Redis
+  await redisConnection!.set(`campaign-state:${data.companyId}`, JSON.stringify({
+    campaignId: data.campaignId,
+    status: delayMs ? "scheduled" : "running",
+    totalContacts: data.leads.length,
+    completedCalls: 0,
+    successfulCalls: 0,
+    failedCalls: 0,
+    leads: data.leads,
+    isReactivation: !!data.isReactivation
+  }));
 
   await campaignExecutionQueue.add(`campaign-${data.companyId}-${Date.now()}`, data, {
     jobId: existingJobId, // Ensures only 1 campaign runs per company, but we removed the old one
