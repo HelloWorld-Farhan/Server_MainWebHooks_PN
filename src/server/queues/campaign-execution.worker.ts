@@ -144,6 +144,9 @@ export const campaignExecutionWorker = redisConnection
                     // Create the PENDING CallLog so the webhook can find it regardless of DID ownership
                     const publicId = `OUT-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
                     
+                    // Validate campaignId as a 24-character hex string for MongoDB ObjectId
+                    const isValidObjectId = /^[0-9a-fA-F]{24}$/.test(campaignId);
+                    
                     await prisma.callLog.create({
                       data: {
                         publicId,
@@ -152,7 +155,7 @@ export const campaignExecutionWorker = redisConnection
                         status: "PENDING",
                         startedAt: new Date(),
                         companyId,
-                        campaignId: campaignId,
+                        campaignId: isValidObjectId ? campaignId : null,
                         durationSeconds: 0,
                         provider: "voicelink",
                         leadId: leadRecordId
@@ -215,9 +218,10 @@ export const campaignExecutionWorker = redisConnection
             if (activeCallCount > 0) {
                await new Promise(resolve => setTimeout(resolve, 3000));
                
-               try {
+                try {
+                 const isValidObjectId = /^[0-9a-fA-F]{24}$/.test(campaignId);
                  const dbCalls = await prisma.callLog.findMany({
-                   where: { companyId, direction: "OUTBOUND" },
+                   where: { companyId, campaignId: isValidObjectId ? campaignId : null, direction: "OUTBOUND" },
                    orderBy: { createdAt: 'desc' },
                    take: 50,
                    include: { lead: true }
