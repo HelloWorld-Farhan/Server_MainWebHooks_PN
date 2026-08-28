@@ -2,6 +2,7 @@ import { Worker, Job } from "bullmq";
 import { redisConnection } from "./redis.client";
 import { CAMPAIGN_EXECUTION_QUEUE_NAME, CampaignExecutionJobData } from "./campaign-execution.queue";
 import prisma from "@/server/lib/prisma";
+import { CampaignGateway } from "@/modules/websockets/campaign.gateway";
 
 const VOICELINK_API_URL = "https://app.voicelink.co.in/api";
 
@@ -73,6 +74,11 @@ export const campaignExecutionWorker = redisConnection
                 const state = JSON.parse(stateStr);
                 const newState = updateFn(state);
                 await redisConnection!.set(`campaign-state:${companyId}`, JSON.stringify(newState));
+                // Broadcast WebSocket event
+                const gateway = CampaignGateway.getInstance();
+                if (gateway) {
+                  gateway.broadcastCampaignUpdate(companyId, newState);
+                }
              }
           };
 

@@ -18,6 +18,7 @@ export const campaignExecutionQueue = redisConnection
       defaultJobOptions: {
         attempts: 1, // Don't auto-retry the entire campaign loop
         removeOnComplete: true,
+        removeOnFail: true,
       },
     })
   : null;

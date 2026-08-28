@@ -6,6 +6,7 @@ import { PrismaModule } from "./database/prisma/prisma.module";
 import { ApiModule } from "./modules/api/api.module";
 import { CampaignExecutionModule } from "./server/campaign-execution/campaign-execution.module";
 import { ChannelsModule } from "./server/channels/channels.module";
+import { WebsocketsModule } from "./modules/websockets/websockets.module";
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { ChannelsModule } from "./server/channels/channels.module";
     ApiModule,
     ChannelsModule,
     CampaignExecutionModule,
+    WebsocketsModule,
   ],
   controllers: [AppController],
   providers: [LoggingInterceptor],
