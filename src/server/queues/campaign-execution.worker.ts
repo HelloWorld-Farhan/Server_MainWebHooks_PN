@@ -146,8 +146,7 @@ export const campaignExecutionWorker = redisConnection
                         did_number: didNumber,
                         customer_number: lead.phone.replace(/\D/g, "").slice(-10),
                         country_code: "91",
-                        // Pass as object, not stringified string inside JSON!
-                        custom_parameters: { name: lead.name, companyId },
+                        custom_parameters: JSON.stringify({ name: lead.name, companyId }),
                       }),
                       signal: controller.signal as any,
                     });
