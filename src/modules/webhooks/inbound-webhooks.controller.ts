@@ -95,6 +95,7 @@ export class InboundWebhooksController {
           const stripped = digits.substring(2);
           if (stripped.length >= 10) {
             variants.add(stripped);
+            variants.add("0" + stripped); // Add the 0 prefix variant for Indian numbers
             variants.add("+" + stripped);
             variants.add("91" + stripped);
             variants.add("+91" + stripped);
