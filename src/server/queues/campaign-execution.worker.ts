@@ -82,6 +82,9 @@ export const campaignExecutionWorker = redisConnection
              }
           };
 
+          // Update status to running immediately when the job starts (useful for scheduled jobs)
+          await updateRedisState(prev => ({ ...prev, status: "running" }));
+
           while (currentIndex < leads.length || activeCallCount > 0) {
             // Check if the user force-stopped (cleared) the campaign
             const currentStateStr = await redisConnection!.get(`campaign-state:${companyId}`);

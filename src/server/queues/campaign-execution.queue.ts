@@ -1,5 +1,6 @@
 import { Queue } from "bullmq";
 import { redisConnection } from "./redis.client";
+import { CampaignGateway } from "@/modules/websockets/campaign.gateway";
 
 export const CAMPAIGN_EXECUTION_QUEUE_NAME = "campaign-execution-queue";
 
@@ -50,7 +51,7 @@ export async function startCampaignJob(data: CampaignExecutionJobData, delayMs?:
   data.leads = deduplicatedLeads;
 
   // Set initial state in Redis
-  await redisConnection!.set(`campaign-state:${data.companyId}`, JSON.stringify({
+  const initialState = {
     campaignId: data.campaignId,
     status: delayMs ? "scheduled" : "running",
     totalContacts: data.leads.length,
@@ -59,7 +60,14 @@ export async function startCampaignJob(data: CampaignExecutionJobData, delayMs?:
     failedCalls: 0,
     leads: data.leads,
     isReactivation: !!data.isReactivation
-  }));
+  };
+  await redisConnection!.set(`campaign-state:${data.companyId}`, JSON.stringify(initialState));
+
+  // Broadcast WebSocket event so UI instantly updates to Scheduled/Running
+  const gateway = CampaignGateway.getInstance();
+  if (gateway) {
+    gateway.broadcastCampaignUpdate(data.companyId, initialState);
+  }
 
   await campaignExecutionQueue.add(`campaign-${data.companyId}-${Date.now()}`, data, {
     jobId: existingJobId, // Ensures only 1 campaign runs per company, but we removed the old one
