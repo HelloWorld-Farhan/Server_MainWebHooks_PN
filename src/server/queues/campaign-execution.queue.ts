@@ -36,9 +36,10 @@ export async function startCampaignJob(data: CampaignExecutionJobData, delayMs?:
     const existingJob = await campaignExecutionQueue.getJob(existingJobId);
     if (existingJob) {
       const state = await existingJob.getState();
-      if (state === "active" || state === "waiting" || state === "delayed") {
-        throw new Error("A campaign is already running or scheduled for this company.");
+      if (state === "active" || state === "waiting") {
+        throw new Error("A campaign is already currently running for this company.");
       }
+      // If it is 'delayed', we allow overwriting it (rescheduling).
       await existingJob.remove();
     }
   } catch (e: any) {
