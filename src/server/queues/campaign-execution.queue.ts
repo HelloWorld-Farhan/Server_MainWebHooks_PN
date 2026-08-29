@@ -65,6 +65,7 @@ export async function startCampaignJob(data: CampaignExecutionJobData, delayMs?:
   const initialState = {
     campaignId: data.campaignId,
     status: delayMs ? "scheduled" : "running",
+    activeJobId: !delayMs ? uniqueJobId : undefined,
     totalContacts: data.leads.length,
     completedCalls: 0,
     successfulCalls: 0,

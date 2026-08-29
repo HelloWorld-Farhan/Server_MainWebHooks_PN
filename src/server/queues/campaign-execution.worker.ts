@@ -54,7 +54,8 @@ export const campaignExecutionWorker = redisConnection
           const currentStateStr = await redisConnection!.get(`campaign-state:${companyId}`);
           if (currentStateStr) {
             const state = JSON.parse(currentStateStr);
-            if (state.status === "running") {
+            // Check if there's a running campaign that is NOT this current job
+            if (state.status === "running" && state.activeJobId && state.activeJobId !== job.id) {
               console.log(`[Queueing] Company ${companyId} is already running a campaign. Re-queueing job ${job.name} for 5 minutes later.`);
               // Re-add the job to the queue with a 5 minute delay
               await campaignExecutionQueue?.add(job.name, job.data, {
@@ -68,6 +69,17 @@ export const campaignExecutionWorker = redisConnection
           }
         } catch (e) {
           console.error("Error checking campaign state during worker startup:", e);
+        }
+
+        // When we start running, make sure to claim this job ID so others know WE are the ones running
+        try {
+          const currentStateStr = await redisConnection!.get(`campaign-state:${companyId}`);
+          if (currentStateStr) {
+            const state = JSON.parse(currentStateStr);
+            await redisConnection!.set(`campaign-state:${companyId}`, JSON.stringify({ ...state, activeJobId: job.id }));
+          }
+        } catch (e) {
+          console.error("Failed to set activeJobId:", e);
         }
 
         try {
