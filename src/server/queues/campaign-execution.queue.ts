@@ -1,6 +1,7 @@
 import { Queue } from "bullmq";
 import { redisConnection } from "./redis.client";
 import { CampaignGateway } from "@/modules/websockets/campaign.gateway";
+import prisma from "@/server/lib/prisma";
 
 export const CAMPAIGN_EXECUTION_QUEUE_NAME = "campaign-execution-queue";
 
@@ -112,7 +113,27 @@ export async function forceStopCampaignState(companyId: string) {
   const stateStr = await redisConnection.get(`campaign-state:${companyId}`);
   if (stateStr) {
     const state = JSON.parse(stateStr);
-    const newState = { ...state, status: "force_stopped" };
+    
+    // Find all ringing/pending calls in DB for this company and mark them as FAILED
+    const updatedCount = await prisma.callLog.updateMany({
+      where: {
+        companyId,
+        status: { in: ["PENDING", "QUEUED", "DISPATCHING", "RINGING"] }
+      },
+      data: {
+        status: "FAILED",
+        providerStatus: "force_stopped"
+      }
+    });
+
+    // Update state to reflect newly failed calls
+    const newState = { 
+      ...state, 
+      status: "force_stopped",
+      failedCalls: (state.failedCalls || 0) + updatedCount.count,
+      completedCalls: (state.completedCalls || 0) + updatedCount.count,
+    };
+    
     await redisConnection.set(`campaign-state:${companyId}`, JSON.stringify(newState));
     
     // Broadcast WebSocket event so UI instantly updates
