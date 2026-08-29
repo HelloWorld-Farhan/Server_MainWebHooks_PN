@@ -31,22 +31,23 @@ export async function startCampaignJob(data: CampaignExecutionJobData, delayMs?:
     throw new Error("Redis not configured. Cannot start campaign.");
   }
   
-  const existingJobId = `campaign-${data.companyId}`;
-  try {
-    const existingJob = await campaignExecutionQueue.getJob(existingJobId);
-    if (existingJob) {
-      const state = await existingJob.getState();
-      if (state === "active" || state === "waiting") {
-        throw new Error("A campaign is already currently running for this company.");
+  // We use a unique Job ID so multiple schedules can coexist without overwriting each other
+  const uniqueJobId = `campaign-${data.companyId}-${Date.now()}`;
+  
+  // Prevent immediate running campaigns if one is already active
+  if (!delayMs) {
+    try {
+      const stateStr = await redisConnection!.get(`campaign-state:${data.companyId}`);
+      if (stateStr) {
+        const state = JSON.parse(stateStr);
+        if (state.status === "running") {
+          throw new Error("A campaign is already currently running for this company.");
+        }
       }
-      // If it is 'delayed', we allow overwriting it (rescheduling).
-      await existingJob.remove();
+    } catch (e: any) {
+      if (e.message.includes("already running")) throw e;
+      console.error("Error checking existing campaign state:", e);
     }
-  } catch (e: any) {
-    if (e.message.includes("already running")) {
-      throw e;
-    }
-    console.error("Error checking existing campaign job:", e);
   }
 
   // Deduplicate leads by phone to prevent multiple calls to the same number
@@ -81,8 +82,8 @@ export async function startCampaignJob(data: CampaignExecutionJobData, delayMs?:
     gateway.broadcastCampaignUpdate(data.companyId, initialState);
   }
 
-  await campaignExecutionQueue.add(`campaign-${data.companyId}-${Date.now()}`, data, {
-    jobId: existingJobId, // Ensures only 1 campaign runs per company, but we removed the old one
+  await campaignExecutionQueue.add(uniqueJobId, data, {
+    jobId: uniqueJobId,
     delay: delayMs ? Math.max(0, delayMs) : undefined,
     removeOnComplete: true,
     removeOnFail: true

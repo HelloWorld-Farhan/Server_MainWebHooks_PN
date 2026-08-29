@@ -1,6 +1,6 @@
 import { Worker, Job } from "bullmq";
 import { redisConnection } from "./redis.client";
-import { CAMPAIGN_EXECUTION_QUEUE_NAME, CampaignExecutionJobData } from "./campaign-execution.queue";
+import { CAMPAIGN_EXECUTION_QUEUE_NAME, CampaignExecutionJobData, campaignExecutionQueue } from "./campaign-execution.queue";
 import prisma from "@/server/lib/prisma";
 import { CampaignGateway } from "@/modules/websockets/campaign.gateway";
 
@@ -48,6 +48,27 @@ export const campaignExecutionWorker = redisConnection
       async (job: Job<CampaignExecutionJobData>) => {
         const { companyId, campaignId, didNumber, leads, channels } = job.data;
         console.log(`Starting Campaign Execution for company: ${companyId}`);
+
+        // Safety check for queued schedules: if another campaign is currently running, wait 5 mins
+        try {
+          const currentStateStr = await redisConnection!.get(`campaign-state:${companyId}`);
+          if (currentStateStr) {
+            const state = JSON.parse(currentStateStr);
+            if (state.status === "running") {
+              console.log(`[Queueing] Company ${companyId} is already running a campaign. Re-queueing job ${job.name} for 5 minutes later.`);
+              // Re-add the job to the queue with a 5 minute delay
+              await campaignExecutionQueue?.add(job.name, job.data, {
+                jobId: job.id, // Keep the same unique ID
+                delay: 5 * 60 * 1000, 
+                removeOnComplete: true,
+                removeOnFail: true
+              });
+              return; // Exit cleanly, the new delayed job will wake up later
+            }
+          }
+        } catch (e) {
+          console.error("Error checking campaign state during worker startup:", e);
+        }
 
         try {
           const token = await loginToVoicelink();
