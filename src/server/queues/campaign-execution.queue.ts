@@ -100,6 +100,11 @@ export async function getCampaignState(companyId: string) {
 export async function clearCampaignState(companyId: string) {
   if (!redisConnection) return;
   await redisConnection.del(`campaign-state:${companyId}`);
+  
+  const gateway = CampaignGateway.getInstance();
+  if (gateway) {
+    gateway.broadcastCampaignUpdate(companyId, { status: "idle", leads: [] });
+  }
 }
 
 export async function forceStopCampaignState(companyId: string) {
