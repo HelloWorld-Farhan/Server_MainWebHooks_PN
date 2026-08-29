@@ -148,8 +148,8 @@ export class OutboundCampaignExecutionController {
         finalCompanyId = requestedCompanyId;
       }
 
-      await forceStopCampaignState(finalCompanyId);
-      return res.json({ success: true, message: "Campaign forcefully stopped" });
+      const newState = await forceStopCampaignState(finalCompanyId);
+      return res.json({ success: true, message: "Campaign forcefully stopped", state: newState });
     } catch (e: any) {
       console.error("Failed to force stop campaign", e);
       return res.status(500).json({ error: e.message });

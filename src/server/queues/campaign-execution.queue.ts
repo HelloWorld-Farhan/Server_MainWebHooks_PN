@@ -141,5 +141,8 @@ export async function forceStopCampaignState(companyId: string) {
     if (gateway) {
       gateway.broadcastCampaignUpdate(companyId, newState);
     }
+    
+    return newState;
   }
+  return null;
 }

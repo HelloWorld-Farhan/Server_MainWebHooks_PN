@@ -339,11 +339,14 @@ export const campaignExecutionWorker = redisConnection
           }
 
           if (!shouldAbort) {
-            await updateRedisState(prev => ({
-              ...prev,
-              status: "completed",
-              completedCalls: prev.leads?.length || 0,
-            }));
+            await updateRedisState(prev => {
+              if (prev.status === "force_stopped" || prev.status === "idle") return prev;
+              return {
+                ...prev,
+                status: "completed",
+                completedCalls: prev.leads?.length || 0,
+              };
+            });
             console.log(`Campaign completed for company: ${companyId}`);
           } else {
             console.log(`Campaign loop aborted for company: ${companyId}, skipping completion state.`);
