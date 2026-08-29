@@ -119,9 +119,19 @@ export const campaignExecutionWorker = redisConnection
           await updateRedisState(prev => ({ ...prev, status: "running" }));
 
           while (currentIndex < leads.length || activeCallCount > 0) {
-            // Check if the user force-stopped (cleared) the campaign
+            // Check if the user force-stopped (cleared or stopped) the campaign
             const currentStateStr = await redisConnection!.get(`campaign-state:${companyId}`);
+            let shouldAbort = false;
             if (!currentStateStr) {
+              shouldAbort = true;
+            } else {
+              const state = JSON.parse(currentStateStr);
+              if (state.status === "force_stopped") {
+                shouldAbort = true;
+              }
+            }
+
+            if (shouldAbort) {
               console.log(`Campaign force stopped for company: ${companyId}. Aborting worker.`);
               
               // Clean up any remaining PENDING calls in DB to FAILED so they aren't stuck

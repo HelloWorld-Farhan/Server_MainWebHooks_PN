@@ -101,3 +101,19 @@ export async function clearCampaignState(companyId: string) {
   if (!redisConnection) return;
   await redisConnection.del(`campaign-state:${companyId}`);
 }
+
+export async function forceStopCampaignState(companyId: string) {
+  if (!redisConnection) return;
+  const stateStr = await redisConnection.get(`campaign-state:${companyId}`);
+  if (stateStr) {
+    const state = JSON.parse(stateStr);
+    const newState = { ...state, status: "force_stopped" };
+    await redisConnection.set(`campaign-state:${companyId}`, JSON.stringify(newState));
+    
+    // Broadcast WebSocket event so UI instantly updates
+    const gateway = CampaignGateway.getInstance();
+    if (gateway) {
+      gateway.broadcastCampaignUpdate(companyId, newState);
+    }
+  }
+}
