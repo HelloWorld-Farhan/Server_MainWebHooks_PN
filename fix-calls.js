@@ -1,21 +1,15 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
-
-async function main() {
-  const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000);
-  const result = await prisma.callLog.updateMany({
+async function run() {
+  const res = await prisma.callLog.updateMany({
     where: {
-      status: { in: ['PENDING', 'RINGING'] },
-      createdAt: { lt: fiveMinsAgo }
+      status: { in: ['RINGING', 'PENDING'] },
+      direction: 'OUTBOUND'
     },
     data: {
-      status: 'FAILED',
-      durationSeconds: 0
+      status: 'FAILED'
     }
   });
-  console.log('Fixed stuck calls:', result.count);
+  console.log('Updated ' + res.count + ' stuck calls to FAILED');
 }
-
-main()
-  .catch(console.error)
-  .finally(() => prisma.$disconnect());
+run().catch(console.error).finally(() => prisma.$disconnect());

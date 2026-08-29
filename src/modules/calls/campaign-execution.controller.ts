@@ -38,7 +38,7 @@ export class OutboundCampaignExecutionController {
     }
 
     try {
-      const { campaignId, didNumber, leads, channels, companyId: requestedCompanyId } = req.body;
+      const { campaignId, didNumber, leads, channels, companyId: requestedCompanyId, uploadedFileName } = req.body;
       
       let finalCompanyId = tokenCompanyId;
       if (requestedCompanyId && requestedCompanyId !== tokenCompanyId) {
@@ -61,7 +61,8 @@ export class OutboundCampaignExecutionController {
         campaignId: campaignId || "manual",
         didNumber,
         leads,
-        channels: channels || 2
+        channels: channels || 2,
+        uploadedFileName
       });
 
       return res.json({ success: true, message: "Campaign queued successfully" });

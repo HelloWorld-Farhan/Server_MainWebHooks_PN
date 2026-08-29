@@ -11,6 +11,8 @@ export type CampaignExecutionJobData = {
   leads: any[];
   channels: number;
   isReactivation?: boolean;
+  scheduledAt?: string;
+  uploadedFileName?: string;
 };
 
 export const campaignExecutionQueue = redisConnection 
@@ -66,7 +68,9 @@ export async function startCampaignJob(data: CampaignExecutionJobData, delayMs?:
     successfulCalls: 0,
     failedCalls: 0,
     leads: data.leads,
-    isReactivation: !!data.isReactivation
+    isReactivation: !!data.isReactivation,
+    scheduledAt: delayMs ? data.scheduledAt : undefined,
+    uploadedFileName: data.uploadedFileName
   };
   await redisConnection!.set(`campaign-state:${data.companyId}`, JSON.stringify(initialState));
 

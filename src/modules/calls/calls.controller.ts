@@ -292,7 +292,7 @@ export class CallsController {
     }
 
     try {
-      const { campaignId, leads, scheduledAt, didNumber } = req.body;
+      const { campaignId, leads, scheduledAt, didNumber, uploadedFileName } = req.body;
       if (!campaignId || !leads || !Array.isArray(leads) || !scheduledAt || !didNumber) {
         return res.status(400).json({ error: "Missing required fields" });
       }
@@ -307,7 +307,9 @@ export class CallsController {
           didNumber,
           leads: leads.filter(l => !!l.phone),
           channels: req.body.channels || 2,
-          isReactivation: true
+          isReactivation: true,
+          scheduledAt,
+          uploadedFileName
         },
         delay
       );
