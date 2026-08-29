@@ -118,10 +118,10 @@ export const campaignExecutionWorker = redisConnection
           // Update status to running immediately when the job starts (useful for scheduled jobs)
           await updateRedisState(prev => ({ ...prev, status: "running" }));
 
+          let shouldAbort = false;
           while (currentIndex < leads.length || activeCallCount > 0) {
             // Check if the user force-stopped (cleared or stopped) the campaign
             const currentStateStr = await redisConnection!.get(`campaign-state:${companyId}`);
-            let shouldAbort = false;
             if (!currentStateStr) {
               shouldAbort = true;
             } else {
@@ -338,13 +338,16 @@ export const campaignExecutionWorker = redisConnection
             }
           }
 
-          await updateRedisState(prev => ({
-            ...prev,
-            status: "completed",
-            completedCalls: prev.leads?.length || 0,
-          }));
-          
-          console.log(`Campaign completed for company: ${companyId}`);
+          if (!shouldAbort) {
+            await updateRedisState(prev => ({
+              ...prev,
+              status: "completed",
+              completedCalls: prev.leads?.length || 0,
+            }));
+            console.log(`Campaign completed for company: ${companyId}`);
+          } else {
+            console.log(`Campaign loop aborted for company: ${companyId}, skipping completion state.`);
+          }
 
         } catch (error) {
           console.error("Campaign worker error:", error);
