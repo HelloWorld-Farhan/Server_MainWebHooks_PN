@@ -201,6 +201,7 @@ export const campaignExecutionWorker = redisConnection
                         campaignId: isValidObjectId ? campaignId : null,
                         durationSeconds: 0,
                         provider: "voicelink",
+                        providerCallId: `pending-${publicId}`, // Prevent unique constraint violation on null
                         leadId: leadRecordId
                       }
                     });

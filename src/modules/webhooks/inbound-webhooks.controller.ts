@@ -33,13 +33,13 @@ export class InboundWebhooksController {
       // Parse payload based on common VoiceNSMS/OBD field names or VoiceLink's nested 'call' object
       const callObj = body.call || {};
       
-      const callingNo = body.phone || body["Calling No"] || body.callingNo || body.calling_no || body.caller_id || callObj.from || "Unknown";
+      const callingNo = body.phone || body["Calling No"] || body.callingNo || body.calling_no || body.caller_id || body.caller_number || callObj.from || "Unknown";
       const callDurationRaw = body.duration ?? body["Call Duration"] ?? body.callDuration ?? body.call_duration ?? callObj.durationSec;
       const statusRaw = body.status ?? body["Status"] ?? callObj.status;
       const logId = body.log_id || body.logId || body["Log ID"] || body.callid || body.calledno || callObj.id || `webhook-${Date.now()}`;
       const recordingUrl = body.recording_url || body.recordingUrl || body.recording || callObj.recordingUrl || null;
       const transcriptUrl = body.transcript_url || body.transcriptUrl || body.transcript || null;
-      const agentNumber = body.callid || body.calledno || callObj.to || "Unknown";
+      const agentNumber = body.callid || body.calledno || body.assigned_number || callObj.to || "Unknown";
 
       // Generate all possible number variants for robust DB lookup
       const getNumberVariants = (num: string): string[] => {
