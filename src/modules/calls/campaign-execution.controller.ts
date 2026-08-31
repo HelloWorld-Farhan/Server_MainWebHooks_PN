@@ -2,7 +2,7 @@ import { Controller, Post, Get, Req, Res } from "@nestjs/common";
 import type { Request, Response } from "express";
 import * as jwt from "jsonwebtoken";
 import prisma from "@/server/lib/prisma";
-import { startCampaignJob, getCampaignState, clearCampaignState, forceStopCampaignState } from "@/server/queues/campaign-execution.queue";
+import { startCampaignJob, getCampaignState, clearCampaignState, forceStopCampaignState, pauseCampaignState, resumeCampaignState } from "@/server/queues/campaign-execution.queue";
 
 const JWT_SECRET = process.env.JWT_SECRET || "propnex_secret_jwt_key_2026_key";
 
@@ -152,6 +152,62 @@ export class OutboundCampaignExecutionController {
       return res.json({ success: true, message: "Campaign forcefully stopped", state: newState });
     } catch (e: any) {
       console.error("Failed to force stop campaign", e);
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
+  @Post("pause")
+  async pauseCampaign(@Req() req: Request, @Res() res: Response) {
+    const tokenCompanyId = await getCompanyIdFromToken(req);
+    if (!tokenCompanyId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    try {
+      const requestedCompanyId = req.body?.companyId;
+      let finalCompanyId = tokenCompanyId;
+      if (requestedCompanyId && requestedCompanyId !== tokenCompanyId) {
+        const subCompany = await prisma.company.findFirst({
+          where: { id: requestedCompanyId, parentCompanyId: tokenCompanyId }
+        });
+        if (!subCompany) {
+          return res.status(403).json({ error: "Forbidden: Not a valid sub-company" });
+        }
+        finalCompanyId = requestedCompanyId;
+      }
+
+      const newState = await pauseCampaignState(finalCompanyId);
+      return res.json({ success: true, message: "Campaign paused", state: newState });
+    } catch (e: any) {
+      console.error("Failed to pause campaign", e);
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
+  @Post("resume")
+  async resumeCampaign(@Req() req: Request, @Res() res: Response) {
+    const tokenCompanyId = await getCompanyIdFromToken(req);
+    if (!tokenCompanyId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    try {
+      const requestedCompanyId = req.body?.companyId;
+      let finalCompanyId = tokenCompanyId;
+      if (requestedCompanyId && requestedCompanyId !== tokenCompanyId) {
+        const subCompany = await prisma.company.findFirst({
+          where: { id: requestedCompanyId, parentCompanyId: tokenCompanyId }
+        });
+        if (!subCompany) {
+          return res.status(403).json({ error: "Forbidden: Not a valid sub-company" });
+        }
+        finalCompanyId = requestedCompanyId;
+      }
+
+      const newState = await resumeCampaignState(finalCompanyId);
+      return res.json({ success: true, message: "Campaign resumed", state: newState });
+    } catch (e: any) {
+      console.error("Failed to resume campaign", e);
       return res.status(500).json({ error: e.message });
     }
   }

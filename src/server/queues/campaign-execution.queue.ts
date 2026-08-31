@@ -144,5 +144,38 @@ export async function forceStopCampaignState(companyId: string) {
     
     return newState;
   }
+  }
+  return null;
+}
+
+export async function pauseCampaignState(companyId: string) {
+  if (!redisConnection) return null;
+  const stateStr = await redisConnection.get(`campaign-state:${companyId}`);
+  if (stateStr) {
+    const state = JSON.parse(stateStr);
+    if (state.status === "running") {
+      const newState = { ...state, status: "paused" };
+      await redisConnection.set(`campaign-state:${companyId}`, JSON.stringify(newState));
+      const gateway = CampaignGateway.getInstance();
+      if (gateway) gateway.broadcastCampaignUpdate(companyId, newState);
+      return newState;
+    }
+  }
+  return null;
+}
+
+export async function resumeCampaignState(companyId: string) {
+  if (!redisConnection) return null;
+  const stateStr = await redisConnection.get(`campaign-state:${companyId}`);
+  if (stateStr) {
+    const state = JSON.parse(stateStr);
+    if (state.status === "paused") {
+      const newState = { ...state, status: "running" };
+      await redisConnection.set(`campaign-state:${companyId}`, JSON.stringify(newState));
+      const gateway = CampaignGateway.getInstance();
+      if (gateway) gateway.broadcastCampaignUpdate(companyId, newState);
+      return newState;
+    }
+  }
   return null;
 }

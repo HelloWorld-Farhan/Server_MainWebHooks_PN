@@ -119,6 +119,7 @@ export const campaignExecutionWorker = redisConnection
           await updateRedisState(prev => ({ ...prev, status: "running" }));
 
           let shouldAbort = false;
+          let isPaused = false;
           while (currentIndex < leads.length || activeCallCount > 0) {
             // Check if the user force-stopped (cleared or stopped) the campaign
             const currentStateStr = await redisConnection!.get(`campaign-state:${companyId}`);
@@ -129,6 +130,7 @@ export const campaignExecutionWorker = redisConnection
               if (state.status === "force_stopped") {
                 shouldAbort = true;
               }
+              isPaused = state.status === "paused";
             }
 
             if (shouldAbort) {
@@ -148,6 +150,11 @@ export const campaignExecutionWorker = redisConnection
                  console.error("Cleanup error on force stop", e);
               }
               break;
+            }
+            
+            if (isPaused) {
+              await new Promise(res => setTimeout(res, 2000));
+              continue;
             }
             
             const batchPromises: Promise<void>[] = [];
