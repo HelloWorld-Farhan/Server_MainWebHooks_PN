@@ -950,6 +950,7 @@ model AgentLibraryEntry {
   avatarGradient        String?
   isPublished           Boolean   @default(true)
   sortOrder             Int       @default(0)
+  totalVoices           Int       @default(10)
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
