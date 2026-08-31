@@ -144,7 +144,6 @@ export async function forceStopCampaignState(companyId: string) {
     
     return newState;
   }
-  }
   return null;
 }
 
