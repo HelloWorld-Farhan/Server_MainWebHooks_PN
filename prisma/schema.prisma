@@ -939,6 +939,10 @@ model AgentLibraryEntry {
   name                  String
   profile               String
   category              String
+  tone                  String    @default("")
+  language              String    @default("English (US)")
+  voice                 String    @default("Female")
+  bestFor               String    @default("")
   useCases              String[]  @default([])
   defaultType           AgentType
   estimatedSetupMinutes Int       @default(5)
