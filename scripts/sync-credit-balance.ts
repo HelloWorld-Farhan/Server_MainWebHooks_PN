@@ -18,6 +18,14 @@ async function main() {
       totalCreditsUsed += log.creditsUsed || 0;
     }
 
+    // Also include manual deductions made by admins
+    const manualUsages = await prisma.creditUsage.findMany({
+      where: { companyId: company.id, reason: "MANUAL_ADJUSTMENT" }
+    });
+    for (const usage of manualUsages) {
+      totalCreditsUsed += usage.amount || 0;
+    }
+
     if (totalCreditsUsed !== company.creditBalance.creditsUsed) {
       console.log(`Company ${company.name}: updating credits used from ${company.creditBalance.creditsUsed} to ${totalCreditsUsed}`);
       
