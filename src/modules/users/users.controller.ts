@@ -358,10 +358,14 @@ export class UsersController {
       const [
         inboundCalls,
         outboundCalls,
-        activeAgents,
+        totalAgents,
+        assignedAgents,
+        availableAgents,
         creditBalances,
         pastInboundCalls,
-        pastOutboundCalls
+        pastOutboundCalls,
+        inboundCreditsAgg,
+        outboundCreditsAgg
       ] = await Promise.all([
         prisma.callLog.count({
           where: { companyId: { in: companyIdsToQuery }, direction: "INBOUND", startedAt: { gte: startOfThisMonth } }
@@ -369,8 +373,12 @@ export class UsersController {
         prisma.callLog.count({
           where: { companyId: { in: companyIdsToQuery }, direction: "OUTBOUND", startedAt: { gte: startOfThisMonth } }
         }),
-        prisma.aiAgent.count({
-          where: { companyId: { in: companyIdsToQuery }, status: "ACTIVE" }
+        prisma.agentLibraryEntry.count(),
+        prisma.agentLibraryEntry.count({
+          where: { isPublished: true }
+        }),
+        prisma.agentLibraryEntry.count({
+          where: { isPublished: false }
         }),
         prisma.creditBalance.findMany({
           where: { companyId: { in: companyIdsToQuery } }
@@ -380,10 +388,20 @@ export class UsersController {
         }),
         prisma.callLog.count({
           where: { companyId: { in: companyIdsToQuery }, direction: "OUTBOUND", startedAt: { gte: startOfLastMonth, lte: endOfLastMonth } }
+        }),
+        prisma.callLog.aggregate({
+          _sum: { creditsUsed: true },
+          where: { companyId: { in: companyIdsToQuery }, direction: "INBOUND" }
+        }),
+        prisma.callLog.aggregate({
+          _sum: { creditsUsed: true },
+          where: { companyId: { in: companyIdsToQuery }, direction: "OUTBOUND" }
         })
       ]);
 
       const totalCreditsUsed = creditBalances.reduce((sum: number, cb: any) => sum + (cb.creditsUsed || 0), 0);
+      const totalCreditsAllocated = creditBalances.reduce((sum: number, cb: any) => sum + (cb.creditsUsed || 0) + (cb.creditsRemaining || 0), 0);
+      const creditsPercentage = totalCreditsAllocated > 0 ? Math.round((totalCreditsUsed / totalCreditsAllocated) * 100) : 0;
       
       const calcTrend = (current: number, past: number, defaultPast: number) => {
         const pastValue = past > 0 ? past : defaultPast;
@@ -394,11 +412,16 @@ export class UsersController {
       return res.json({
         inboundCalls,
         outboundCalls,
-        activeAgents,
+        totalAgents,
+        assignedAgents,
+        availableAgents,
         creditsUsed: totalCreditsUsed > 0 ? totalCreditsUsed : 0,
+        creditsPercentage,
+        inboundCreditsUsed: inboundCreditsAgg._sum.creditsUsed || 0,
+        outboundCreditsUsed: outboundCreditsAgg._sum.creditsUsed || 0,
         inboundTrend: calcTrend(inboundCalls, pastInboundCalls, 400),
         outboundTrend: calcTrend(outboundCalls, pastOutboundCalls, 200),
-        agentsTrend: calcTrend(activeAgents, 0, 5), // Assumed default of 5 for active agents
+        agentsTrend: 0, // No longer using gathering data trend for agents
         creditsTrend: calcTrend(totalCreditsUsed, 0, 5000)
       });
     } catch (error) {
