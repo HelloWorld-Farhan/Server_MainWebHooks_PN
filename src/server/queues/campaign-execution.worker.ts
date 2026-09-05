@@ -347,15 +347,94 @@ export const campaignExecutionWorker = redisConnection
           }
 
           if (!shouldAbort) {
+            let finalState: any = null;
             await updateRedisState(prev => {
               if (prev.status === "force_stopped" || prev.status === "idle") return prev;
-              return {
+              finalState = {
                 ...prev,
                 status: "completed",
                 completedCalls: prev.leads?.length || 0,
               };
+              return finalState;
             });
             console.log(`Campaign completed for company: ${companyId}`);
+
+            // -------------------------------------------------------------
+            // PHASE 2: AUTO-REACTIVATION ENGINE
+            // -------------------------------------------------------------
+            if (finalState && finalState.leads) {
+              const failedLeads = finalState.leads.filter((l: any) => l.isFailed);
+              if (failedLeads.length > 0) {
+                const dbCampaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
+                if (dbCampaign) {
+                  let nextStage: any = null;
+                  let nextHour = 0;
+
+                  // Stage progression logic
+                  if (dbCampaign.stage === "MAIN") { nextStage = "Q1"; nextHour = 11; }
+                  else if (dbCampaign.stage === "Q1") { nextStage = "Q2"; nextHour = 14; }
+                  else if (dbCampaign.stage === "Q2") { nextStage = "Q3"; nextHour = 17; }
+
+                  if (nextStage) {
+                    try {
+                      // 1. Create the new Campaign record in the database
+                      const nextResourceKey = `${dbCampaign.resourceKey}-${nextStage}-${Date.now().toString().slice(-4)}`;
+                      
+                      const nextCampaign = await prisma.campaign.create({
+                        data: {
+                          companyId,
+                          resourceKey: nextResourceKey,
+                          name: `${dbCampaign.name} - Reactivation ${nextStage}`,
+                          stage: nextStage,
+                          parentCampaignId: dbCampaign.parentCampaignId || dbCampaign.id,
+                          direction: dbCampaign.direction,
+                          aiEnabled: dbCampaign.aiEnabled,
+                          systemPrompt: dbCampaign.systemPrompt,
+                          aiConfig: dbCampaign.aiConfig || {},
+                          status: "ACTIVE" // Scheduled campaigns are active until completed
+                        }
+                      });
+
+                      // 2. Calculate delay until tomorrow at the specified hour
+                      const now = new Date();
+                      const nextDay = new Date(now);
+                      nextDay.setDate(nextDay.getDate() + 1);
+                      nextDay.setHours(nextHour, 0, 0, 0);
+                      
+                      // If somehow the calculated time is in the past (e.g. timezone edge cases), add a day
+                      if (nextDay.getTime() <= now.getTime()) {
+                        nextDay.setDate(nextDay.getDate() + 1);
+                      }
+                      
+                      const delayMs = nextDay.getTime() - now.getTime();
+
+                      // 3. Import and submit to the queue
+                      const { startCampaignJob } = await import('./campaign-execution.queue');
+                      await startCampaignJob({
+                        companyId,
+                        campaignId: nextCampaign.id,
+                        didNumber,
+                        leads: failedLeads.map((l: any) => ({ phone: l.phone, name: l.name })),
+                        channels,
+                        isReactivation: true,
+                        scheduledAt: nextDay.toISOString(),
+                        uploadedFileName: job.data.uploadedFileName
+                      }, delayMs);
+
+                      console.log(`[Reactivation Engine] Scheduled ${nextStage} for Campaign ${campaignId} at ${nextDay.toISOString()} with ${failedLeads.length} leads.`);
+                    } catch (reactivationError) {
+                      console.error(`[Reactivation Engine] Failed to schedule ${nextStage} for Campaign ${campaignId}:`, reactivationError);
+                    }
+                  } else {
+                     console.log(`[Reactivation Engine] Campaign ${campaignId} reached final stage (Q3). No further reactivations.`);
+                  }
+                }
+              } else {
+                console.log(`[Reactivation Engine] Campaign ${campaignId} had 100% success! No reactivation needed.`);
+              }
+            }
+            // -------------------------------------------------------------
+
           } else {
             console.log(`Campaign loop aborted for company: ${companyId}, skipping completion state.`);
           }
