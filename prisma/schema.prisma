@@ -591,6 +591,7 @@ model PendingApproval {
   id          String                @id @default(auto()) @map("_id") @db.ObjectId
   email       String                @unique
   status      PendingApprovalStatus @default(PENDING)
+  remindedAt  DateTime?
   createdAt   DateTime              @default(now())
   updatedAt   DateTime              @updatedAt
 
@@ -1611,6 +1612,13 @@ model DialerIntegrationLog {
 
 // ─── Campaigns (generic business units) ─────────────────────────────────────────
 
+enum CampaignStage {
+  MAIN
+  Q1
+  Q2
+  Q3
+}
+
 model Campaign {
   id             String         @id @default(auto()) @map("_id") @db.ObjectId
   companyId      String         @db.ObjectId
@@ -1619,6 +1627,10 @@ model Campaign {
   name           String
   status         CampaignStatus    @default(ACTIVE)
   direction      CampaignDirection @default(OUTBOUND)
+  stage          CampaignStage     @default(MAIN)
+  parentCampaignId String?         @db.ObjectId
+  parentCampaign   Campaign?       @relation("CampaignRetries", fields: [parentCampaignId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  childCampaigns   Campaign[]      @relation("CampaignRetries")
   address        String?
   phone          String?
   email          String?
@@ -1651,6 +1663,7 @@ model Campaign {
   @@index([companyId, lastActivityAt])
   @@index([companyId, aiEnabled])
   @@index([companyId, direction])
+  @@index([parentCampaignId])
   @@unique([companyId, resourceKey])
 }
 
