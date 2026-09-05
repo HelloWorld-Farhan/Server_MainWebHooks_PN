@@ -409,7 +409,7 @@ export const campaignExecutionWorker = redisConnection
                       const delayMs = nextDay.getTime() - now.getTime();
 
                       // 3. Import and submit to the queue
-                      const { startCampaignJob } = await import('./campaign-execution.queue');
+                      const { startCampaignJob } = require('./campaign-execution.queue');
                       await startCampaignJob({
                         companyId,
                         campaignId: nextCampaign.id,
