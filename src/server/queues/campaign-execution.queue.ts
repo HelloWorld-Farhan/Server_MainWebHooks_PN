@@ -12,6 +12,7 @@ export type CampaignExecutionJobData = {
   leads: any[];
   channels: number;
   isReactivation?: boolean;
+  qStage?: "Q1" | "Q2" | "Q3";
   scheduledAt?: string;
   uploadedFileName?: string;
 };
@@ -42,7 +43,15 @@ export async function startCampaignJob(data: CampaignExecutionJobData, delayMs?:
       if (stateStr) {
         const state = JSON.parse(stateStr);
         if (state.status === "running") {
-          throw new Error("A campaign is already currently running for this company.");
+          // Priority Engine: If a live campaign starts while a reactivation is running, pause the reactivation
+          if (!data.isReactivation && (state.isReactivation || state.qStage)) {
+            console.log(`[Traffic Cop] Preempting Reactivation for company ${data.companyId} to start Live Campaign.`);
+            const pausedState = { ...state, status: "paused" };
+            await redisConnection!.set(`campaign-state:paused:${data.companyId}`, JSON.stringify(pausedState));
+            // Proceed to overwrite `campaign-state:${data.companyId}` below
+          } else {
+            throw new Error("A campaign is already currently running for this company.");
+          }
         }
       }
     } catch (e: any) {
@@ -73,6 +82,7 @@ export async function startCampaignJob(data: CampaignExecutionJobData, delayMs?:
     failedCalls: 0,
     leads: data.leads,
     isReactivation: !!data.isReactivation,
+    qStage: data.qStage,
     scheduledAt: delayMs ? data.scheduledAt : undefined,
     uploadedFileName: data.uploadedFileName
   };

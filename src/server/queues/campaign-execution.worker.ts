@@ -121,16 +121,32 @@ export const campaignExecutionWorker = redisConnection
           let shouldAbort = false;
           let isPaused = false;
           while (currentIndex < leads.length || activeCallCount > 0) {
+            let isPreempted = false;
             // Check if the user force-stopped (cleared or stopped) the campaign
             const currentStateStr = await redisConnection!.get(`campaign-state:${companyId}`);
             if (!currentStateStr) {
               shouldAbort = true;
             } else {
               const state = JSON.parse(currentStateStr);
-              if (state.status === "force_stopped") {
+              if (state.status === "force_stopped" && state.activeJobId === job.id) {
                 shouldAbort = true;
+              } else if (state.activeJobId !== job.id) {
+                // My job got preempted! Check if I was moved to the paused holding key
+                const pausedStateStr = await redisConnection!.get(`campaign-state:paused:${companyId}`);
+                if (pausedStateStr) {
+                  const pausedState = JSON.parse(pausedStateStr);
+                  if (pausedState.activeJobId === job.id) {
+                    isPaused = true;
+                    isPreempted = true;
+                  } else {
+                    shouldAbort = true; // Something else took over
+                  }
+                } else {
+                  shouldAbort = true;
+                }
+              } else {
+                isPaused = state.status === "paused";
               }
-              isPaused = state.status === "paused";
             }
 
             if (shouldAbort) {
@@ -437,6 +453,35 @@ export const campaignExecutionWorker = redisConnection
 
           } else {
             console.log(`Campaign loop aborted for company: ${companyId}, skipping completion state.`);
+          }
+
+          // -------------------------------------------------------------
+          // PHASE 3: PRIORITY ENGINE AUTO-RESUME
+          // -------------------------------------------------------------
+          try {
+            const pausedStateStr = await redisConnection!.get(`campaign-state:paused:${companyId}`);
+            if (pausedStateStr) {
+              const pausedState = JSON.parse(pausedStateStr);
+              if (!job.data.isReactivation) {
+                 console.log(`[Traffic Cop] Live Campaign finished. Auto-resuming Reactivation for company ${companyId}`);
+                 const resumedState = { ...pausedState, status: "running" };
+                 await redisConnection!.set(`campaign-state:${companyId}`, JSON.stringify(resumedState));
+                 await redisConnection!.del(`campaign-state:paused:${companyId}`);
+                 const gateway = CampaignGateway.getInstance();
+                 if (gateway) gateway.broadcastCampaignUpdate(companyId, resumedState);
+              }
+            } else {
+              // If we reached the end of the last campaign, clear the state so UI returns to idle
+              const currentStateStr = await redisConnection!.get(`campaign-state:${companyId}`);
+              if (currentStateStr) {
+                 const currentState = JSON.parse(currentStateStr);
+                 if (currentState.status === "completed" || currentState.status === "force_stopped" || shouldAbort) {
+                    // Do nothing, let clearCampaignState handle it, or just leave it for UI to show "completed"
+                 }
+              }
+            }
+          } catch (resumeErr) {
+            console.error("Failed to auto-resume paused reactivation:", resumeErr);
           }
 
         } catch (error) {

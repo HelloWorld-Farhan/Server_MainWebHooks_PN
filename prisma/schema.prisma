@@ -7,7 +7,7 @@ generator client {
 
 datasource db {
   provider = "mongodb"
-  url      = env("DATABASE_URL")
+  url      = "mongodb://propnexaiofficial_db_user:KccmbOVh4GsZp1Ok@ac-bwr5uzv-shard-00-00.vuuzm1i.mongodb.net:27017,ac-bwr5uzv-shard-00-01.vuuzm1i.mongodb.net:27017,ac-bwr5uzv-shard-00-02.vuuzm1i.mongodb.net:27017/propnex?ssl=true&authSource=admin&replicaSet=atlas-j95wo5-shard-0&retryWrites=true&w=majority&appName=Cluster0"
 }
 
 // ─── Enums ───────────────────────────────────────────────────────────────────
@@ -125,6 +125,7 @@ enum PhoneNumberStatus {
 enum CallDirection {
   INBOUND
   OUTBOUND
+  BOTH
 }
 
 enum CallStatus {
@@ -744,6 +745,7 @@ model PhoneNumber {
   /// Full external ID (e.g. v1.PNX.CP000001.PH000001).
   publicId           String
   number             String
+  channels           Int?
   label              String?
   provider           TelephonyProvider
   campaignId         String?           @db.ObjectId
@@ -956,6 +958,11 @@ model AgentLibraryEntry {
   isPublished           Boolean   @default(true)
   sortOrder             Int       @default(0)
   totalVoices           Int       @default(10)
+
+  assignedByName        String?
+  assignedByEmail       String?
+  assignedByPhone       String?
+
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
@@ -1610,8 +1617,6 @@ model DialerIntegrationLog {
   @@index([dialerCallId, createdAt])
 }
 
-// ─── Campaigns (generic business units) ─────────────────────────────────────────
-
 enum CampaignStage {
   MAIN
   Q1
@@ -1629,6 +1634,11 @@ model Campaign {
   direction      CampaignDirection @default(OUTBOUND)
   stage          CampaignStage     @default(MAIN)
   parentCampaignId String?         @db.ObjectId
+  currentQStage      String?
+  q1ScheduledAt      DateTime?
+  q2ScheduledAt      DateTime?
+  q3ScheduledAt      DateTime?
+  qStatus            String?
   parentCampaign   Campaign?       @relation("CampaignRetries", fields: [parentCampaignId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   childCampaigns   Campaign[]      @relation("CampaignRetries")
   address        String?
@@ -1799,4 +1809,17 @@ model CampaignInvitation {
   campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 
   @@index([companyId])
+}
+
+model FormSubmission {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  formType  String   // "DEMO_CALL" or "PARTNER_APP"
+  name      String
+  email     String
+  phone     String
+  company   String?
+  industry  String?
+  clients   String?  // For Partner App
+  volume    String?  // For Partner App
+  createdAt DateTime @default(now())
 }
