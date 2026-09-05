@@ -433,6 +433,7 @@ export const campaignExecutionWorker = redisConnection
                         leads: failedLeads.map((l: any) => ({ phone: l.phone, name: l.name })),
                         channels,
                         isReactivation: true,
+                        qStage: nextStage,
                         scheduledAt: nextDay.toISOString(),
                         uploadedFileName: job.data.uploadedFileName
                       }, delayMs);
