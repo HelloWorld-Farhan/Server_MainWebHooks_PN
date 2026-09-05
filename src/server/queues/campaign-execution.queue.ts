@@ -105,7 +105,40 @@ export async function startCampaignJob(data: CampaignExecutionJobData, delayMs?:
 export async function getCampaignState(companyId: string) {
   if (!redisConnection) return null;
   const state = await redisConnection.get(`campaign-state:${companyId}`);
-  return state ? JSON.parse(state) : null;
+  if (state) return JSON.parse(state);
+
+  // Fallback: if Redis has no state, check BullMQ for any pending delayed reactivation jobs
+  // This handles the case where Redis state was cleared but the BullMQ job is still scheduled
+  if (campaignExecutionQueue) {
+    try {
+      const delayedJobs = await campaignExecutionQueue.getDelayed();
+      const pending = delayedJobs.find(
+        (job) => job.data.companyId === companyId && job.data.isReactivation
+      );
+      if (pending) {
+        const scheduledState = {
+          campaignId: pending.data.campaignId,
+          status: "scheduled",
+          totalContacts: pending.data.leads?.length || 0,
+          completedCalls: 0,
+          successfulCalls: 0,
+          failedCalls: 0,
+          leads: pending.data.leads || [],
+          isReactivation: true,
+          qStage: pending.data.qStage,
+          scheduledAt: pending.data.scheduledAt,
+          uploadedFileName: pending.data.uploadedFileName,
+        };
+        // Re-write to Redis so future requests are fast
+        await redisConnection.set(`campaign-state:${companyId}`, JSON.stringify(scheduledState));
+        return scheduledState;
+      }
+    } catch (e) {
+      console.error("[getCampaignState] BullMQ fallback check failed:", e);
+    }
+  }
+
+  return null;
 }
 
 export async function clearCampaignState(companyId: string) {
