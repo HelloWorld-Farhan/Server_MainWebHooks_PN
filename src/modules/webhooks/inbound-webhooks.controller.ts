@@ -32,14 +32,18 @@ export class InboundWebhooksController {
       
       // Parse payload based on common VoiceNSMS/OBD field names or VoiceLink's nested 'call' object
       const callObj = body.call || {};
+      const messageObj = body.message || {};
       
-      const callingNo = body.phone || body["Calling No"] || body.callingNo || body.calling_no || body.caller_id || body.caller_number || callObj.from || "Unknown";
-      const callDurationRaw = body.duration ?? body["Call Duration"] ?? body.callDuration ?? body.call_duration ?? callObj.durationSec;
-      const statusRaw = body.status ?? body["Status"] ?? callObj.status;
-      const logId = body.log_id || body.logId || body["Log ID"] || body.callid || body.calledno || callObj.id || `webhook-${Date.now()}`;
-      const recordingUrl = body.recording_url || body.recordingUrl || body.recording || callObj.recordingUrl || null;
-      const transcriptUrl = body.transcript_url || body.transcriptUrl || body.transcript || null;
-      const agentNumber = body.callid || body.calledno || body.assigned_number || callObj.to || "Unknown";
+      const callingNo = body.phone || body["Calling No"] || body.callingNo || body.calling_no || body.caller_id || body.caller_number || callObj.from || messageObj.customer?.number || "Unknown";
+      const callDurationRaw = body.duration ?? body["Call Duration"] ?? body.callDuration ?? body.call_duration ?? callObj.durationSec ?? messageObj.call?.duration;
+      
+      // Enhance status extraction to support various providers (Vapi, Bland, Retell, etc.)
+      const statusRaw = body.status ?? body.event ?? body.type ?? body.call_status ?? body.callStatus ?? body["Status"] ?? callObj.status ?? messageObj.status ?? messageObj.type;
+      
+      const logId = body.log_id || body.logId || body.call_id || body.callId || body["Log ID"] || body.callid || body.calledno || callObj.id || messageObj.call?.id || `webhook-${Date.now()}`;
+      const recordingUrl = body.recording_url || body.recordingUrl || body.recording || callObj.recordingUrl || messageObj.call?.recordingUrl || null;
+      const transcriptUrl = body.transcript_url || body.transcriptUrl || body.transcript || messageObj.call?.transcriptUrl || null;
+      const agentNumber = body.callid || body.calledno || body.assigned_number || callObj.to || messageObj.call?.phoneNumber || "Unknown";
 
       // Generate all possible number variants for robust DB lookup
       const getNumberVariants = (num: string): string[] => {
@@ -342,7 +346,17 @@ export class InboundWebhooksController {
         }
 
         const updateData: any = {};
-        if (statusRaw !== undefined) updateData.status = status;
+        if (statusRaw !== undefined) {
+          updateData.status = status;
+          
+          // State machine validation: don't let a live status overwrite a terminal status (out-of-order webhooks)
+          if (existingCall) {
+            const terminalStatuses = ["COMPLETED", "FAILED", "MISSED", "CANCELED"];
+            if (terminalStatuses.includes(existingCall.status) && isCallLive) {
+              delete updateData.status;
+            }
+          }
+        }
         
         if (existingCall && existingCall.status === "PENDING" && isCallLive) {
           updateData.startedAt = new Date();
