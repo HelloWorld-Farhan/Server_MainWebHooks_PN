@@ -45,14 +45,14 @@ jobs:
           username: ${{ secrets.HOSTINGER_USERNAME }}
           password: ${{ secrets.HOSTINGER_PASSWORD }}
           script: |
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
             cd /root/propnexai-main-server
             tar -xzf deploy.tar.gz
             rm deploy.tar.gz
             npm ci
             npx prisma generate
-            pm2 delete all || true
-            cd /root/propnex-server && pm2 start npm --name "propnex-server" -- run start
-            cd /root/propnexai-main-server && pm2 start npm --name "propnexai-main-server" -- run start:prod
+            pm2 restart propnexai-main-server || pm2 start npm --name "propnexai-main-server" -- run start:prod
             pm2 save
             sleep 3
             pm2 logs --nostream --lines 50
