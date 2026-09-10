@@ -17,8 +17,8 @@ async function loginToVoicelink() {
         "Accept": "application/json",
       },
       body: JSON.stringify({
-        username: "propnex",
-        password: "PropnexAi2025@#",
+        username: process.env.BONVOICE_USERNAME || "propnex",
+        password: process.env.BONVOICE_PASSWORD || "PropnexAi2025@#",
       }),
       signal: controller.signal as any,
     });
