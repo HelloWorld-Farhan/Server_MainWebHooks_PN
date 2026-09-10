@@ -52,6 +52,7 @@ export const campaignExecutionWorker = redisConnection
         if (didNumber && !didNumber.startsWith("+")) {
            if (didNumber.length === 10) didNumber = "+91" + didNumber;
            else if (didNumber.length === 12 && didNumber.startsWith("91")) didNumber = "+" + didNumber;
+           else if (didNumber.length === 11 && didNumber.startsWith("0")) didNumber = "+91" + didNumber.substring(1);
            else didNumber = "+" + didNumber;
         }
         console.log(`Starting Campaign Execution for company: ${companyId}`);
