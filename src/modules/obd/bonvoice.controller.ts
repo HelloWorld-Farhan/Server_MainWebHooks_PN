@@ -1,7 +1,7 @@
 import { Controller, Post, Body } from "@nestjs/common";
 
-@Controller("api/obd/voicelink")
-export class VoicelinkController {
+@Controller("api/obd/bonvoice")
+export class BonvoiceController {
   @Post("add-leads")
   async addLeads(
     @Body()
@@ -12,54 +12,54 @@ export class VoicelinkController {
     }
   ) {
     const { leads, didNumber, companyId } = body;
-    const VOICELINK_API_URL = "https://app.voicelink.co.in/api";
+    const BONVOICE_API_URL = process.env.BONVOICE_BASE_URL || "https://backend.pbx.bonvoice.com";
 
     // 1. Authenticate
-    const loginRes = await fetch(`${VOICELINK_API_URL}/v1/auth/login`, {
+    const loginRes = await fetch(`${BONVOICE_API_URL}/usermanagement/external-auth/`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Accept": "application/json",
       },
       body: JSON.stringify({
-        username: "propnex",
-        password: "PropnexAi2025@#",
+        username: process.env.BONVOICE_USERNAME || "PROP_NEXT",
+        password: process.env.BONVOICE_PASSWORD || "PRopne##xt89",
       }),
     });
 
     if (!loginRes.ok) {
-      throw new Error("Failed to authenticate with Voicelink");
+      throw new Error("Failed to authenticate with Bonvoice");
     }
 
     const loginData = await loginRes.json();
-    const token = loginData.data?.access_token || loginData.access_token;
+    const token = loginData.token || loginData.access_token || loginData.data?.access_token;
 
     if (!token) {
-      throw new Error("Invalid authentication response from Voicelink");
+      throw new Error("Invalid authentication response from Bonvoice");
     }
 
-    // 2. Send leads to Voicelink one by one using the exact working payload
+    // 2. Send leads to Bonvoice one by one using click2call
+    const template_url = process.env.BONVOICE_VOICEBOT_URL || "wss://vineeth-inbound.onrender.com/ws/voice-agent";
     const responses = await Promise.all(
       leads.map(async (lead: any) => {
         try {
-          const res = await fetch(`${VOICELINK_API_URL}/v1/add_lead`, {
+          const res = await fetch(`${BONVOICE_API_URL}/click2call/`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
               "Accept": "application/json",
-              Authorization: `Bearer ${token}`,
+              Authorization: `Token ${token}`,
             },
             body: JSON.stringify({
-              did_number: didNumber,
-              customer_number: lead.phone,
-              country_code: "91",
-              custom_parameters: JSON.stringify({ name: lead.name, companyId }),
+              source_number: didNumber,
+              destination_number: lead.phone,
+              template_url: template_url,
             }),
           });
           
           if (!res.ok) {
               const text = await res.text();
-              throw new Error(`Voicelink API Error: ${text}`);
+              throw new Error(`Bonvoice API Error: ${text}`);
           }
           return await res.json();
         } catch (err: any) {

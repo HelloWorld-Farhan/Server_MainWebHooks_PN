@@ -30,7 +30,7 @@ export class InboundWebhooksController {
       console.log(`[Inbound Webhook] Received payload:`, JSON.stringify(body));
       console.log(`[Inbound Webhook] Key fields - agentNumber(callid/calledno): ${body.callid || body.calledno}, callerNo(phone): ${body.phone || body.callingNo}, status: ${body.status}`);
       
-      // Parse payload based on common VoiceNSMS/OBD field names or VoiceLink's nested 'call' object
+      // Parse payload based on common VoiceNSMS/OBD field names or Bonvoice's nested 'call' object
       const callObj = body.call || {};
       const messageObj = body.message || {};
       
@@ -211,7 +211,7 @@ export class InboundWebhooksController {
       }
 
 
-      // Map status from VoiceLink/provider to our DB enum
+      // Map status from Bonvoice/provider to our DB enum
       let status = "COMPLETED";
       if (statusRaw !== undefined) {
         const normalizedStatus = statusRaw.toString().toUpperCase();
@@ -298,7 +298,7 @@ export class InboundWebhooksController {
           callLogIdToUse = existingCall.callLogId;
         } else if (direction === "OUTBOUND") {
           // Strategy 1: Direct match via pendingCallId embedded in customParameters (fastest & race-condition-free)
-          // NOTE: Do NOT filter by status=PENDING here — VoiceLink sometimes delivers call.completed BEFORE
+          // NOTE: Do NOT filter by status=PENDING here — Bonvoice sometimes delivers call.completed BEFORE
           // call.ringing (out of order), meaning the record may already be FAILED by the time ringing arrives.
           const pendingCallIdFromParams = customParams?.pendingCallId;
           if (pendingCallIdFromParams) {
@@ -392,7 +392,7 @@ export class InboundWebhooksController {
           update: updateData,
           create: {
             companyId: company.id,
-            callLogId: logId, // If creating new, use Voicelink's ID
+            callLogId: logId, // If creating new, use Bonvoice's ID
             publicId: publicId,
             direction: direction as any,
             status: status as any,

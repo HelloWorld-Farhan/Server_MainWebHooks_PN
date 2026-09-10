@@ -6,7 +6,7 @@ import { CampaignGateway } from "@/modules/websockets/campaign.gateway";
 
 const BONVOICE_API_URL = process.env.BONVOICE_BASE_URL || "https://backend.pbx.bonvoice.com";
 
-async function loginToVoicelink() {
+async function loginToBonvoice() {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000);
   try {
@@ -90,7 +90,7 @@ export const campaignExecutionWorker = redisConnection
         }
 
         try {
-          const token = await loginToVoicelink();
+          const token = await loginToBonvoice();
 
           let activeCallIds = new Set<string>();
           let activeCallTimeouts = new Map<string, number>();
@@ -231,7 +231,7 @@ export const campaignExecutionWorker = redisConnection
                         companyId,
                         campaignId: isValidObjectId ? campaignId : null,
                         durationSeconds: 0,
-                        provider: "voicelink",
+                        provider: "BONVOICE",
                         providerCallId: `pending-${publicId}`, // Prevent unique constraint violation on null
                         leadId: leadRecordId
                       }
@@ -259,7 +259,7 @@ export const campaignExecutionWorker = redisConnection
                   
                   if (!res.ok) {
                     const errText = await res.text();
-                    console.error(`Failed to push lead ${lead.phone} to Voicelink:`, errText);
+                    console.error(`Failed to push lead ${lead.phone} to Bonvoice:`, errText);
                     await markAsFailed(lead.phone, didNumber);
                     
                     await updateRedisState((prev) => {
