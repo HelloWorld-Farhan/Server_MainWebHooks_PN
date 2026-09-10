@@ -4,35 +4,35 @@ import { CAMPAIGN_EXECUTION_QUEUE_NAME, CampaignExecutionJobData, campaignExecut
 import prisma from "@/server/lib/prisma";
 import { CampaignGateway } from "@/modules/websockets/campaign.gateway";
 
-const VOICELINK_API_URL = "https://app.voicelink.co.in/api";
+const BONVOICE_API_URL = process.env.BONVOICE_BASE_URL || "https://backend.pbx.bonvoice.com";
 
 async function loginToVoicelink() {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000);
   try {
-    const loginRes = await fetch(`${VOICELINK_API_URL}/v1/auth/login`, {
+    const loginRes = await fetch(`${BONVOICE_API_URL}/usermanagement/external-auth/`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Accept": "application/json",
       },
       body: JSON.stringify({
-        username: process.env.BONVOICE_USERNAME || "propnex",
-        password: process.env.BONVOICE_PASSWORD || "PropnexAi2025@#",
+        username: process.env.BONVOICE_USERNAME || "PROP_NEXT",
+        password: process.env.BONVOICE_PASSWORD || "PRopne##xt89",
       }),
       signal: controller.signal as any,
     });
     clearTimeout(timeoutId);
 
     if (!loginRes.ok) {
-      throw new Error("Failed to authenticate with Voicelink");
+      throw new Error("Failed to authenticate with Bonvoice");
     }
 
     const loginData = await loginRes.json();
-    const token = loginData.data?.access_token || loginData.access_token;
+    const token = loginData.token || loginData.access_token || loginData.data?.access_token;
 
     if (!token) {
-      throw new Error("Invalid authentication response from Voicelink");
+      throw new Error("Invalid authentication response from Bonvoice");
     }
 
     return token;
@@ -92,11 +92,12 @@ export const campaignExecutionWorker = redisConnection
         try {
           const token = await loginToVoicelink();
 
-          let activeCalls = new Map<string, number>();
+          let activeCallIds = new Set<string>();
           let activeCallTimeouts = new Map<string, number>();
           let activeCallCount = 0;
           let completedCount = 0;
           let currentIndex = 0;
+          let leadPhoneMap = new Map<string, string>(); // Maps callLogId to lead phone
           
           const CALL_TIMEOUT_MS = 120000;
 
@@ -220,7 +221,7 @@ export const campaignExecutionWorker = redisConnection
                     // Validate campaignId as a 24-character hex string for MongoDB ObjectId
                     const isValidObjectId = /^[0-9a-fA-F]{24}$/.test(campaignId);
                     
-                    await prisma.callLog.create({
+                    const callLog = await prisma.callLog.create({
                       data: {
                         publicId,
                         callLogId: publicId, // Webhook logic preserves this if it finds the pending call
@@ -238,18 +239,19 @@ export const campaignExecutionWorker = redisConnection
 
                     const controller = new AbortController();
                     const timeoutId = setTimeout(() => controller.abort(), 15000);
-                    const res = await fetch(`${VOICELINK_API_URL}/v1/add_lead`, {
+                    const template_url = process.env.BONVOICE_VOICEBOT_URL || "wss://vineeth-inbound.onrender.com/ws/voice-agent";
+                    const res = await fetch(`${BONVOICE_API_URL}/click2call/`, {
                       method: "POST",
                       headers: {
                         "Content-Type": "application/json",
                         "Accept": "application/json",
-                        Authorization: `Bearer ${token}`,
+                        Authorization: `Token ${token}`,
                       },
                       body: JSON.stringify({
-                          did_number: didNumber,
-                          customer_number: lead.phone.replace(/\D/g, "").slice(-10),
-                          country_code: "91",
-                          custom_parameters: JSON.stringify({ name: lead.name, companyId, pendingCallId: publicId }),
+                          source_number: didNumber,
+                          destination_number: lead.phone.replace(/\D/g, "").slice(-10),
+                          template_url: template_url,
+                          reference_id: callLog.id
                         }),
                       signal: controller.signal as any,
                     });
@@ -268,8 +270,22 @@ export const campaignExecutionWorker = redisConnection
                     activeCallCount--;
                     completedCount++;
                   } else {
-                    activeCalls.set(lead.phone, (activeCalls.get(lead.phone) || 0) + 1);
-                    activeCallTimeouts.set(lead.phone, Date.now());
+                    try {
+                      const responseData = await res.json();
+                      const returnedCallId = responseData.uuid || responseData.callID || responseData.call_id || responseData.data?.uuid || responseData.data?.callID;
+                      if (returnedCallId) {
+                        await prisma.callLog.update({
+                          where: { id: callLog.id },
+                          data: { providerCallId: String(returnedCallId) }
+                        });
+                      }
+                    } catch (e) {
+                      console.error("Failed to parse Bonvoice response", e);
+                    }
+                    
+                    activeCallIds.add(callLog.id);
+                    leadPhoneMap.set(callLog.id, lead.phone);
+                    activeCallTimeouts.set(callLog.id, Date.now());
                   }
                 } catch (err: any) {
                   console.error(`Failed to push lead ${lead.phone}:`, err.message);
@@ -299,75 +315,74 @@ export const campaignExecutionWorker = redisConnection
                await new Promise(resolve => setTimeout(resolve, 3000));
                
                 try {
-                 const isValidObjectId = /^[0-9a-fA-F]{24}$/.test(campaignId);
-                 const dbCalls = await prisma.callLog.findMany({
-                   where: { companyId, campaignId: isValidObjectId ? campaignId : null, direction: "OUTBOUND" },
-                   orderBy: { createdAt: 'desc' },
-                   take: 50,
-                   include: { lead: true }
-                 });
-                 
-                 for (const [phone, count] of Array.from(activeCalls.entries())) {
-                   const corePhone = phone.replace(/\D/g, "").slice(-10);
-                   
-                   const matchingCalls = dbCalls.filter(c => c.lead?.phone?.includes(corePhone) && c.createdAt.getTime() > (activeCallTimeouts.get(phone) || 0) - 10000);
-                   
-                   const activeMatching = matchingCalls.filter(c => ["pending", "ringing", "answered", "in-progress"].includes(c.status?.toLowerCase() || ""));
-                   
-                   const timeElapsed = Date.now() - (activeCallTimeouts.get(phone) || 0);
-                   const hasTimedOut = timeElapsed > CALL_TIMEOUT_MS;
-                   
-                   if (activeMatching.length < count || hasTimedOut) {
-                     const finishedCount = hasTimedOut ? count : (count - activeMatching.length);
-                     
-                     const newlyFinished = matchingCalls.filter(c => !["pending", "ringing", "answered", "in-progress"].includes(c.status?.toLowerCase() || ""));
-                     const newlyFailedCount = newlyFinished.filter(c => ["failed", "missed", "busy", "no-answer"].includes(c.status?.toLowerCase() || "")).length;
-                                          if (hasTimedOut || activeMatching.length === 0) {
-                         activeCalls.delete(phone);
-                         activeCallTimeouts.delete(phone);
-                         
-                         // Clean up stuck calls in the database
-                         if (hasTimedOut) {
-                           try {
-                             await prisma.callLog.updateMany({
-                               where: {
-                                 companyId,
-                                 lead: { phone: { contains: corePhone } },
-                                 status: { in: ["PENDING", "RINGING"] }
-                               },
-                               data: { status: "FAILED", durationSeconds: 0 }
-                             });
-                           } catch (err) {
-                             console.error("Failed to clean up timed out calls in db", err);
-                           }
-                         }
-                       } else {
-                         activeCalls.set(phone, activeMatching.length);
-                       }
-                     activeCallCount -= finishedCount;
-                     completedCount += finishedCount;
-                     
-                     await updateRedisState(prev => {
-                       const updatedLeads = (prev.leads || []).map((l: any) => {
-                         if (l.phone === phone) {
-                           const isFailed = (newlyFailedCount > 0) || (hasTimedOut && newlyFinished.length === 0);
-                           return { ...l, called: true, isFailed };
-                         }
-                         return l;
-                       });
-                       
-                       const totalFailed = updatedLeads.filter((l: any) => l.isFailed).length;
-                       const totalSuccessful = updatedLeads.filter((l: any) => l.called && !l.isFailed).length;
-                       
-                       return { 
-                         ...prev, 
-                         completedCalls: completedCount,
-                         leads: updatedLeads,
-                         failedCalls: totalFailed,
-                         successfulCalls: totalSuccessful
-                       };
+                 if (activeCallIds.size > 0) {
+                     const dbCalls = await prisma.callLog.findMany({
+                       where: { id: { in: Array.from(activeCallIds) } }
                      });
-                   }
+                     
+                     let newlyFinishedCount = 0;
+                     const finishedPhones: {phone: string, isFailed: boolean}[] = [];
+                     
+                     for (const callLogId of Array.from(activeCallIds)) {
+                         const c = dbCalls.find(dbC => dbC.id === callLogId);
+                         const phone = leadPhoneMap.get(callLogId) || "";
+                         
+                         const timeElapsed = Date.now() - (activeCallTimeouts.get(callLogId) || 0);
+                         const hasTimedOut = timeElapsed > CALL_TIMEOUT_MS;
+                         
+                         let isFinished = false;
+                         let isFailed = false;
+                         
+                         if (!c || hasTimedOut) {
+                             isFinished = true;
+                             isFailed = true; // timeout or disappeared
+                             if (hasTimedOut && c) {
+                                 await prisma.callLog.update({ where: { id: callLogId }, data: { status: "FAILED" } }).catch(()=>{});
+                             }
+                         } else {
+                             const status = c.status?.toLowerCase() || "";
+                             if (!["pending", "ringing", "queued", "dispatching", "queued_at_provider", "answered", "in-progress"].includes(status)) {
+                                 isFinished = true;
+                                 if (["failed", "missed", "busy", "no-answer", "cancelled"].includes(status)) {
+                                     isFailed = true;
+                                 }
+                             }
+                         }
+                         
+                         if (isFinished) {
+                             activeCallIds.delete(callLogId);
+                             activeCallTimeouts.delete(callLogId);
+                             leadPhoneMap.delete(callLogId);
+                             activeCallCount--;
+                             completedCount++;
+                             
+                             newlyFinishedCount++;
+                             finishedPhones.push({ phone, isFailed });
+                         }
+                     }
+                     
+                     if (newlyFinishedCount > 0) {
+                         await updateRedisState(prev => {
+                           const updatedLeads = (prev.leads || []).map((l: any) => {
+                             const finishedEntry = finishedPhones.find(fp => fp.phone === l.phone);
+                             if (finishedEntry) {
+                               return { ...l, called: true, isFailed: finishedEntry.isFailed };
+                             }
+                             return l;
+                           });
+                           
+                           const totalFailed = updatedLeads.filter((l: any) => l.isFailed).length;
+                           const totalSuccessful = updatedLeads.filter((l: any) => l.called && !l.isFailed).length;
+                           
+                           return { 
+                             ...prev, 
+                             completedCalls: completedCount,
+                             leads: updatedLeads,
+                             failedCalls: totalFailed,
+                             successfulCalls: totalSuccessful
+                           };
+                         });
+                     }
                  }
                } catch (pollErr) {
                  console.error("Failed to poll call status in worker", pollErr);
