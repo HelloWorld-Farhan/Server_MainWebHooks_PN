@@ -46,7 +46,14 @@ export const campaignExecutionWorker = redisConnection
   ? new Worker<CampaignExecutionJobData>(
       CAMPAIGN_EXECUTION_QUEUE_NAME,
       async (job: Job<CampaignExecutionJobData>) => {
-        const { companyId, campaignId, didNumber, leads, channels } = job.data;
+        const { companyId, campaignId, didNumber: rawDidNumber, leads, channels: rawChannels } = job.data;
+        const channels = Number(rawChannels) || 1;
+        let didNumber = rawDidNumber ? rawDidNumber.trim() : "";
+        if (didNumber && !didNumber.startsWith("+")) {
+           if (didNumber.length === 10) didNumber = "+91" + didNumber;
+           else if (didNumber.length === 12 && didNumber.startsWith("91")) didNumber = "+" + didNumber;
+           else didNumber = "+" + didNumber;
+        }
         console.log(`Starting Campaign Execution for company: ${companyId}`);
 
         // Safety check for queued schedules: if another campaign is currently running, wait 5 mins
@@ -280,6 +287,12 @@ export const campaignExecutionWorker = redisConnection
             
             if (batchPromises.length > 0) {
               await Promise.all(batchPromises);
+            }
+            
+            // If activeCallCount drops to 0 immediately (e.g. all API calls failed),
+            // prevent an infinite tight loop that crashes the server by sleeping briefly.
+            if (activeCallCount === 0 && currentIndex < leads.length) {
+               await new Promise(resolve => setTimeout(resolve, 1000));
             }
             
             if (activeCallCount > 0) {
