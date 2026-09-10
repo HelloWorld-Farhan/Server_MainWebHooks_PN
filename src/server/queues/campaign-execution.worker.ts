@@ -241,7 +241,11 @@ export const campaignExecutionWorker = redisConnection
                     const controller = new AbortController();
                     const timeoutId = setTimeout(() => controller.abort(), 15000);
                     const template_url = process.env.BONVOICE_VOICEBOT_URL || "wss://vineeth-inbound.onrender.com/ws/voice-agent";
-                    const res = await fetch(`${BONVOICE_API_URL}/click2call/`, {
+                    const voicebotProvider = process.env.BONVOICE_VOICEBOT_PROVIDER || "custom";
+                    const cleanDestination = lead.phone.replace(/\D/g, "").slice(-10);
+                    
+                    // Use correct Bonvoice API: /autoDialManagement/autoCallBridging/ with autocallType 5 (Voicebot)
+                    const res = await fetch(`${BONVOICE_API_URL}/autoDialManagement/autoCallBridging/`, {
                       method: "POST",
                       headers: {
                         "Content-Type": "application/json",
@@ -249,10 +253,12 @@ export const campaignExecutionWorker = redisConnection
                         Authorization: `Token ${token}`,
                       },
                       body: JSON.stringify({
-                          source_number: didNumber,
-                          destination_number: lead.phone.replace(/\D/g, "").slice(-10),
-                          template_url: template_url,
-                          reference_id: callLog.id
+                          autocallType: "5",
+                          destination: cleanDestination,
+                          legACallerID: didNumber,
+                          eventID: callLog.id,
+                          voicebotProvider: voicebotProvider,
+                          voicebotURL: template_url,
                         }),
                       signal: controller.signal as any,
                     });
@@ -273,12 +279,13 @@ export const campaignExecutionWorker = redisConnection
                   } else {
                     try {
                       const responseData = await res.json();
-                      const returnedCallId = responseData.uuid || responseData.callID || responseData.call_id || responseData.data?.uuid || responseData.data?.callID;
-                      if (returnedCallId) {
-                        await prisma.callLog.update({
-                          where: { id: callLog.id },
-                          data: { providerCallId: String(returnedCallId) }
-                        });
+                      // Bonvoice autoCallBridging returns { responseCode: 200, responseDescription: "Success" }
+                      // There is no UUID returned; tracking is done via eventID (callLog.id)
+                      const isSuccess = responseData.responseCode === 200 || responseData.responseType === "Success";
+                      if (!isSuccess) {
+                        console.warn(`Bonvoice returned non-success for ${lead.phone}:`, JSON.stringify(responseData));
+                      } else {
+                        console.log(`✅ Call initiated for ${lead.phone} via Bonvoice (eventID: ${callLog.id})`);
                       }
                     } catch (e) {
                       console.error("Failed to parse Bonvoice response", e);
