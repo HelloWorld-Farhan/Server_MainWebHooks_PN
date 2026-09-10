@@ -7,7 +7,7 @@ generator client {
 
 datasource db {
   provider = "mongodb"
-  url      = "mongodb://propnexaiofficial_db_user:KccmbOVh4GsZp1Ok@ac-bwr5uzv-shard-00-00.vuuzm1i.mongodb.net:27017,ac-bwr5uzv-shard-00-01.vuuzm1i.mongodb.net:27017,ac-bwr5uzv-shard-00-02.vuuzm1i.mongodb.net:27017/propnex?ssl=true&authSource=admin&replicaSet=atlas-j95wo5-shard-0&retryWrites=true&w=majority&appName=Cluster0"
+  url      = "mongodb://propnex_admin:Propnexai%40123@200.234.34.240:27017/propnex?authSource=admin&replicaSet=rs0"
 }
 
 // ─── Enums ───────────────────────────────────────────────────────────────────

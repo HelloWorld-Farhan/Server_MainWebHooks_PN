@@ -23,7 +23,6 @@ import { ObdController } from '../obd/obd.controller';
 import { VoicelinkController } from '../obd/voicelink.controller';
 import { PageCacheController } from '../page-cache/page-cache.controller';
 import { TelephonyController } from '../telephony/telephony.controller';
-import { ObdWebhooksController } from '../webhooks/obd-webhooks.controller';
 import { WebhooksController } from '../webhooks/webhooks.controller';
 import { InboundWebhooksController } from '../webhooks/inbound-webhooks.controller';
 import { UsersController } from '../users/users.controller';
@@ -39,7 +38,6 @@ import { UsersController } from '../users/users.controller';
     ObdController,
     VoicelinkController,
     WebhooksController,
-    ObdWebhooksController,
     InboundWebhooksController,
     UsersController,
     InternalController,
