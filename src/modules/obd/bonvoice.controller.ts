@@ -32,7 +32,7 @@ export class BonvoiceController {
     }
 
     const loginData = await loginRes.json();
-    const token = loginData.token || loginData.access_token || loginData.data?.access_token;
+    const token = loginData.token || loginData.access_token || loginData.data?.token || loginData.data?.access_token;
 
     if (!token) {
       throw new Error("Invalid authentication response from Bonvoice");
