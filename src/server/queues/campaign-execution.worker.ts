@@ -276,10 +276,24 @@ export const campaignExecutionWorker = redisConnection
                       signal: controller.signal as any,
                     });
                     clearTimeout(timeoutId);
+                    
+                    const responseText = await res.text();
+                    let responseJson = null;
+                    try { responseJson = JSON.parse(responseText); } catch (e) {}
                   
-                  if (!res.ok) {
-                    const errText = await res.text();
-                    console.error(`Failed to push lead ${lead.phone} to Bonvoice:`, errText);
+                  if (!res.ok || (responseJson && responseJson.status === "error")) {
+                    console.error(`Failed to push lead ${lead.phone} to Bonvoice:`, responseText);
+                    
+                    // Mark CallLog as FAILED so it doesn't get stuck in PENDING
+                    await prisma.callLog.update({
+                      where: { publicId },
+                      data: { 
+                        status: "FAILED", 
+                        completedAt: new Date(), 
+                        failureReason: responseJson?.message || "Bonvoice rejected the call"
+                      }
+                    }).catch(console.error);
+
                     await markAsFailed(lead.phone, didNumber);
                     
                     await updateRedisState((prev) => {
