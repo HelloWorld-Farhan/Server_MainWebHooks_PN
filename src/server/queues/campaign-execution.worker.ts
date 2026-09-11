@@ -92,6 +92,22 @@ export const campaignExecutionWorker = redisConnection
 
         try {
           const token = await loginToBonvoice();
+          
+          let dbAgentUrl = "";
+          try {
+            const phoneNumber = await prisma.phoneNumber.findFirst({
+              where: {
+                companyId,
+                number: didNumber,
+                direction: "OUTBOUND"
+              }
+            });
+            if (phoneNumber && phoneNumber.agentUrl) {
+              dbAgentUrl = phoneNumber.agentUrl;
+            }
+          } catch (e) {
+            console.error("Failed to lookup agentUrl from DB:", e);
+          }
 
           let activeCallIds = new Set<string>();
           let activeCallTimeouts = new Map<string, number>();
@@ -252,6 +268,7 @@ export const campaignExecutionWorker = redisConnection
                       : (typeof lead.customFields === 'string' ? JSON.parse(lead.customFields || "{}") : {});
 
                     const voicebotProvider = process.env.BONVOICE_VOICEBOT_PROVIDER || "BONVOICE";
+                    const voicebotUrlToUse = dbAgentUrl || process.env.BONVOICE_VOICEBOT_URL;
                     
                     // Native Bonvoice payload with custom CSV fields injected dynamically
                     const callPayload = {
@@ -260,7 +277,7 @@ export const campaignExecutionWorker = redisConnection
                       legACallerID: cleanDid,            
                       eventID: eventId,
                       voicebotProvider: voicebotProvider,
-                      ...(process.env.BONVOICE_VOICEBOT_URL ? { voicebotURL: process.env.BONVOICE_VOICEBOT_URL } : {}),
+                      ...(voicebotUrlToUse ? { voicebotURL: voicebotUrlToUse } : {}),
                       ...customFields
                     };
                     

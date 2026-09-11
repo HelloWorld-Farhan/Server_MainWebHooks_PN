@@ -248,6 +248,8 @@ export class PhoneNumbersRepository extends BaseRepository {
       label?: string;
       inboundAgentId?: string;
       outboundAgentId?: string;
+      agentUrl?: string;
+      channels?: number;
       campaignId?: string;
       campaignResourceKey?: string;
       companyCli?: string;
@@ -261,25 +263,18 @@ export class PhoneNumbersRepository extends BaseRepository {
       );
 
       let publicId: string;
-      if (data.campaignResourceKey && data.companyCli) {
+      if (data.companyCli && data.campaignResourceKey) {
         publicId = generatePublicId({
           cli: data.companyCli,
           campaignId: data.campaignResourceKey,
           entityId: phoneNumberId,
         });
       } else {
-        const company = await tx.company.findUnique({
+        const company = await tx.company.findUniqueOrThrow({
           where: { id: companyId },
-          select: { cli: true, companyCode: true },
+          select: { cli: true },
         });
-        if (!company) {
-          throw new Error("Company not found");
-        }
-        publicId = generateLegacyPublicId({
-          cli: company.cli,
-          companyCode: company.companyCode,
-          resourceKey: phoneNumberId,
-        });
+        publicId = `v1.PNX.${company.cli}.${phoneNumberId}`;
       }
 
       return tx.phoneNumber.create({
@@ -289,6 +284,8 @@ export class PhoneNumbersRepository extends BaseRepository {
           label: data.label,
           phoneNumberId,
           publicId,
+          agentUrl: data.agentUrl,
+          channels: data.channels,
           company: { connect: { id: companyId } },
           ...(data.campaignId
             ? { campaign: { connect: { id: data.campaignId } } }

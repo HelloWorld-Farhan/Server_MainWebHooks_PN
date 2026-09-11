@@ -196,6 +196,8 @@ type PhoneNumber {
   status: String!
   inboundAgentId: ID
   outboundAgentId: ID
+  agentUrl: String
+  channels: Int
   inboundAgent: AiAgent
   outboundAgent: AiAgent
   inboundCallsCount: Int!
@@ -211,6 +213,8 @@ input CreatePhoneNumberInput {
   label: String
   inboundAgentId: ID
   outboundAgentId: ID
+  agentUrl: String
+  channels: Int
 }
 
 input UpdatePhoneNumberInput {
@@ -218,6 +222,8 @@ input UpdatePhoneNumberInput {
   status: String
   inboundAgentId: ID
   outboundAgentId: ID
+  agentUrl: String
+  channels: Int
 }
 
 type PhoneNumbersMutations {

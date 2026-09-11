@@ -115,6 +115,8 @@ export class PhoneNumbersService {
       label?: string;
       inboundAgentId?: string;
       outboundAgentId?: string;
+      agentUrl?: string;
+      channels?: number;
     },
   ) {
     tenantService.requirePermission(ctx, PERMISSIONS.AGENTS_WRITE);
@@ -131,6 +133,8 @@ export class PhoneNumbersService {
       status?: PhoneNumberStatus;
       inboundAgentId?: string | null;
       outboundAgentId?: string | null;
+      agentUrl?: string | null;
+      channels?: number | null;
     },
   ) {
     tenantService.requirePermission(ctx, PERMISSIONS.AGENTS_WRITE);
@@ -139,18 +143,16 @@ export class PhoneNumbersService {
     if (!existing) throw new NotFoundError("Phone number not found");
 
     const row = await this.repo.update(ctx.companyId, id, {
-      label: input.label,
-      status: input.status,
-      inboundAgent: input.inboundAgentId
-        ? { connect: { id: input.inboundAgentId } }
-        : input.inboundAgentId === null
-          ? { disconnect: true }
-          : undefined,
-      outboundAgent: input.outboundAgentId
-        ? { connect: { id: input.outboundAgentId } }
-        : input.outboundAgentId === null
-          ? { disconnect: true }
-          : undefined,
+      ...(input.label !== undefined && { label: input.label }),
+      ...(input.status !== undefined && { status: input.status }),
+      ...(input.inboundAgentId !== undefined && {
+        inboundAgentId: input.inboundAgentId,
+      }),
+      ...(input.outboundAgentId !== undefined && {
+        outboundAgentId: input.outboundAgentId,
+      }),
+      ...(input.agentUrl !== undefined && { agentUrl: input.agentUrl }),
+      ...(input.channels !== undefined && { channels: input.channels }),
     });
 
     await cacheService.invalidatePhoneNumberPages(ctx.companyId);
