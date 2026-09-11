@@ -246,29 +246,22 @@ export const campaignExecutionWorker = redisConnection
                     const cleanDestination = lead.phone.replace(/\D/g, "").slice(-10);
                     const eventId = callLog.id.replace(/[^a-zA-Z0-9]/g, "").slice(0, 16);
                     
-                    // Determine call type:
-                    // - If BONVOICE_VOICEBOT_PROVIDER is set → use autocallType 5 (Voicebot/AI agent)
-                    // - Otherwise → use autocallType 4 (TTS) which works without provider registration
-                    const voicebotProvider = process.env.BONVOICE_VOICEBOT_PROVIDER;
-                    const callPayload = voicebotProvider
-                      ? {
-                          autocallType: "5",
-                          destination: cleanDestination,
-                          legACallerID: cleanDid,
-                          eventID: eventId,
-                          voicebotProvider: voicebotProvider,
-                          voicebotURL: process.env.BONVOICE_VOICEBOT_URL || "wss://vineeth-inbound.onrender.com/ws/voice-agent",
-                        }
-                      : {
-                          // TTS mode: calls customer, plays speech message — proven to work ✅
-                          autocallType: "4",
-                          destination: cleanDestination,
-                          legACallerID: cleanDid,
-                          speechContent: process.env.BONVOICE_TTS_MESSAGE || "Hello, this is a call from PropNex AI. Our representative will connect with you shortly. Thank you.",
-                          speechLanguage: process.env.BONVOICE_TTS_LANGUAGE || "ENGLISH",
-                          legADialAttempts: "1",
-                          eventID: eventId,
-                        };
+                    // Use Click2Call (autocallType 3) to dynamically route to the agent.
+                    // Leg A calls the customer. Once answered, Leg B calls the DID itself.
+                    // Bonvoice will automatically route the Leg B call to whatever agent/webhook is configured for that DID.
+                    const callPayload = {
+                      autocallType: "3",
+                      destination: cleanDestination,     // Customer's phone number
+                      ringStrategy: "ringall",
+                      legACallerID: cleanDid,            // Show the DID to the customer
+                      legAChannelID: "1",
+                      legADialAttempts: "1",
+                      legBDestination: cleanDid,         // Bridge back to the DID to trigger its inbound agent
+                      legBCallerID: cleanDid,
+                      legBChannelID: "1",
+                      legBDialAttempts: "1",
+                      eventID: eventId,
+                    };
                     
                     // Use correct Bonvoice API: /autoDialManagement/autoCallBridging/
                     console.log(`📞 Calling ${cleanDestination} from ${cleanDid} [type=${callPayload.autocallType}]`);
