@@ -246,27 +246,29 @@ export const campaignExecutionWorker = redisConnection
                     const cleanDestination = lead.phone.replace(/\D/g, "").slice(-10);
                     // Use publicId as eventId so the webhook can correctly match the CallLog
                     const eventId = publicId;
-                    
-                    // Use Voicebot (autocallType 5) to connect to the central Vapi websocket.
-                    // The websocket server will route to the correct agent based on the cleanDid.
-                    const voicebotProvider = process.env.BONVOICE_VOICEBOT_PROVIDER || "custom";
+                    // Construct the dynamic payload from the lead's customFields
+                    const customFields = lead.customFields && typeof lead.customFields === 'object'
+                      ? lead.customFields 
+                      : (typeof lead.customFields === 'string' ? JSON.parse(lead.customFields || "{}") : {});
+
+                    // Merge core fields with custom fields for the webhook
                     const callPayload = {
-                      autocallType: "5",
-                      destination: cleanDestination,     // Customer's phone number
-                      legACallerID: cleanDid,            // Show the DID to the customer
-                      eventID: eventId,
-                      voicebotProvider: voicebotProvider,
-                      voicebotURL: process.env.BONVOICE_VOICEBOT_URL || "wss://vineeth-inbound.onrender.com/ws/voice-agent",
+                      phone_number: cleanDestination,
+                      prompt_type: "outbound_new_lead", // Provide fallback; can be overridden by customFields
+                      assigned_number: cleanDid,
+                      event_id: eventId,
+                      ...customFields
                     };
                     
-                    // Use correct Bonvoice API: /autoDialManagement/autoCallBridging/
-                    console.log(`📞 Calling ${cleanDestination} from ${cleanDid} [type=${callPayload.autocallType}]`);
-                    const res = await fetch(`${BONVOICE_API_URL}/autoDialManagement/autoCallBridging/`, {
+                    // Fallback to the user's custom VAPI outbound microservice
+                    const webhookUrl = process.env.CUSTOM_OUTBOUND_WEBHOOK_URL || "https://vineeth-outbound.onrender.com/api/call/initiate";
+                    
+                    console.log(`📞 Calling ${cleanDestination} from ${cleanDid} via Webhook [url=${webhookUrl}]`);
+                    const res = await fetch(webhookUrl, {
                       method: "POST",
                       headers: {
                         "Content-Type": "application/json",
                         "Accept": "application/json",
-                        Authorization: `Token ${token}`,
                       },
                       body: JSON.stringify(callPayload),
                       signal: controller.signal as any,
