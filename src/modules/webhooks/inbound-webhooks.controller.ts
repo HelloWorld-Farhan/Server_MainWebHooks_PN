@@ -40,7 +40,7 @@ export class InboundWebhooksController {
       // Enhance status extraction to support various providers (Vapi, Bland, Retell, etc.)
       const statusRaw = body.status ?? body.event ?? body.type ?? body.call_status ?? body.callStatus ?? body["Status"] ?? callObj.status ?? messageObj.status ?? messageObj.type;
       
-      const logId = body.log_id || body.logId || body.call_id || body.callId || body["Log ID"] || body.callid || body.calledno || callObj.id || messageObj.call?.id || `webhook-${Date.now()}`;
+      const logId = body.eventID || body.eventId || body.event_id || body.log_id || body.logId || body.call_id || body.callId || body["Log ID"] || body.callid || body.calledno || callObj.id || messageObj.call?.id || `webhook-${Date.now()}`;
       const recordingUrl = body.recording_url || body.recordingUrl || body.recording || callObj.recordingUrl || messageObj.call?.recordingUrl || null;
       const transcriptUrl = body.transcript_url || body.transcriptUrl || body.transcript || messageObj.call?.transcriptUrl || null;
       const agentNumber = body.callid || body.calledno || body.assigned_number || callObj.to || messageObj.call?.phoneNumber || "Unknown";
