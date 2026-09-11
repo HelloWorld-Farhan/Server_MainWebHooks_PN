@@ -437,7 +437,11 @@ export const campaignExecutionWorker = redisConnection
             if (finalState && finalState.leads) {
               const failedLeads = finalState.leads.filter((l: any) => l.isFailed);
               if (failedLeads.length > 0) {
-                const dbCampaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
+                const isValidObjectIdForReactivation = /^[0-9a-fA-F]{24}$/.test(campaignId);
+                let dbCampaign: any = null;
+                if (isValidObjectIdForReactivation) {
+                  dbCampaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
+                }
                 if (dbCampaign) {
                   let nextStage: any = null;
                   let nextHour = 0;
