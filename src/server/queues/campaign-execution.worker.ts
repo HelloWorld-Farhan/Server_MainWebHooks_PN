@@ -251,24 +251,26 @@ export const campaignExecutionWorker = redisConnection
                       ? lead.customFields 
                       : (typeof lead.customFields === 'string' ? JSON.parse(lead.customFields || "{}") : {});
 
-                    // Merge core fields with custom fields for the webhook
+                    const voicebotProvider = process.env.BONVOICE_VOICEBOT_PROVIDER || "propnex_bot";
+                    
+                    // Native Bonvoice payload with custom CSV fields injected dynamically
                     const callPayload = {
-                      phone_number: cleanDestination,
-                      prompt_type: "outbound_new_lead", // Provide fallback; can be overridden by customFields
-                      assigned_number: cleanDid,
-                      event_id: eventId,
+                      autocallType: "5",
+                      destination: cleanDestination,     
+                      legACallerID: cleanDid,            
+                      eventID: eventId,
+                      voicebotProvider: voicebotProvider,
+                      ...(process.env.BONVOICE_VOICEBOT_URL ? { voicebotURL: process.env.BONVOICE_VOICEBOT_URL } : {}),
                       ...customFields
                     };
                     
-                    // Fallback to the user's custom VAPI outbound microservice
-                    const webhookUrl = process.env.CUSTOM_OUTBOUND_WEBHOOK_URL || "https://vineeth-outbound.onrender.com/api/call/initiate";
-                    
-                    console.log(`📞 Calling ${cleanDestination} from ${cleanDid} via Webhook [url=${webhookUrl}]`);
-                    const res = await fetch(webhookUrl, {
+                    console.log(`📞 Calling ${cleanDestination} from ${cleanDid} natively via Bonvoice`);
+                    const res = await fetch(`${BONVOICE_API_URL}/autoDialManagement/autoCallBridging/`, {
                       method: "POST",
                       headers: {
                         "Content-Type": "application/json",
                         "Accept": "application/json",
+                        Authorization: `Token ${token}`,
                       },
                       body: JSON.stringify(callPayload),
                       signal: controller.signal as any,
