@@ -278,7 +278,7 @@ export const campaignExecutionWorker = redisConnection
                     clearTimeout(timeoutId);
                     
                     const responseText = await res.text();
-                    let responseJson = null;
+                    let responseJson: any = null;
                     try { responseJson = JSON.parse(responseText); } catch (e) {}
                   
                   if (!res.ok || (responseJson && responseJson.status === "error")) {
@@ -286,11 +286,9 @@ export const campaignExecutionWorker = redisConnection
                     
                     // Mark CallLog as FAILED so it doesn't get stuck in PENDING
                     await prisma.callLog.update({
-                      where: { publicId },
+                      where: { id: callLog.id },
                       data: { 
-                        status: "FAILED", 
-                        completedAt: new Date(), 
-                        failureReason: responseJson?.message || "Bonvoice rejected the call"
+                        status: "FAILED"
                       }
                     }).catch(console.error);
 
