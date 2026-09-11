@@ -251,7 +251,7 @@ export const campaignExecutionWorker = redisConnection
                       ? lead.customFields 
                       : (typeof lead.customFields === 'string' ? JSON.parse(lead.customFields || "{}") : {});
 
-                    const voicebotProvider = process.env.BONVOICE_VOICEBOT_PROVIDER || "propnex_bot";
+                    const voicebotProvider = process.env.BONVOICE_VOICEBOT_PROVIDER || "BONVOICE";
                     
                     // Native Bonvoice payload with custom CSV fields injected dynamically
                     const callPayload = {
