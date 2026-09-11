@@ -244,23 +244,19 @@ export const campaignExecutionWorker = redisConnection
                     // Strip leading zeros from DID — Bonvoice requires 10-digit format (e.g. 7946350797 not 07946350797)
                     const cleanDid = didNumber.replace(/\D/g, "").replace(/^0+/, "");
                     const cleanDestination = lead.phone.replace(/\D/g, "").slice(-10);
-                    const eventId = callLog.id.replace(/[^a-zA-Z0-9]/g, "").slice(0, 16);
+                    // Use publicId as eventId so the webhook can correctly match the CallLog
+                    const eventId = publicId;
                     
-                    // Use Click2Call (autocallType 3) to dynamically route to the agent.
-                    // Leg A calls the customer. Once answered, Leg B calls the DID itself.
-                    // Bonvoice will automatically route the Leg B call to whatever agent/webhook is configured for that DID.
+                    // Use Voicebot (autocallType 5) to connect to the central Vapi websocket.
+                    // The websocket server will route to the correct agent based on the cleanDid.
+                    const voicebotProvider = process.env.BONVOICE_VOICEBOT_PROVIDER || "custom";
                     const callPayload = {
-                      autocallType: "3",
+                      autocallType: "5",
                       destination: cleanDestination,     // Customer's phone number
-                      ringStrategy: "ringall",
                       legACallerID: cleanDid,            // Show the DID to the customer
-                      legAChannelID: "1",
-                      legADialAttempts: "1",
-                      legBDestination: cleanDid,         // Bridge back to the DID to trigger its inbound agent
-                      legBCallerID: cleanDid,
-                      legBChannelID: "1",
-                      legBDialAttempts: "1",
                       eventID: eventId,
+                      voicebotProvider: voicebotProvider,
+                      voicebotURL: process.env.BONVOICE_VOICEBOT_URL || "wss://vineeth-inbound.onrender.com/ws/voice-agent",
                     };
                     
                     // Use correct Bonvoice API: /autoDialManagement/autoCallBridging/
