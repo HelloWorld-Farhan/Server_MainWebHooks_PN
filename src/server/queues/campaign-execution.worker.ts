@@ -240,11 +240,38 @@ export const campaignExecutionWorker = redisConnection
 
                     const controller = new AbortController();
                     const timeoutId = setTimeout(() => controller.abort(), 15000);
-                    const template_url = process.env.BONVOICE_VOICEBOT_URL || "wss://vineeth-inbound.onrender.com/ws/voice-agent";
-                    const voicebotProvider = process.env.BONVOICE_VOICEBOT_PROVIDER || "custom";
-                    const cleanDestination = lead.phone.replace(/\D/g, "").slice(-10);
                     
-                    // Use correct Bonvoice API: /autoDialManagement/autoCallBridging/ with autocallType 5 (Voicebot)
+                    // Strip leading zeros from DID — Bonvoice requires 10-digit format (e.g. 7946350797 not 07946350797)
+                    const cleanDid = didNumber.replace(/\D/g, "").replace(/^0+/, "");
+                    const cleanDestination = lead.phone.replace(/\D/g, "").slice(-10);
+                    const eventId = callLog.id.replace(/[^a-zA-Z0-9]/g, "").slice(0, 16);
+                    
+                    // Determine call type:
+                    // - If BONVOICE_VOICEBOT_PROVIDER is set → use autocallType 5 (Voicebot/AI agent)
+                    // - Otherwise → use autocallType 4 (TTS) which works without provider registration
+                    const voicebotProvider = process.env.BONVOICE_VOICEBOT_PROVIDER;
+                    const callPayload = voicebotProvider
+                      ? {
+                          autocallType: "5",
+                          destination: cleanDestination,
+                          legACallerID: cleanDid,
+                          eventID: eventId,
+                          voicebotProvider: voicebotProvider,
+                          voicebotURL: process.env.BONVOICE_VOICEBOT_URL || "wss://vineeth-inbound.onrender.com/ws/voice-agent",
+                        }
+                      : {
+                          // TTS mode: calls customer, plays speech message — proven to work ✅
+                          autocallType: "4",
+                          destination: cleanDestination,
+                          legACallerID: cleanDid,
+                          speechContent: process.env.BONVOICE_TTS_MESSAGE || "Hello, this is a call from PropNex AI. Our representative will connect with you shortly. Thank you.",
+                          speechLanguage: process.env.BONVOICE_TTS_LANGUAGE || "ENGLISH",
+                          legADialAttempts: "1",
+                          eventID: eventId,
+                        };
+                    
+                    // Use correct Bonvoice API: /autoDialManagement/autoCallBridging/
+                    console.log(`📞 Calling ${cleanDestination} from ${cleanDid} [type=${callPayload.autocallType}]`);
                     const res = await fetch(`${BONVOICE_API_URL}/autoDialManagement/autoCallBridging/`, {
                       method: "POST",
                       headers: {
@@ -252,14 +279,7 @@ export const campaignExecutionWorker = redisConnection
                         "Accept": "application/json",
                         Authorization: `Token ${token}`,
                       },
-                      body: JSON.stringify({
-                          autocallType: "5",
-                          destination: cleanDestination,
-                          legACallerID: didNumber,
-                          eventID: callLog.id,
-                          voicebotProvider: voicebotProvider,
-                          voicebotURL: template_url,
-                        }),
+                      body: JSON.stringify(callPayload),
                       signal: controller.signal as any,
                     });
                     clearTimeout(timeoutId);
