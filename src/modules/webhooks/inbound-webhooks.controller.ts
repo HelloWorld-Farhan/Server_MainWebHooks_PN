@@ -38,7 +38,7 @@ export class InboundWebhooksController {
       const callDurationRaw = body.duration ?? body["Call Duration"] ?? body.callDuration ?? body.call_duration ?? callObj.durationSec ?? messageObj.call?.duration;
       
       // Enhance status extraction to support various providers (Vapi, Bland, Retell, Bonvoice, etc.)
-      const statusRaw = body.Status || body.status ?? body.event ?? body.type ?? body.call_status ?? body.callStatus ?? body["Status"] ?? callObj.status ?? messageObj.status ?? messageObj.type;
+      const statusRaw = (body.Status || body.status) ?? body.event ?? body.type ?? body.call_status ?? body.callStatus ?? body["Status"] ?? callObj.status ?? messageObj.status ?? messageObj.type;
       
       const logId = body.eventID || body.callID || body.eventId || body.event_id || body.log_id || body.logId || body.call_id || body.callId || body["Log ID"] || body.callid || body.calledno || callObj.id || messageObj.call?.id || `webhook-${Date.now()}`;
       const recordingUrl = body.ResourceURL || body.recording_url || body.recordingUrl || body.recording || callObj.recordingUrl || messageObj.call?.recordingUrl || null;
