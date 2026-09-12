@@ -253,7 +253,7 @@ export const campaignExecutionWorker = redisConnection
                     const timeoutId = setTimeout(() => controller.abort(), 15000);
                     
                     // Strip leading zeros from DID — Bonvoice requires 10-digit format (e.g. 7946350797 not 07946350797)
-                    const cleanDid = didNumber.replace(/\D/g, "").replace(/^0+/, "");
+                    const cleanDid = didNumber.replace(/\D/g, "").slice(-10);
                     const cleanDestination = lead.phone.replace(/\D/g, "").slice(-10);
                     // Use publicId as eventId so the webhook can correctly match the CallLog
                     const eventId = publicId;
