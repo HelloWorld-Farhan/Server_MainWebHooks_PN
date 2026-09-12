@@ -173,12 +173,9 @@ export class ObdOutboundService {
       
       if (phoneNumber?.agentUrl) {
         resolved = { ...resolved, voicebotUrl: phoneNumber.agentUrl };
+      } else {
+        throw new Error(`No Agent URL assigned to DID ${configuredNumber}. Please assign a Voicebot URL in the Admin Panel.`);
       }
-    }
-
-    const configuredIvrTemplateId = setup?.ivrTemplateId?.trim();
-    if (configuredIvrTemplateId) {
-      resolved = { ...resolved, ivrTemplateId: configuredIvrTemplateId };
     }
 
     return resolved;

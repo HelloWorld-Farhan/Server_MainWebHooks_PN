@@ -7,35 +7,45 @@ export const DEFAULT_OBD_SERVICE_NUMBERS = [
 export type ObdConfig = {
   /** Full Bonvoice autoCallBridging endpoint URL. */
   baseUrl: string;
-  apiKey: string;
+  username: string;
+  password: string;
   webhookUrl: string | null;
   timeoutMs: number;
   maxRetries: number;
   webhookSecret: string | null;
   serviceNo: string;
   voicebotUrl: string | null;
-  
-  // Legacy fields (can be removed later if completely unused, but kept for compatibility just in case)
-  voiceFile: string;
-  ivrTemplateId: string;
-  retryAttempts: string;
-  retryDuration: string;
-  sourceType: string;
-  campaignType: string;
-  fileType: string;
-  sendNow: string;
 };
 
+export function assertObdDispatchConfig(
+  config: ObdConfig,
+): asserts config is ObdConfig & {
+  username: string;
+  password: string;
+} {
+  if (!config.baseUrl) {
+    throw new Error("OBD configuration error: Missing OBD_BASE_URL");
+  }
+  if (!config.username || !config.password) {
+    throw new Error("OBD configuration error: Missing OBD_USERNAME or OBD_PASSWORD");
+  }
+  if (!config.serviceNo) {
+    throw new Error(
+      "OBD configuration error: No default service number or fallback available",
+    );
+  }
+}
+
 export function getObdServiceNumbers(): string[] {
-  return [...DEFAULT_OBD_SERVICE_NUMBERS];
+  return [resolveDefaultServiceNo()];
 }
 
 export function getDefaultObdServiceNo(): string {
-  return getObdServiceNumbers()[0] ?? "";
+  return resolveDefaultServiceNo();
 }
 
 function resolveDefaultServiceNo(): string {
-  return getDefaultObdServiceNo();
+  return (process.env.OBD_SERVICE_NO ?? "917946350797").trim();
 }
 
 function parsePositiveInt(value: string | undefined, fallback: number): number {
@@ -49,35 +59,15 @@ function parsePositiveInt(value: string | undefined, fallback: number): number {
 export function getObdConfig(): ObdConfig {
   return {
     baseUrl: (process.env.OBD_BASE_URL ?? "https://backend.pbx.bonvoice.com/autoDialManagement/autoCallBridging/").trim().replace(/\/$/, "") + "/",
-    apiKey: (process.env.OBD_API_KEY ?? "").trim(),
+    username: (process.env.OBD_USERNAME ?? "PROP_NEXT").trim(),
+    password: (process.env.OBD_PASSWORD ?? "PRopne##xt89").trim(),
     webhookUrl: (process.env.OBD_WEBHOOK_URL ?? "").trim() || null,
     timeoutMs: parsePositiveInt(process.env.OBD_TIMEOUT_MS, 30_000),
     maxRetries: parsePositiveInt(process.env.OBD_MAX_RETRIES, 2),
     webhookSecret: (process.env.OBD_WEBHOOK_SECRET ?? "").trim() || null,
     serviceNo: resolveDefaultServiceNo(),
     voicebotUrl: (process.env.OBD_VOICEBOT_URL ?? "").trim() || null,
-    
-    voiceFile: (process.env.OBD_VOICE_FILE ?? "").trim(),
-    ivrTemplateId: (process.env.OBD_IVR_TEMPLATE_ID ?? "179").trim(),
-    retryAttempts: (process.env.OBD_RETRY_ATTEMPTS ?? "0").trim(),
-    retryDuration: (process.env.OBD_RETRY_DURATION ?? "15").trim(),
-    sourceType: (process.env.OBD_SOURCE_TYPE ?? "1").trim(),
-    campaignType: (process.env.OBD_CAMPAIGN_TYPE ?? "4").trim(),
-    fileType: (process.env.OBD_FILE_TYPE ?? "2").trim(),
-    sendNow: (process.env.OBD_SEND_NOW ?? "1").trim(),
   };
-}
-
-export function assertObdDispatchConfig(config: ObdConfig): void {
-  if (!config.baseUrl) {
-    throw new Error("OBD_BASE_URL is not configured");
-  }
-  if (!config.apiKey) {
-    throw new Error("OBD_API_KEY is not configured");
-  }
-  if (!config.serviceNo) {
-    throw new Error("No OBD service number is configured");
-  }
 }
 
 /**

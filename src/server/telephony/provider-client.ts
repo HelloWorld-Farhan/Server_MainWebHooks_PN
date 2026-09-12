@@ -49,10 +49,47 @@ function headersToRecord(headers: Headers): Record<string, string> {
 export class ObdProviderClient {
   private readonly fetchFn: typeof fetch;
   private readonly configOverride?: ObdConfig;
+  private cachedToken: string | null = null;
 
   constructor(deps: ObdProviderClientDeps = {}) {
     this.fetchFn = deps.fetchFn ?? fetch;
     this.configOverride = deps.config;
+  }
+
+  private async authenticateAndGetToken(config: ObdConfig): Promise<string> {
+    if (this.cachedToken) {
+      return this.cachedToken;
+    }
+    
+    try {
+      const authUrl = "https://backend.pbx.bonvoice.com/usermanagement/external-auth/";
+      const response = await this.fetchFn(authUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: config.username,
+          password: config.password,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Auth failed with HTTP ${response.status}`);
+      }
+
+      const body = await response.json() as { data?: { token?: string } };
+      if (body?.data?.token) {
+        this.cachedToken = body.data.token;
+        return this.cachedToken;
+      }
+      
+      throw new Error("Token not found in auth response");
+    } catch (err) {
+      logObdError({
+        correlationId: "AUTH",
+        message: err instanceof Error ? err.message : "Authentication error",
+      });
+      throw err;
+    }
   }
 
   async sendOutboundCall(
@@ -68,23 +105,36 @@ export class ObdProviderClient {
 
     const payload = buildObdProviderOutboundPayload(input, config);
     const url = config.baseUrl;
-    const requestHeaders = {
-      "Content-Type": "application/json",
-      "X-Correlation-Id": input.correlationId,
-      Authorization: `Token ${config.apiKey}`,
-    };
-
-    logObdProviderRequest({
-      correlationId: input.correlationId,
-      url,
-      method: "POST",
-      headers: requestHeaders,
-      payload,
-    });
 
     let lastError: ProviderErrorDetails | null = null;
 
     for (let attempt = 0; attempt <= config.maxRetries; attempt += 1) {
+      let token: string;
+      try {
+        token = await this.authenticateAndGetToken(config);
+      } catch (err) {
+        return {
+          ok: false,
+          error: { message: "Failed to authenticate with Bonvoice provider", isNetworkError: true }
+        };
+      }
+      
+      const requestHeaders = {
+        "Content-Type": "application/json",
+        "X-Correlation-Id": input.correlationId,
+        Authorization: `Token ${token}`,
+      };
+
+      if (attempt === 0) {
+        logObdProviderRequest({
+          correlationId: input.correlationId,
+          url,
+          method: "POST",
+          headers: requestHeaders,
+          payload,
+        });
+      }
+
       const result = await this.executeRequest(
         url,
         payload,
@@ -92,14 +142,21 @@ export class ObdProviderClient {
         config.timeoutMs,
         requestHeaders,
       );
+      
       if (result.ok) {
         return result;
       }
 
       lastError = result.error;
+      
+      if (result.error.httpStatus === 401 || result.error.httpStatus === 403) {
+        this.cachedToken = null; // Invalidate token and retry
+      }
+
       const canRetry =
         attempt < config.maxRetries &&
-        isRetryableProviderError(result.error);
+        (isRetryableProviderError(result.error) || result.error.httpStatus === 401 || result.error.httpStatus === 403);
+        
       if (!canRetry) {
         break;
       }
