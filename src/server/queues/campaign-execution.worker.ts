@@ -351,11 +351,11 @@ export const campaignExecutionWorker = redisConnection
                     } else {
                       console.log(`✅ Call initiated for ${lead.phone} via Bonvoice (eventID: ${callLog.id})`);
                       
-                      // Bonvoice does not send real-time webhooks for outbound answered events,
-                      // so we immediately set it to ANSWERED to start the live timer on the UI!
+                      // We set the initial status to RINGING.
+                      // The Bonvoice notification webhook will later update it to ANSWERED.
                       await prisma.callLog.update({
                         where: { id: callLog.id },
-                        data: { status: "ANSWERED", answeredAt: new Date() }
+                        data: { status: "RINGING" }
                       }).catch(console.error);
                     }
                     
