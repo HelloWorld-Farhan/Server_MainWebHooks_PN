@@ -20,8 +20,11 @@ jobs:
           cache: 'npm'
 
       - name: Install and Build on GitHub
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NODE_OPTIONS: "--max_old_space_size=6144"
         run: |
-          export NODE_OPTIONS="--max_old_space_size=6144"
           npm ci
           npm run build
 
@@ -50,7 +53,7 @@ jobs:
             cd /root/propnexai-main-server
             tar -xzf deploy.tar.gz
             rm deploy.tar.gz
-            npm ci
+            npm ci --omit=dev
             npx prisma generate
             pm2 restart propnexai-main-server || pm2 start npm --name "propnexai-main-server" -- run start:prod
             pm2 save
