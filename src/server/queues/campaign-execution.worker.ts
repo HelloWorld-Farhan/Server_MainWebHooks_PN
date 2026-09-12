@@ -272,6 +272,11 @@ export const campaignExecutionWorker = redisConnection
                       legACallerID: cleanDid,            
                       eventID: eventId,
                       voicebotProvider: voicebotProvider,
+                      callBackUrl: "https://voice.propnexai.com/api/webhooks/bonvoice/notification",
+                      callbackUrl: "https://voice.propnexai.com/api/webhooks/bonvoice/notification",
+                      webhookURL: "https://voice.propnexai.com/api/webhooks/bonvoice/notification",
+                      eventUrl: "https://voice.propnexai.com/api/webhooks/bonvoice/notification",
+                      statusCallback: "https://voice.propnexai.com/api/webhooks/bonvoice/notification",
                       ...(voicebotUrlToUse ? { voicebotURL: voicebotUrlToUse } : {}),
                       ...customFields
                     };
@@ -322,6 +327,12 @@ export const campaignExecutionWorker = redisConnection
                       console.warn(`Bonvoice returned non-success for ${lead.phone}:`, responseText);
                     } else {
                       console.log(`✅ Call initiated for ${lead.phone} via Bonvoice (eventID: ${callLog.id})`);
+                      
+                      // Immediately set to RINGING so the UI updates
+                      await prisma.callLog.update({
+                        where: { id: callLog.id },
+                        data: { status: "RINGING" }
+                      }).catch(console.error);
                     }
                     
                     activeCallIds.add(callLog.id);
