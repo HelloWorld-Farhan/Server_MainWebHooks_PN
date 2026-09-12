@@ -95,15 +95,29 @@ export const campaignExecutionWorker = redisConnection
           
           let dbAgentUrl = "";
           try {
+            // The DID in DB may be stored in a different format than the normalized didNumber
+            // Try multiple formats to ensure we always find the agentUrl
+            const rawDid = rawDidNumber ? rawDidNumber.trim() : "";
+            const digitsOnly = rawDid.replace(/\D/g, "");
+            const last10 = digitsOnly.slice(-10);
+            
             const phoneNumber = await prisma.phoneNumber.findFirst({
               where: {
                 companyId,
-                number: didNumber,
-                direction: "OUTBOUND"
+                direction: "OUTBOUND",
+                OR: [
+                  { number: didNumber },         // +917946350797
+                  { number: rawDid },            // 07946350797 (as provided)
+                  { number: digitsOnly },        // 07946350797 digits only
+                  { number: { endsWith: last10 } } // ends with 7946350797
+                ]
               }
             });
             if (phoneNumber && phoneNumber.agentUrl) {
               dbAgentUrl = phoneNumber.agentUrl;
+              console.log(`✅ Found agentUrl for DID ${rawDid}: ${dbAgentUrl}`);
+            } else {
+              console.warn(`⚠️ No agentUrl found in DB for DID ${rawDid} / ${didNumber}`);
             }
           } catch (e) {
             console.error("Failed to lookup agentUrl from DB:", e);
