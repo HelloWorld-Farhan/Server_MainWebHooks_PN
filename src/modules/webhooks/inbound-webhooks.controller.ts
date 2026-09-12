@@ -34,16 +34,16 @@ export class InboundWebhooksController {
       const callObj = body.call || {};
       const messageObj = body.message || {};
       
-      const callingNo = body.phone || body["Calling No"] || body.callingNo || body.calling_no || body.caller_id || body.caller_number || callObj.from || messageObj.customer?.number || "Unknown";
+      const callingNo = body.SourceNumber || body.phone || body["Calling No"] || body.callingNo || body.calling_no || body.caller_id || body.caller_number || callObj.from || messageObj.customer?.number || "Unknown";
       const callDurationRaw = body.duration ?? body["Call Duration"] ?? body.callDuration ?? body.call_duration ?? callObj.durationSec ?? messageObj.call?.duration;
       
-      // Enhance status extraction to support various providers (Vapi, Bland, Retell, etc.)
-      const statusRaw = body.status ?? body.event ?? body.type ?? body.call_status ?? body.callStatus ?? body["Status"] ?? callObj.status ?? messageObj.status ?? messageObj.type;
+      // Enhance status extraction to support various providers (Vapi, Bland, Retell, Bonvoice, etc.)
+      const statusRaw = body.Status || body.status ?? body.event ?? body.type ?? body.call_status ?? body.callStatus ?? body["Status"] ?? callObj.status ?? messageObj.status ?? messageObj.type;
       
-      const logId = body.eventID || body.eventId || body.event_id || body.log_id || body.logId || body.call_id || body.callId || body["Log ID"] || body.callid || body.calledno || callObj.id || messageObj.call?.id || `webhook-${Date.now()}`;
-      const recordingUrl = body.recording_url || body.recordingUrl || body.recording || callObj.recordingUrl || messageObj.call?.recordingUrl || null;
+      const logId = body.eventID || body.callID || body.eventId || body.event_id || body.log_id || body.logId || body.call_id || body.callId || body["Log ID"] || body.callid || body.calledno || callObj.id || messageObj.call?.id || `webhook-${Date.now()}`;
+      const recordingUrl = body.ResourceURL || body.recording_url || body.recordingUrl || body.recording || callObj.recordingUrl || messageObj.call?.recordingUrl || null;
       const transcriptUrl = body.transcript_url || body.transcriptUrl || body.transcript || messageObj.call?.transcriptUrl || null;
-      const agentNumber = body.callid || body.calledno || body.assigned_number || callObj.to || messageObj.call?.phoneNumber || "Unknown";
+      const agentNumber = body.DestinationNumber || body.DisplayNumber || body.callid || body.calledno || body.assigned_number || callObj.to || messageObj.call?.phoneNumber || "Unknown";
 
       // Generate all possible number variants for robust DB lookup
       const getNumberVariants = (num: string): string[] => {
@@ -129,13 +129,15 @@ export class InboundWebhooksController {
         else if (typeof customParamsStr === 'object') customParams = customParamsStr;
       } catch(e) {}
       
-      let direction = "INBOUND";
+      let direction = body.Direction === "Outbound" || body.direction === "outbound" || body.direction === "OUTBOUND" ? "OUTBOUND" : "INBOUND";
       const payloadCompanyId = customParams?.companyId || customParams?.company_id;
       if (payloadCompanyId) {
         const exactCompany = await prisma.company.findUnique({ where: { id: payloadCompanyId } });
         if (exactCompany) {
           companies = [exactCompany];
-          direction = customParams.callType === "outbound" || callObj.direction === "outbound" ? "OUTBOUND" : "INBOUND";
+          if (customParams.callType === "outbound" || callObj.direction === "outbound") {
+            direction = "OUTBOUND";
+          }
         }
       }
 
@@ -161,27 +163,41 @@ export class InboundWebhooksController {
         }
       }
 
-      // If STILL no company found (not an outbound pending call), look up by agent number (INBOUND) and calling number (OUTBOUND) in PhoneNumber table
+      // If STILL no company found, look up DID in PhoneNumber table
       let phoneNumbers: any[] = [];
       if (companies.length === 0) {
-        phoneNumbers = await prisma.phoneNumber.findMany({
-          where: { 
-            OR: agentVariants.map(v => ({ number: { contains: v } })),
-            status: "ACTIVE",
-            direction: { not: "OUTBOUND" }
-          }
-        });
-        
-        // If agentNumber didn't match a DID, try callingNo (Outbound calls have DID in the from/callingNo field)
-        if (phoneNumbers.length === 0) {
+        if (direction === "OUTBOUND") {
+          // For outbound, the DID could be in callingNo (SourceNumber) or agentNumber (DisplayNumber)
           phoneNumbers = await prisma.phoneNumber.findMany({
-            where: { 
-              OR: callingVariants.map(v => ({ number: { contains: v } })),
+            where: {
+              OR: [
+                ...callingVariants.map(v => ({ number: { contains: v } })),
+                ...agentVariants.map(v => ({ number: { contains: v } }))
+              ],
               status: "ACTIVE"
             }
           });
-          if (phoneNumbers.length > 0) {
-            direction = "OUTBOUND";
+        } else {
+          // For inbound, look up by agent number (DID) first
+          phoneNumbers = await prisma.phoneNumber.findMany({
+            where: { 
+              OR: agentVariants.map(v => ({ number: { contains: v } })),
+              status: "ACTIVE",
+              direction: { not: "OUTBOUND" }
+            }
+          });
+          
+          // If agentNumber didn't match a DID, try callingNo (maybe it's actually an outbound call but direction wasn't in payload)
+          if (phoneNumbers.length === 0) {
+            phoneNumbers = await prisma.phoneNumber.findMany({
+              where: { 
+                OR: callingVariants.map(v => ({ number: { contains: v } })),
+                status: "ACTIVE"
+              }
+            });
+            if (phoneNumbers.length > 0) {
+              direction = "OUTBOUND";
+            }
           }
         }
         
