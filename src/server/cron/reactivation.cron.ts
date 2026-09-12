@@ -123,7 +123,6 @@ cron.schedule(
     }
   },
   {
-    scheduled: true,
     timezone: "Asia/Kolkata",
   }
 );
