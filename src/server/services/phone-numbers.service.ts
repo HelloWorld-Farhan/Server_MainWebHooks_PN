@@ -120,6 +120,19 @@ export class PhoneNumbersService {
     },
   ) {
     tenantService.requirePermission(ctx, PERMISSIONS.AGENTS_WRITE);
+
+    // Auto-inherit agentUrl from any existing record with the same DID number
+    // agentUrl belongs to the DID number itself, shared across all companies
+    if (!input.agentUrl) {
+      const existing = await prisma.phoneNumber.findFirst({
+        where: { number: input.number, agentUrl: { not: null } },
+        select: { agentUrl: true },
+      });
+      if (existing?.agentUrl) {
+        input = { ...input, agentUrl: existing.agentUrl };
+      }
+    }
+
     const row = await this.repo.create(ctx.companyId, input);
     await cacheService.invalidatePhoneNumberPages(ctx.companyId);
     return mapPhoneNumber(row);
@@ -154,6 +167,18 @@ export class PhoneNumbersService {
       ...(input.agentUrl !== undefined && { agentUrl: input.agentUrl }),
       ...(input.channels !== undefined && { channels: input.channels }),
     });
+
+    // If agentUrl was changed, sync it to ALL records with the same DID number
+    // agentUrl belongs to the DID number itself, shared across all companies
+    if (input.agentUrl !== undefined && existing.number) {
+      await prisma.phoneNumber.updateMany({
+        where: {
+          number: existing.number,
+          id: { not: id }, // skip the one already updated
+        },
+        data: { agentUrl: input.agentUrl },
+      });
+    }
 
     await cacheService.invalidatePhoneNumberPages(ctx.companyId);
     return mapPhoneNumber(row);
