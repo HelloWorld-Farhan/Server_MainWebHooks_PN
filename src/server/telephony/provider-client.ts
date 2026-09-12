@@ -71,6 +71,7 @@ export class ObdProviderClient {
     const requestHeaders = {
       "Content-Type": "application/json",
       "X-Correlation-Id": input.correlationId,
+      Authorization: `Token ${config.apiKey}`,
     };
 
     logObdProviderRequest({

@@ -5,7 +5,7 @@ export const DEFAULT_OBD_SERVICE_NUMBERS = [
 ] as const;
 
 export type ObdConfig = {
-  /** Full VoiceNSMS CreateOBDCampaignPost endpoint URL. */
+  /** Full Bonvoice autoCallBridging endpoint URL. */
   baseUrl: string;
   apiKey: string;
   webhookUrl: string | null;
@@ -13,6 +13,9 @@ export type ObdConfig = {
   maxRetries: number;
   webhookSecret: string | null;
   serviceNo: string;
+  voicebotUrl: string | null;
+  
+  // Legacy fields (can be removed later if completely unused, but kept for compatibility just in case)
   voiceFile: string;
   ivrTemplateId: string;
   retryAttempts: string;
@@ -20,7 +23,6 @@ export type ObdConfig = {
   sourceType: string;
   campaignType: string;
   fileType: string;
-  /** `1` = send immediately; do not include `schddate`. */
   sendNow: string;
 };
 
@@ -46,13 +48,15 @@ function parsePositiveInt(value: string | undefined, fallback: number): number {
 
 export function getObdConfig(): ObdConfig {
   return {
-    baseUrl: (process.env.OBD_BASE_URL ?? "").trim().replace(/\/$/, ""),
+    baseUrl: (process.env.OBD_BASE_URL ?? "https://backend.pbx.bonvoice.com/autoDialManagement/autoCallBridging/").trim().replace(/\/$/, "") + "/",
     apiKey: (process.env.OBD_API_KEY ?? "").trim(),
     webhookUrl: (process.env.OBD_WEBHOOK_URL ?? "").trim() || null,
     timeoutMs: parsePositiveInt(process.env.OBD_TIMEOUT_MS, 30_000),
     maxRetries: parsePositiveInt(process.env.OBD_MAX_RETRIES, 2),
     webhookSecret: (process.env.OBD_WEBHOOK_SECRET ?? "").trim() || null,
     serviceNo: resolveDefaultServiceNo(),
+    voicebotUrl: (process.env.OBD_VOICEBOT_URL ?? "").trim() || null,
+    
     voiceFile: (process.env.OBD_VOICE_FILE ?? "").trim(),
     ivrTemplateId: (process.env.OBD_IVR_TEMPLATE_ID ?? "179").trim(),
     retryAttempts: (process.env.OBD_RETRY_ATTEMPTS ?? "0").trim(),

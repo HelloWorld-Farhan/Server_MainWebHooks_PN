@@ -161,11 +161,19 @@ export class ObdOutboundService {
     let resolved = config;
 
     const configuredNumber = setup?.serviceNumber?.trim();
-    if (
-      configuredNumber &&
-      getObdServiceNumbers().includes(configuredNumber)
-    ) {
+    if (configuredNumber) {
       resolved = { ...resolved, serviceNo: configuredNumber };
+      
+      const phoneNumber = await prisma.phoneNumber.findFirst({
+        where: { 
+          number: { endsWith: configuredNumber }
+        },
+        select: { agentUrl: true },
+      });
+      
+      if (phoneNumber?.agentUrl) {
+        resolved = { ...resolved, voicebotUrl: phoneNumber.agentUrl };
+      }
     }
 
     const configuredIvrTemplateId = setup?.ivrTemplateId?.trim();
