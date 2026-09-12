@@ -265,6 +265,7 @@ export const campaignExecutionWorker = redisConnection
                         startedAt: new Date(),
                         companyId,
                         campaignId: isValidObjectId ? campaignId : null,
+                        correlationId: campaignId, // Save the original campaignId here for Reactivation tracking (q1/q2/q3)
                         durationSeconds: 0,
                         provider: "BONVOICE",
                         providerCallId: `pending-${publicId}`, // Prevent unique constraint violation on null
