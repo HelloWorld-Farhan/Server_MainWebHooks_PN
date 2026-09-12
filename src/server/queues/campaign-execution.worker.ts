@@ -203,6 +203,29 @@ export const campaignExecutionWorker = redisConnection
                 continue;
               }
 
+              if (job.data.isReactivation && (job.data.qStage === "Q2" || job.data.qStage === "Q3") && lead.id) {
+                 const startOfToday = new Date();
+                 startOfToday.setHours(0,0,0,0);
+                 const successfulCallsToday = await prisma.callLog.count({
+                    where: {
+                       leadId: lead.id,
+                       status: "COMPLETED",
+                       durationSeconds: { gt: 0 },
+                       startedAt: { gte: startOfToday }
+                    }
+                 });
+                 if (successfulCallsToday > 0) {
+                     console.log(`[Reactivation Engine] Skipping lead ${lead.phone} in ${job.data.qStage} because they successfully answered earlier today.`);
+                     // Still increment completed calls for UI progress
+                     await updateRedisState(prev => ({ 
+                        ...prev, 
+                        completedCalls: prev.completedCalls + 1,
+                        successfulCalls: prev.successfulCalls + 1
+                     }));
+                     continue;
+                 }
+              }
+
               activeCallCount++;
                             batchPromises.push((async () => {
                   try {

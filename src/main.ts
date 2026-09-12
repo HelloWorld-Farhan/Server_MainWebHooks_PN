@@ -12,6 +12,7 @@ import { LoggingInterceptor } from "./common/interceptors/logging.interceptor";
 
 import "./server/queues/delayed-calls.worker";
 import "./server/queues/campaign-execution.worker";
+import "./server/cron/reactivation.cron";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bodyParser: false });

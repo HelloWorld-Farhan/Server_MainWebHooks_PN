@@ -243,9 +243,9 @@ export class InboundWebhooksController {
       let status = "COMPLETED";
       if (statusRaw !== undefined) {
         const normalizedStatus = statusRaw.toString().toUpperCase();
-        if (normalizedStatus.includes("RING") || normalizedStatus.includes("INITIAT") || normalizedStatus.includes("QUEUE") || normalizedStatus.includes("DISPATCH")) {
+        if (normalizedStatus.includes("RING") || normalizedStatus.includes("INITIAT") || normalizedStatus.includes("QUEUE") || normalizedStatus.includes("DISPATCH") || normalizedStatus.includes("IN_PROGRESS") || normalizedStatus.includes("IN-PROGRESS")) {
           status = "RINGING";
-        } else if (normalizedStatus.includes("ANSWER") || normalizedStatus.includes("CONNECT") || normalizedStatus.includes("ACTIVE") || normalizedStatus.includes("IN_PROGRESS")) {
+        } else if (normalizedStatus.includes("ANSWER") || normalizedStatus.includes("CONNECT") || normalizedStatus.includes("ACTIVE") || normalizedStatus.includes("BRIDGED")) {
           status = "ANSWERED";
         } else if (normalizedStatus.includes("FAIL") || normalizedStatus.includes("ERROR") || normalizedStatus.includes("REJECT") || normalizedStatus.includes("CANCEL")) {
           status = "FAILED";
@@ -374,15 +374,14 @@ export class InboundWebhooksController {
         }
 
         const updateData: any = {};
-        if (statusRaw !== undefined) {
-          updateData.status = status;
-          
-          // State machine validation: don't let a live status overwrite a terminal status (out-of-order webhooks)
-          if (existingCall) {
-            const terminalStatuses = ["COMPLETED", "FAILED", "MISSED", "CANCELED"];
-            if (terminalStatuses.includes(existingCall.status) && isCallLive) {
-              delete updateData.status;
-            }
+        // Always update the status. If statusRaw was undefined but we inferred FAILED from 0s, this saves it.
+        updateData.status = status;
+        
+        // State machine validation: don't let a live status overwrite a terminal status (out-of-order webhooks)
+        if (existingCall) {
+          const terminalStatuses = ["COMPLETED", "FAILED", "MISSED", "CANCELED"];
+          if (terminalStatuses.includes(existingCall.status) && isCallLive) {
+            delete updateData.status;
           }
         }
         
