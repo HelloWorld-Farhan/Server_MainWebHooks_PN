@@ -7,39 +7,9 @@ import { CampaignGateway } from "@/modules/websockets/campaign.gateway";
 const BONVOICE_API_URL = process.env.BONVOICE_BASE_URL || "https://backend.pbx.bonvoice.com";
 
 async function loginToBonvoice() {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000);
-  try {
-    const loginRes = await fetch(`${BONVOICE_API_URL}/usermanagement/external-auth/`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-      },
-      body: JSON.stringify({
-        username: process.env.BONVOICE_USERNAME || "PROP_NEXT",
-        password: process.env.BONVOICE_PASSWORD || "PRopne##xt89",
-      }),
-      signal: controller.signal as any,
-    });
-    clearTimeout(timeoutId);
-
-    if (!loginRes.ok) {
-      throw new Error("Failed to authenticate with Bonvoice");
-    }
-
-    const loginData = await loginRes.json();
-    const token = loginData.token || loginData.access_token || loginData.data?.token || loginData.data?.access_token;
-
-    if (!token) {
-      throw new Error("Invalid authentication response from Bonvoice");
-    }
-
-    return token;
-  } catch (error) {
-    clearTimeout(timeoutId);
-    throw error;
-  }
+  // Use the static token provided by the user, or fallback to env var
+  const token = process.env.BONVOICE_TOKEN || "27d4d72e911173a1e171007d98d8d2d1fd4bfa85";
+  return token;
 }
 
 export const campaignExecutionWorker = redisConnection
