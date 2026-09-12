@@ -34,7 +34,7 @@ export class InboundWebhooksController {
       const callObj = body.call || {};
       const messageObj = body.message || {};
       
-      const callingNo = body.SourceNumber || body.phone || body["Calling No"] || body.callingNo || body.calling_no || body.caller_id || body.caller_number || callObj.from || messageObj.customer?.number || "Unknown";
+      let callingNo = body.SourceNumber || body.phone || body["Calling No"] || body.callingNo || body.calling_no || body.caller_id || body.caller_number || callObj.from || messageObj.customer?.number || "Unknown";
       const callDurationRaw = body.duration ?? body["Call Duration"] ?? body.callDuration ?? body.call_duration ?? callObj.durationSec ?? messageObj.call?.duration;
       
       // Enhance status extraction to support various providers (Vapi, Bland, Retell, Bonvoice, etc.)
@@ -43,7 +43,19 @@ export class InboundWebhooksController {
       const logId = body.eventID || body.callID || body.eventId || body.event_id || body.log_id || body.logId || body.call_id || body.callId || body["Log ID"] || body.callid || body.calledno || callObj.id || messageObj.call?.id || `webhook-${Date.now()}`;
       const recordingUrl = body.ResourceURL || body.recording_url || body.recordingUrl || body.recording || callObj.recordingUrl || messageObj.call?.recordingUrl || null;
       const transcriptUrl = body.transcript_url || body.transcriptUrl || body.transcript || messageObj.call?.transcriptUrl || null;
-      const agentNumber = body.DestinationNumber || body.DisplayNumber || body.callid || body.calledno || body.assigned_number || callObj.to || messageObj.call?.phoneNumber || "Unknown";
+      let agentNumber = body.DestinationNumber || body.DisplayNumber || body.callid || body.calledno || body.assigned_number || callObj.to || messageObj.call?.phoneNumber || "Unknown";
+
+      // Fix Bonvoice-specific quirks where DestinationNumber is "None" for inbound, and SourceNumber is the agent extension for outbound
+      if (body.Direction === "Inbound" || body.direction === "inbound" || body.direction === "INBOUND") {
+        if (body.DestinationNumber === "None" && body.DisplayNumber) {
+          agentNumber = body.DisplayNumber; // Map DID correctly
+        }
+      } else if (body.Direction === "Outbound" || body.direction === "outbound" || body.direction === "OUTBOUND") {
+        if (body.DisplayNumber) {
+          callingNo = body.DisplayNumber; // Map DID correctly
+          agentNumber = body.DestinationNumber || agentNumber; // Map Customer correctly
+        }
+      }
 
       // Generate all possible number variants for robust DB lookup
       const getNumberVariants = (num: string): string[] => {
