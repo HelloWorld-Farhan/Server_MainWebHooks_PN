@@ -319,18 +319,14 @@ export const campaignExecutionWorker = redisConnection
                     activeCallCount--;
                     completedCount++;
                   } else {
-                    try {
-                      const responseData = await res.json();
-                      // Bonvoice autoCallBridging returns { responseCode: 200, responseDescription: "Success" }
-                      // There is no UUID returned; tracking is done via eventID (callLog.id)
-                      const isSuccess = responseData.responseCode === 200 || responseData.responseType === "Success";
-                      if (!isSuccess) {
-                        console.warn(`Bonvoice returned non-success for ${lead.phone}:`, JSON.stringify(responseData));
-                      } else {
-                        console.log(`✅ Call initiated for ${lead.phone} via Bonvoice (eventID: ${callLog.id})`);
-                      }
-                    } catch (e) {
-                      console.error("Failed to parse Bonvoice response", e);
+                    // responseJson was already parsed from responseText above — do NOT call res.json() again
+                    // Bonvoice autoCallBridging returns { responseCode: 200, responseDescription: "Success" }
+                    // There is no UUID returned; tracking is done via eventID (callLog.id)
+                    const isSuccess = responseJson?.responseCode === 200 || responseJson?.responseType === "Success" || res.ok;
+                    if (!isSuccess) {
+                      console.warn(`Bonvoice returned non-success for ${lead.phone}:`, responseText);
+                    } else {
+                      console.log(`✅ Call initiated for ${lead.phone} via Bonvoice (eventID: ${callLog.id})`);
                     }
                     
                     activeCallIds.add(callLog.id);
