@@ -95,29 +95,40 @@ export const campaignExecutionWorker = redisConnection
           
           let dbAgentUrl = "";
           try {
-            // The DID in DB may be stored in a different format than the normalized didNumber
-            // Try multiple formats to ensure we always find the agentUrl
+            // The DID in DB may be stored in a different format AND/OR under a different companyId
+            // Try multiple number formats, first scoped to companyId, then globally
             const rawDid = rawDidNumber ? rawDidNumber.trim() : "";
             const digitsOnly = rawDid.replace(/\D/g, "");
             const last10 = digitsOnly.slice(-10);
             
-            const phoneNumber = await prisma.phoneNumber.findFirst({
-              where: {
-                companyId,
-                direction: "OUTBOUND",
-                OR: [
-                  { number: didNumber },         // +917946350797
-                  { number: rawDid },            // 07946350797 (as provided)
-                  { number: digitsOnly },        // 07946350797 digits only
-                  { number: { endsWith: last10 } } // ends with 7946350797
-                ]
-              }
+            const numberFormats = [
+              { number: rawDid },
+              { number: digitsOnly },
+              { number: didNumber },
+              { number: { endsWith: last10 } }
+            ];
+
+            // First try: scoped to company
+            let phoneNumber = await prisma.phoneNumber.findFirst({
+              where: { companyId, direction: "OUTBOUND", OR: numberFormats }
             });
+            
+            // Second try: global search (DID may be registered under a different/parent company)
+            if (!phoneNumber || !phoneNumber.agentUrl) {
+              const globalPhone = await prisma.phoneNumber.findFirst({
+                where: { direction: "OUTBOUND", OR: numberFormats }
+              });
+              if (globalPhone && globalPhone.agentUrl) {
+                phoneNumber = globalPhone;
+                console.log(`⚠️ agentUrl found under companyId ${globalPhone.companyId} (campaign companyId: ${companyId})`);
+              }
+            }
+
             if (phoneNumber && phoneNumber.agentUrl) {
               dbAgentUrl = phoneNumber.agentUrl;
               console.log(`✅ Found agentUrl for DID ${rawDid}: ${dbAgentUrl}`);
             } else {
-              console.warn(`⚠️ No agentUrl found in DB for DID ${rawDid} / ${didNumber}`);
+              console.warn(`⚠️ No agentUrl found in DB for DID ${rawDid}. Calls will fail if BONVOICE_VOICEBOT_URL env is also not set.`);
             }
           } catch (e) {
             console.error("Failed to lookup agentUrl from DB:", e);
