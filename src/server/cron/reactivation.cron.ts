@@ -57,10 +57,10 @@ cron.schedule(
       }
 
       // 11:59 PM to 10:00 AM = 10 hours 1 minute = 36,060,000 ms
-      // 11:59 PM to 2:00 PM = 14 hours 1 minute = 50,460,000 ms
+      // 11:59 PM to 3:00 PM = 15 hours 1 minute = 54,060,000 ms
       // 11:59 PM to 8:00 PM = 20 hours 1 minute = 72,060,000 ms
       const q1Delay = 10 * 60 * 60 * 1000 + 1 * 60 * 1000;
-      const q2Delay = 14 * 60 * 60 * 1000 + 1 * 60 * 1000;
+      const q2Delay = 15 * 60 * 60 * 1000 + 1 * 60 * 1000;
       const q3Delay = 20 * 60 * 60 * 1000 + 1 * 60 * 1000;
 
       for (const key of Object.keys(buckets)) {

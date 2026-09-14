@@ -64,6 +64,7 @@ export const campaignExecutionWorker = redisConnection
           const token = await loginToBonvoice();
           
           let dbAgentUrl = "";
+          let dbPhoneNumberId: string | null = null;
           try {
             // The DID in DB may be stored in a different format AND/OR under a different companyId
             // Try multiple number formats, first scoped to companyId, then globally
@@ -94,9 +95,12 @@ export const campaignExecutionWorker = redisConnection
               }
             }
 
-            if (phoneNumber && phoneNumber.agentUrl) {
-              dbAgentUrl = phoneNumber.agentUrl;
-              console.log(`✅ Found agentUrl for DID ${rawDid}: ${dbAgentUrl}`);
+            if (phoneNumber) {
+              dbPhoneNumberId = phoneNumber.id;
+              if (phoneNumber.agentUrl) {
+                dbAgentUrl = phoneNumber.agentUrl;
+                console.log(`✅ Found agentUrl for DID ${rawDid}: ${dbAgentUrl}`);
+              }
             } else {
               console.warn(`⚠️ No agentUrl found in DB for DID ${rawDid}. Calls will fail if BONVOICE_VOICEBOT_URL env is also not set.`);
             }
@@ -270,7 +274,7 @@ export const campaignExecutionWorker = redisConnection
                         provider: "BONVOICE",
                         providerCallId: `pending-${publicId}`, // Prevent unique constraint violation on null
                         leadId: leadRecordId,
-                        phoneNumberId: phoneNumber?.id || undefined
+                        phoneNumberId: dbPhoneNumberId
                       }
                     });
 
