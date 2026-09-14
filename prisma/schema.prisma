@@ -806,6 +806,10 @@ model CallLog {
   publicId        String
   leadId          String?       @db.ObjectId
   phoneNumberId   String?       @db.ObjectId
+  
+  // Historical Snapshot fields
+  historicalDidString String?
+  historicalChannels  Int?
   aiAgentId       String?       @db.ObjectId
   assignedUserId  String?       @db.ObjectId
   campaignId        String?       @db.ObjectId

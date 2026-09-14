@@ -274,7 +274,9 @@ export const campaignExecutionWorker = redisConnection
                         provider: "BONVOICE",
                         providerCallId: `pending-${publicId}`, // Prevent unique constraint violation on null
                         leadId: leadRecordId,
-                        phoneNumberId: dbPhoneNumberId
+                        phoneNumberId: dbPhoneNumberId,
+                        historicalDidString: didNumber || "Unknown",
+                        historicalChannels: channels
                       }
                     });
 
