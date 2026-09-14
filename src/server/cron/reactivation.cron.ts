@@ -83,7 +83,7 @@ cron.schedule(
 
         await startCampaignJob({
           companyId: bucket.companyId,
-          campaignId: `reactivation-${Date.now()}-q1`,
+          campaignId: `reactivation-${Date.now()}-${bucket.didNumber.replace(/\D/g, "")}-q1`,
           didNumber: bucket.didNumber,
           leads: bucket.leads,
           channels: 1, // Safe concurrency for background tasks
@@ -95,7 +95,7 @@ cron.schedule(
 
         await startCampaignJob({
           companyId: bucket.companyId,
-          campaignId: `reactivation-${Date.now()}-q2`,
+          campaignId: `reactivation-${Date.now()}-${bucket.didNumber.replace(/\D/g, "")}-q2`,
           didNumber: bucket.didNumber,
           leads: bucket.leads,
           channels: 1,
@@ -107,7 +107,7 @@ cron.schedule(
 
         await startCampaignJob({
           companyId: bucket.companyId,
-          campaignId: `reactivation-${Date.now()}-q3`,
+          campaignId: `reactivation-${Date.now()}-${bucket.didNumber.replace(/\D/g, "")}-q3`,
           didNumber: bucket.didNumber,
           leads: bucket.leads,
           channels: 1,
