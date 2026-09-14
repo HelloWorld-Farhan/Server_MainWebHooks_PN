@@ -269,7 +269,8 @@ export const campaignExecutionWorker = redisConnection
                         durationSeconds: 0,
                         provider: "BONVOICE",
                         providerCallId: `pending-${publicId}`, // Prevent unique constraint violation on null
-                        leadId: leadRecordId
+                        leadId: leadRecordId,
+                        phoneNumberId: phoneNumber?.id || undefined
                       }
                     });
 
