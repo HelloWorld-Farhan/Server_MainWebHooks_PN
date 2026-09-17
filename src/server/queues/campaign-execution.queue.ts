@@ -15,6 +15,10 @@ export type CampaignExecutionJobData = {
   qStage?: "Q1" | "Q2" | "Q3";
   scheduledAt?: string;
   uploadedFileName?: string;
+  /** Stable date key (YYYY-MM-DD) so wave chaining can build the correct correlationId */
+  reactivationDateKey?: string;
+  /** Full original lead list carried through all waves for filtering */
+  allOriginalLeads?: any[];
 };
 
 export const campaignExecutionQueue = redisConnection 
@@ -100,6 +104,38 @@ export async function startCampaignJob(data: CampaignExecutionJobData, delayMs?:
     removeOnComplete: true,
     removeOnFail: true
   });
+
+  // ── Reactivation wave-chaining ──────────────────────────────────────────
+  // After this job completes, automatically schedule the next wave with ONLY
+  // the leads that failed in this wave (Q1 → Q2, Q2 → Q3).
+  if (data.isReactivation && data.qStage && data.reactivationDateKey) {
+    campaignExecutionQueue.on("completed", async (job) => {
+      if (job.id !== uniqueJobId) return; // Only handle our own job
+      if (!job.data.isReactivation || !job.data.reactivationDateKey) return;
+
+      const { scheduleReactivationWave2, scheduleReactivationWave3 } = await import(
+        "@/server/cron/reactivation.cron"
+      );
+
+      if (job.data.qStage === "Q1") {
+        await scheduleReactivationWave2(
+          job.data.companyId,
+          job.data.didNumber,
+          job.data.reactivationDateKey,
+          job.data.uploadedFileName || "",
+          job.data.allOriginalLeads || job.data.leads
+        );
+      } else if (job.data.qStage === "Q2") {
+        await scheduleReactivationWave3(
+          job.data.companyId,
+          job.data.didNumber,
+          job.data.reactivationDateKey,
+          job.data.uploadedFileName || "",
+          job.data.allOriginalLeads || job.data.leads
+        );
+      }
+    });
+  }
 }
 
 export async function getCampaignState(companyId: string) {
