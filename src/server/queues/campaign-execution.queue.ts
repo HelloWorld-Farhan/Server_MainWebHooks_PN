@@ -88,7 +88,10 @@ export async function startCampaignJob(data: CampaignExecutionJobData, delayMs?:
     isReactivation: !!data.isReactivation,
     qStage: data.qStage,
     scheduledAt: delayMs ? data.scheduledAt : undefined,
-    uploadedFileName: data.uploadedFileName
+    uploadedFileName: data.uploadedFileName,
+    // Carried through all reactivation waves so the runner can filter on completion
+    allOriginalLeads: data.allOriginalLeads ?? data.leads,
+    reactivationDateKey: data.reactivationDateKey,
   };
   await redisConnection!.set(`campaign-state:${data.companyId}`, JSON.stringify(initialState));
 
@@ -98,44 +101,13 @@ export async function startCampaignJob(data: CampaignExecutionJobData, delayMs?:
     gateway.broadcastCampaignUpdate(data.companyId, initialState);
   }
 
-  await campaignExecutionQueue.add(uniqueJobId, data, {
+  // Enqueue the job (with optional delay for scheduled waves)
+  await campaignExecutionQueue!.add(uniqueJobId, data, {
     jobId: uniqueJobId,
     delay: delayMs ? Math.max(0, delayMs) : undefined,
     removeOnComplete: true,
-    removeOnFail: true
+    removeOnFail: true,
   });
-
-  // ── Reactivation wave-chaining ──────────────────────────────────────────
-  // After this job completes, automatically schedule the next wave with ONLY
-  // the leads that failed in this wave (Q1 → Q2, Q2 → Q3).
-  if (data.isReactivation && data.qStage && data.reactivationDateKey) {
-    campaignExecutionQueue.on("completed", async (job) => {
-      if (job.id !== uniqueJobId) return; // Only handle our own job
-      if (!job.data.isReactivation || !job.data.reactivationDateKey) return;
-
-      const { scheduleReactivationWave2, scheduleReactivationWave3 } = await import(
-        "@/server/cron/reactivation.cron"
-      );
-
-      if (job.data.qStage === "Q1") {
-        await scheduleReactivationWave2(
-          job.data.companyId,
-          job.data.didNumber,
-          job.data.reactivationDateKey,
-          job.data.uploadedFileName || "",
-          job.data.allOriginalLeads || job.data.leads
-        );
-      } else if (job.data.qStage === "Q2") {
-        await scheduleReactivationWave3(
-          job.data.companyId,
-          job.data.didNumber,
-          job.data.reactivationDateKey,
-          job.data.uploadedFileName || "",
-          job.data.allOriginalLeads || job.data.leads
-        );
-      }
-    });
-  }
 }
 
 export async function getCampaignState(companyId: string) {

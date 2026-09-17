@@ -10,6 +10,8 @@ import { CampaignsRepository } from "@/server/repositories/campaigns.repository"
 import { outboundCallsService } from "@/server/services/outbound-calls.service";
 import { campaignExecutionLockService } from "@/server/campaign-execution/campaign-execution-lock.service";
 import { retryJobRepository } from "@/server/campaign-execution/retry/retry-job.repository";
+import { redisConnection } from "@/server/queues/redis.client";
+import { chainNextReactivationWave } from "@/server/cron/reactivation-wave-chainer";
 
 export class CampaignRunnerService {
   private readonly campaignsRepo = new CampaignsRepository(prisma);
@@ -93,12 +95,12 @@ export class CampaignRunnerService {
 
       if (contacts.length === 0) {
         // Cursor exhausted — all contacts were already dialed/sent to VoiceNSMS.
-        // Mark COMPLETED even if processedCount/totalContacts drifted (e.g. deleted
-        // contacts), so the UI can swap Stop → Start Again.
         await campaignExecutionService.markCompleted(
           execution.companyId,
           execution.campaignId,
         );
+        // Auto-chain next reactivation wave if applicable
+        await this.maybeChainNextWave(execution.companyId, execution.correlationId);
         return true;
       }
 
@@ -210,6 +212,8 @@ export class CampaignRunnerService {
           execution.companyId,
           execution.campaignId,
         );
+        // Auto-chain next reactivation wave if applicable
+        await this.maybeChainNextWave(execution.companyId, execution.correlationId);
       } else {
         const totalContacts = await this.campaignsRepo.countContacts(
           execution.companyId,
@@ -218,6 +222,7 @@ export class CampaignRunnerService {
         await this.completeIfQueueDrained({
           companyId: execution.companyId,
           campaignId: execution.campaignId,
+          correlationId: execution.correlationId,
           processedCount,
           totalContacts,
         });
@@ -255,6 +260,7 @@ export class CampaignRunnerService {
   private async completeIfQueueDrained(execution: {
     companyId: string;
     campaignId: string;
+    correlationId: string | null;
     processedCount: number;
     totalContacts: number;
   }): Promise<void> {
@@ -268,6 +274,36 @@ export class CampaignRunnerService {
       execution.companyId,
       execution.campaignId,
     );
+    // Auto-chain next reactivation wave if applicable
+    await this.maybeChainNextWave(execution.companyId, execution.correlationId);
+  }
+
+  /**
+   * After a reactivation wave completes, read Redis for the original lead list
+   * and trigger the next wave (Q1→Q2 or Q2→Q3) with only failed leads.
+   */
+  private async maybeChainNextWave(
+    companyId: string,
+    correlationId: string | null
+  ): Promise<void> {
+    if (!correlationId?.startsWith("reactivation-")) return;
+    try {
+      // Read allOriginalLeads and uploadedFileName from the Redis campaign state
+      // (stored by startCampaignJob before the wave ran)
+      const stateStr = await redisConnection?.get(`campaign-state:${companyId}`);
+      const state = stateStr ? JSON.parse(stateStr) : null;
+      const allOriginalLeads: any[] = state?.allOriginalLeads ?? state?.leads ?? [];
+      const uploadedFileName: string = state?.uploadedFileName ?? "";
+
+      await chainNextReactivationWave(
+        companyId,
+        correlationId,
+        allOriginalLeads,
+        uploadedFileName
+      );
+    } catch (err) {
+      console.error("[Reactivation] Failed to chain next wave:", err);
+    }
   }
 }
 
