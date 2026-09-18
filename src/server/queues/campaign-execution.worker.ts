@@ -493,12 +493,28 @@ export const campaignExecutionWorker = redisConnection
             if (finalState && finalState.leads) {
               const failedLeads = finalState.leads.filter((l: any) => l.isFailed);
               if (failedLeads.length > 0) {
-                const isValidObjectIdForReactivation = /^[0-9a-fA-F]{24}$/.test(campaignId);
-                let dbCampaign: any = null;
-                if (isValidObjectIdForReactivation) {
-                  dbCampaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
-                }
-                if (dbCampaign) {
+                // Handle NEW Reactivation Logic (cron-based waves)
+                if (finalState.isReactivation && campaignId.startsWith("reactivation-")) {
+                  try {
+                    const { chainNextReactivationWave } = require("@/server/cron/reactivation-wave-chainer");
+                    await chainNextReactivationWave(
+                      companyId,
+                      campaignId, // correlationId
+                      finalState.allOriginalLeads || finalState.leads,
+                      finalState.uploadedFileName || ""
+                    );
+                  } catch (err) {
+                    console.error("[Reactivation Worker] Failed to chain next wave:", err);
+                  }
+                } 
+                // Handle OLD Auto-Reactivation Logic
+                else {
+                  const isValidObjectIdForReactivation = /^[0-9a-fA-F]{24}$/.test(campaignId);
+                  let dbCampaign: any = null;
+                  if (isValidObjectIdForReactivation) {
+                    dbCampaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
+                  }
+                  if (dbCampaign) {
                   let nextStage: any = null;
                   let nextHour = 0;
 

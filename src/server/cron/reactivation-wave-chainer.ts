@@ -87,9 +87,26 @@ export async function chainNextReactivationWave(
     nextStage
   );
 
+  // Calculate correct delay for Q2 (3 PM) or Q3 (8 PM) IST
+  // dateStr is the date the calls failed. Reactivation is the NEXT day.
+  const [yyyy, mm, dd] = dateStr.split('-');
+  const failureDate = new Date(`${yyyy}-${mm}-${dd}T00:00:00+05:30`);
+  const reactivationDate = new Date(failureDate.getTime() + 24 * 60 * 60 * 1000);
+  const reactYear = reactivationDate.getFullYear();
+  const reactMonth = String(reactivationDate.getMonth() + 1).padStart(2, "0");
+  const reactDay = String(reactivationDate.getDate()).padStart(2, "0");
+  
+  const targetTimeStr = nextStageLabel === "Q2" ? "15:00:00" : "20:00:00";
+  const targetDateStr = `${reactYear}-${reactMonth}-${reactDay}T${targetTimeStr}+05:30`;
+  const targetDate = new Date(targetDateStr);
+  
+  const nowMs = Date.now();
+  const delayMs = Math.max(0, targetDate.getTime() - nowMs);
+
   console.log(
-    `[Reactivation] Auto-chaining ${nextStageLabel} for ${companyId} — ${failedLeads.length} failed leads → correlationId: ${nextCorrelationId}`
+    `[Reactivation] Auto-chaining ${nextStageLabel} for ${companyId} — ${failedLeads.length} failed leads -> correlationId: ${nextCorrelationId}`
   );
+  console.log(`[Reactivation] Scheduling at ${targetDate.toISOString()} (Delay: ${Math.round(delayMs / 60000)} mins)`);
 
   await startCampaignJob(
     {
@@ -101,10 +118,10 @@ export async function chainNextReactivationWave(
       isReactivation: true,
       qStage: nextStageLabel as "Q2" | "Q3",
       uploadedFileName,
-      scheduledAt: new Date().toISOString(),
+      scheduledAt: targetDate.toISOString(),
       reactivationDateKey: dateStr,
       allOriginalLeads,
     },
-    0 // Fire immediately after previous wave completes
+    delayMs
   );
 }
