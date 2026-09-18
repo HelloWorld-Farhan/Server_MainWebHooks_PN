@@ -578,6 +578,7 @@ export const campaignExecutionWorker = redisConnection
                      console.log(`[Reactivation Engine] Campaign ${campaignId} reached final stage (Q3). No further reactivations.`);
                   }
                 }
+                }
               } else {
                 console.log(`[Reactivation Engine] Campaign ${campaignId} had 100% success! No reactivation needed.`);
               }
