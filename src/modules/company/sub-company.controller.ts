@@ -58,12 +58,17 @@ export class SubCompaniesController {
 
       // Format them to match what the frontend expects
       const formatted = subCompanies.map((c: any) => {
-        const allNumbers: string[] = (c.phoneNumbers || []).map((p: any) => p.number).filter(Boolean);
+        const allNumbers = (c.phoneNumbers || []).map((p: any) => ({
+          number: p.number,
+          direction: p.direction || "GENERAL",
+          channels: p.channels,
+          agentUrl: p.agentUrl
+        }));
         return {
           _id: c.id,
           companyName: c.name,
           companyEmail: "", 
-          contactPhone: allNumbers[0] || "",     // first number (backward compat)
+          contactPhone: allNumbers[0]?.number || "",     // first number (backward compat)
           assignedNumbers: allNumbers,            // ALL numbers
           status: c.status.toLowerCase(),
           createdAt: c.createdAt.toISOString(),
