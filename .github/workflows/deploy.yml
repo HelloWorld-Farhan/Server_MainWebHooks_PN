@@ -55,7 +55,11 @@ jobs:
             rm deploy.tar.gz
             npm ci --omit=dev
             npx prisma generate
-            pm2 restart propnexai-main-server || pm2 start npm --name "propnexai-main-server" -- run start:prod
+            
+            # Ensure Google Apps Script webhook URL is present in .env
+            grep -q "GOOGLE_SCRIPT_WEBHOOK_URL" .env || echo "GOOGLE_SCRIPT_WEBHOOK_URL=https://script.google.com/macros/s/AKfycbz2zj_l7vcmiPZKuYqEVdso0apyW3aDJZZWTVTJ1jRrQr8PLGZIH_TzRpTLFskphIwgDQ/exec" >> .env
+            
+            pm2 restart propnexai-main-server --update-env || pm2 start npm --name "propnexai-main-server" -- run start:prod
             pm2 save
             sleep 3
             pm2 logs --nostream --lines 50
