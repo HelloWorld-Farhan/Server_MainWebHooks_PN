@@ -60,7 +60,7 @@ export class SubCompaniesController {
       const formatted = subCompanies.map((c: any) => {
         const allNumbers = (c.phoneNumbers || []).map((p: any) => ({
           number: p.number,
-          direction: p.direction || "GENERAL",
+          direction: p.direction || "OUTBOUND",  // Default to OUTBOUND if not set
           channels: p.channels,
           agentUrl: p.agentUrl
         }));
