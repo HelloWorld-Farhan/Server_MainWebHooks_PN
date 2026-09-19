@@ -1,7 +1,7 @@
 import cron from "node-cron";
 import prisma from "@/server/lib/prisma";
 import { startCampaignJob } from "@/server/queues/campaign-execution.queue";
-import { buildReactivationCorrelationId } from "@/server/cron/reactivation-wave-chainer";
+import { buildReactivationCorrelationId } from "@/server/queues/campaign-execution.queue";
 
 
 // Run every night at 11:59 PM IST — schedules Wave 1 only.
@@ -54,9 +54,10 @@ cron.schedule(
         }
       }
 
-      // Wave 1 fires at 10 AM IST next morning
-      // 11:59 PM → 10:00 AM = 10h 1m = 36,060,000 ms
-      const q1Delay = 10 * 60 * 60 * 1000 + 1 * 60 * 1000;
+      // Calculate delays from 11:59 PM IST
+      const q1Delay = 10 * 60 * 60 * 1000 + 1 * 60 * 1000; // 10 AM
+      const q2Delay = 15 * 60 * 60 * 1000 + 1 * 60 * 1000; // 3 PM
+      const q3Delay = 20 * 60 * 60 * 1000 + 1 * 60 * 1000; // 8 PM
 
       for (const key of Object.keys(buckets)) {
         const bucket = buckets[key];
@@ -76,30 +77,38 @@ cron.schedule(
           day: "numeric",
         });
         const uploadedFileName = `${dateLabel} Failed Leads`;
-        const q1CorrelationId = buildReactivationCorrelationId(dateStr, bucket.companyId, bucket.didNumber, "q1");
+        
+        const stages = [
+          { stage: "q1", label: "Q1", delay: q1Delay },
+          { stage: "q2", label: "Q2", delay: q2Delay },
+          { stage: "q3", label: "Q3", delay: q3Delay },
+        ] as const;
 
-        console.log(
-          `[Reactivation Engine] Scheduling Wave 1 — Company: ${bucket.companyId}, DID: ${bucket.didNumber}, ` +
-          `Leads: ${bucket.leads.length}, correlationId: ${q1CorrelationId}`
-        );
+        for (const { stage, label, delay } of stages) {
+          const correlationId = buildReactivationCorrelationId(dateStr, bucket.companyId, bucket.didNumber, stage as any);
 
-        // Only schedule Wave 1. Wave 2 & 3 are auto-chained after completion.
-        await startCampaignJob(
-          {
-            companyId: bucket.companyId,
-            campaignId: q1CorrelationId,
-            didNumber: bucket.didNumber,
-            leads: bucket.leads,
-            channels: 1,
-            isReactivation: true,
-            qStage: "Q1",
-            uploadedFileName,
-            scheduledAt: new Date(now.getTime() + q1Delay).toISOString(),
-            reactivationDateKey: dateStr,
-            allOriginalLeads: bucket.leads,
-          },
-          q1Delay
-        );
+          console.log(
+            `[Reactivation Engine] Scheduling ${label} — Company: ${bucket.companyId}, DID: ${bucket.didNumber}, ` +
+            `Base Leads: ${bucket.leads.length}, correlationId: ${correlationId}`
+          );
+
+          await startCampaignJob(
+            {
+              companyId: bucket.companyId,
+              campaignId: correlationId,
+              didNumber: bucket.didNumber,
+              leads: bucket.leads, // Q2 and Q3 will dynamically filter these at execution time
+              channels: 1,
+              isReactivation: true,
+              qStage: label as "Q1" | "Q2" | "Q3",
+              uploadedFileName,
+              scheduledAt: new Date(now.getTime() + delay).toISOString(),
+              reactivationDateKey: dateStr,
+              allOriginalLeads: bucket.leads,
+            },
+            delay
+          );
+        }
       }
     } catch (err) {
       console.error("[Reactivation Engine] Daily Extraction Error:", err);

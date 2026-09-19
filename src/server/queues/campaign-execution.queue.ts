@@ -5,6 +5,17 @@ import prisma from "@/server/lib/prisma";
 
 export const CAMPAIGN_EXECUTION_QUEUE_NAME = "campaign-execution-queue";
 
+export function buildReactivationCorrelationId(
+  dateStr: string,   // "2026-09-17"
+  companyId: string,
+  didNumber: string,
+  stage: "q1" | "q2" | "q3"
+): string {
+  const compShort = companyId.replace(/-/g, "").slice(0, 8);
+  const didDigits = didNumber.replace(/\D/g, "").slice(-6);
+  return `reactivation-${dateStr}-${compShort}-${didDigits}-${stage}`;
+}
+
 export type CampaignExecutionJobData = {
   companyId: string;
   campaignId: string;

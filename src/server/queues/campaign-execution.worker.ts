@@ -16,7 +16,7 @@ export const campaignExecutionWorker = redisConnection
   ? new Worker<CampaignExecutionJobData>(
       CAMPAIGN_EXECUTION_QUEUE_NAME,
       async (job: Job<CampaignExecutionJobData>) => {
-        const { companyId, campaignId, didNumber: rawDidNumber, leads, channels: rawChannels } = job.data;
+        let { companyId, campaignId, didNumber: rawDidNumber, leads, channels: rawChannels, isReactivation, qStage, reactivationDateKey, allOriginalLeads } = job.data;
         const channels = Number(rawChannels) || 1;
         let didNumber = rawDidNumber ? rawDidNumber.trim() : "";
         if (didNumber && !didNumber.startsWith("+")) {
@@ -25,6 +25,49 @@ export const campaignExecutionWorker = redisConnection
            else if (didNumber.length === 11 && didNumber.startsWith("0")) didNumber = "+91" + didNumber.substring(1);
            else didNumber = "+" + didNumber;
         }
+        
+        // REAL-TIME AUTO-FILTERING FOR REACTIVATION
+        if (isReactivation && reactivationDateKey && (qStage === "Q2" || qStage === "Q3")) {
+          console.log(`[Reactivation Pre-Execution] Filtering ${qStage} leads for ${companyId} against previous waves...`);
+          const baseLeads = allOriginalLeads || leads;
+          if (baseLeads && baseLeads.length > 0) {
+            const compShort = companyId.replace(/-/g, "").slice(0, 8);
+            const didDigits = didNumber.replace(/\D/g, "").slice(-6);
+            
+            const priorCorrelationIds = qStage === "Q2" 
+               ? [`reactivation-${reactivationDateKey}-${compShort}-${didDigits}-q1`]
+               : [`reactivation-${reactivationDateKey}-${compShort}-${didDigits}-q1`,
+                  `reactivation-${reactivationDateKey}-${compShort}-${didDigits}-q2`];
+            
+            const priorLogs = await prisma.callLog.findMany({
+              where: {
+                companyId,
+                correlationId: { in: priorCorrelationIds },
+              },
+              select: { leadId: true, status: true, durationSeconds: true }
+            });
+            
+            const succeededLeadIds = new Set(
+              priorLogs
+                .filter((l) => l.status === "COMPLETED" && (l.durationSeconds || 0) > 0)
+                .map((l) => l.leadId)
+                .filter(Boolean)
+            );
+            
+            leads = baseLeads.filter((lead) => {
+              const id = lead.id || lead.leadId;
+              return !succeededLeadIds.has(id);
+            });
+            
+            if (leads.length === 0) {
+               console.log(`[Reactivation] All leads successfully contacted in previous waves. Skipping ${qStage}.`);
+               return; // Exit cleanly, no calls to make
+            } else {
+               console.log(`[Reactivation] Filtered down to ${leads.length} failed leads for ${qStage}.`);
+            }
+          }
+        }
+        
         console.log(`Starting Campaign Execution for company: ${companyId}`);
 
         // Safety check for queued schedules: if another campaign is currently running, wait 5 mins
@@ -493,20 +536,11 @@ export const campaignExecutionWorker = redisConnection
             if (finalState && finalState.leads) {
               const failedLeads = finalState.leads.filter((l: any) => l.isFailed);
               if (failedLeads.length > 0) {
-                // Handle NEW Reactivation Logic (cron-based waves)
+                // NEW Reactivation Logic (cron-based waves) is now handled entirely by BullMQ pre-scheduled delays.
+                // Q2 and Q3 are auto-scheduled by the cron at 11:59 PM and self-filter at execution time.
                 if (finalState.isReactivation && campaignId.startsWith("reactivation-")) {
-                  try {
-                    const { chainNextReactivationWave } = require("@/server/cron/reactivation-wave-chainer");
-                    await chainNextReactivationWave(
-                      companyId,
-                      campaignId, // correlationId
-                      finalState.allOriginalLeads || finalState.leads,
-                      finalState.uploadedFileName || ""
-                    );
-                  } catch (err) {
-                    console.error("[Reactivation Worker] Failed to chain next wave:", err);
-                  }
-                } 
+                  // No action needed here anymore, filtering happens at execution time.
+                }
                 // Handle OLD Auto-Reactivation Logic
                 else {
                   const isValidObjectIdForReactivation = /^[0-9a-fA-F]{24}$/.test(campaignId);
