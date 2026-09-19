@@ -30,6 +30,8 @@ cron.schedule(
           ],
           leadId: { not: null },
           companyId: { not: null },
+          campaignId: null,
+          correlationId: null,
         },
         include: { lead: true, phoneNumber: true },
       });
