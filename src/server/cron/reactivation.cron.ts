@@ -37,14 +37,17 @@ export async function runReactivationExtraction(now: Date): Promise<void> {
 
   console.log(`[Reactivation Engine] Found ${failedCalls.length} failed calls today.`);
 
-  // Group by companyId + didNumber
-  const buckets: Record<string, { companyId: string; didNumber: string; leads: any[] }> = {};
+  // Group by exact IST calendar day + companyId + didNumber
+  const buckets: Record<string, { dateKey: string; companyId: string; didNumber: string; leads: any[] }> = {};
+  const istFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" });
 
   for (const call of failedCalls) {
     if (!call.lead) continue;
-    const key = `${call.companyId}-${call.phoneNumber?.number || "default"}`;
+    const callDateKey = istFmt.format(call.startedAt);
+    const key = `${callDateKey}-${call.companyId}-${call.phoneNumber?.number || "default"}`;
     if (!buckets[key]) {
       buckets[key] = {
+        dateKey: callDateKey,
         companyId: call.companyId!,
         didNumber: call.phoneNumber?.number || "",
         leads: [],
@@ -136,6 +139,10 @@ export async function runReactivationExtraction(now: Date): Promise<void> {
       }
     }
 
+    const shortMonthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const [yyyyStr, mmStr, ddStr] = bucket.dateKey.split("-");
+    const bucketDate = new Date(`${bucket.dateKey}T12:00:00Z`);
+    const dateLabel = `${ddStr} ${shortMonthNames[parseInt(mmStr, 10) - 1]}`;
     const uploadedFileName = `${dateLabel} Failed Leads`;
 
     const stages = [
@@ -146,7 +153,7 @@ export async function runReactivationExtraction(now: Date): Promise<void> {
 
     for (const { stage, label, delay } of stages) {
       const correlationId = buildReactivationCorrelationId(
-        dateStr,
+        bucket.dateKey,
         bucket.companyId,
         bucket.didNumber,
         stage as any
@@ -168,7 +175,7 @@ export async function runReactivationExtraction(now: Date): Promise<void> {
           qStage:             label as "Q1" | "Q2" | "Q3",
           uploadedFileName,
           scheduledAt:        new Date(now.getTime() + delay).toISOString(),
-          reactivationDateKey: dateStr,
+          reactivationDateKey: bucket.dateKey,
           allOriginalLeads:   bucket.leads,
         },
         delay
