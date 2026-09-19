@@ -29,7 +29,7 @@ jobs:
           npm run build
 
       - name: Tar files for deployment
-        run: tar -czf deploy.tar.gz dist package.json package-lock.json prisma
+        run: tar -czvf deploy.tar.gz dist package.json package-lock.json prisma
 
       - name: Copy files to VPS via SCP
         uses: appleboy/scp-action@v0.1.4
@@ -40,6 +40,7 @@ jobs:
           source: "deploy.tar.gz"
           target: "/root/propnexai-main-server"
           overwrite: true
+          timeout: 2m
 
       - name: Restart PM2 on VPS
         uses: appleboy/ssh-action@v1.0.3
