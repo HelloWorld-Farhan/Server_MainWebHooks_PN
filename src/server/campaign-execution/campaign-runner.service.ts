@@ -112,7 +112,10 @@ export class CampaignRunnerService {
 
       let processedCount = execution.processedCount;
 
-      for (const contact of contacts) {
+      const CONCURRENCY_LIMIT = 10;
+      for (let i = 0; i < contacts.length; i += CONCURRENCY_LIMIT) {
+        const chunk = contacts.slice(i, i + CONCURRENCY_LIMIT);
+
         const running = await campaignExecutionService.isRunning(
           execution.companyId,
           execution.campaignId,
@@ -121,7 +124,8 @@ export class CampaignRunnerService {
           break;
         }
 
-        const normalizedPhone = normalizeOutboundPhone(contact.phone);
+        await Promise.all(chunk.map(async (contact) => {
+          const normalizedPhone = normalizeOutboundPhone(contact.phone);
         if (!normalizedPhone) {
           logCampaignExecutionEvent("contact:skipped", {
             campaignPublicId,
@@ -129,14 +133,7 @@ export class CampaignRunnerService {
             reason: "invalid_phone",
             phone: contact.phone,
           });
-          processedCount += 1;
-          await campaignExecutionRepository.updateCursor(
-            execution.companyId,
-            execution.campaignId,
-            contact.id,
-            processedCount,
-          );
-          continue;
+          return;
         }
 
         const existingCall = await prisma.callLog.findFirst({
@@ -167,17 +164,24 @@ export class CampaignRunnerService {
           (!existingCall || terminalStatuses.has(existingCall.status));
 
         if (shouldDial) {
-          await outboundCallsService.createOutboundCall(ctx, {
-            campaignId: campaignPublicId,
-            phoneNumber: normalizedPhone,
-          });
+          try {
+            await outboundCallsService.createOutboundCall(ctx, {
+              campaignId: campaignPublicId,
+              phoneNumber: normalizedPhone,
+            });
+          } catch (err) {
+            console.error('[Campaign Runner] Failed to dial contact:', err);
+          }
         }
+        }));
 
-        processedCount += 1;
+        processedCount += chunk.length;
+        const lastContact = chunk[chunk.length - 1];
+
         await campaignExecutionRepository.updateCursor(
           execution.companyId,
           execution.campaignId,
-          contact.id,
+          lastContact.id,
           processedCount,
         );
 
