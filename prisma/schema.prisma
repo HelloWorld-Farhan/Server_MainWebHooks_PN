@@ -111,8 +111,7 @@ enum LeadActivityType {
 }
 
 enum TelephonyProvider {
-  TWILIO
-  EXOTEL
+  BONVOICE
   PROPNEX
 }
 
@@ -337,6 +336,20 @@ enum SystemEventType {
   CREDIT_LOW
   INTEGRATION_SYNC
   BILLING_ALERT
+  CREDIT_ADDED
+  CREDIT_DEDUCTED
+  CREDIT_EDITED
+  NOTIFICATION_CREATED
+  NOTIFICATION_EDITED
+  NOTIFICATION_DELETED
+  AGENT_CREATED
+  AGENT_EDITED
+  AGENT_DELETED
+  NUMBER_ASSIGNED
+  NUMBER_RELEASED
+  COMPANY_CREATED
+  JOB_POSTED
+  FORM_INFO
 }
 
 enum SupportRequestReason {
@@ -422,6 +435,8 @@ model Company {
   parentCompanyId     String?          @db.ObjectId
   parentCompany       Company?         @relation("CompanyToSubCompany", fields: [parentCompanyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   childCompanies      Company[]        @relation("CompanyToSubCompany")
+  infraNotifications    InfraCostNotification[] @relation(name: "InfraNotificationCompany")
+  infraSubNotifications InfraCostNotification[] @relation(name: "InfraNotificationSubCompany")
   primaryUseCase      PrimaryUseCase?
   callVolume          CallVolumeRange?
   settings            Json             @default("{}")
@@ -806,10 +821,6 @@ model CallLog {
   publicId        String
   leadId          String?       @db.ObjectId
   phoneNumberId   String?       @db.ObjectId
-  
-  // Historical Snapshot fields
-  historicalDidString String?
-  historicalChannels  Int?
   aiAgentId       String?       @db.ObjectId
   assignedUserId  String?       @db.ObjectId
   campaignId        String?       @db.ObjectId
@@ -829,6 +840,8 @@ model CallLog {
   provider         String?
   providerStatus   String?
   providerCallId   String?
+  historicalDidString String?
+  historicalChannels  Int?
   correlationId    String?
   providerRequestedAt DateTime?
   providerAcceptedAt  DateTime?
@@ -1425,16 +1438,17 @@ model BillingInvoice {
 
 model SystemEvent {
   id         String          @id @default(auto()) @map("_id") @db.ObjectId
-  companyId  String          @db.ObjectId
+  companyId  String?         @db.ObjectId
   type       SystemEventType
   actorId    String?         @db.ObjectId
   entityType String?
   entityId   String?
   title      String
+  message    String?
   payload    Json            @default("{}")
   createdAt  DateTime        @default(now())
 
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@index([companyId, createdAt])
   @@index([companyId, type])
@@ -1827,4 +1841,71 @@ model FormSubmission {
   clients   String?  // For Partner App
   volume    String?  // For Partner App
   createdAt DateTime @default(now())
+}
+
+// ─── Jobs & Careers ─────────────────────────────────────────────────────────
+
+model JobPosting {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  jobId            String   @unique
+  title            String
+  description      String
+  experience       String
+  responsibilities String
+  knowledge        String
+  education        String
+  jobType          String?  @default("Full-time")
+  location         String?  @default("Remote")
+  lastDate         DateTime
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  applications     JobApplication[]
+}
+
+model JobApplication {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  jobId          String   @db.ObjectId
+  firstName      String
+  lastName       String
+  email          String
+  countryCode    String?
+  phone          String
+  experience     String
+  expectedPayout String
+  currentPayout  String?
+  sponsor        String?
+  legalStatus    String?
+  citizenship    String?
+  gender         String?
+  resumeUrl      String
+  agreedToTerms  Boolean  @default(true)
+  isRead         Boolean  @default(false)
+  status         String   @default("PENDING")
+  appliedAt      DateTime @default(now())
+
+  job            JobPosting @relation(fields: [jobId], references: [id], onDelete: Cascade)
+}
+
+model InfraCostNotification {
+  id             String    @id @default(auto()) @map("_id") @db.ObjectId
+  email          String?   
+  companyId      String?   @db.ObjectId 
+  subCompanyId   String?   @db.ObjectId 
+  companyName    String?
+  subCompanyName String?
+  
+  startDate      DateTime
+  endDate        DateTime
+  recurrenceType String    @default("ONCE")
+  customMonths   Int[]     @default([])
+  message        String?
+  
+  pausedUntil    DateTime?
+  
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  company      Company?  @relation(name: "InfraNotificationCompany", fields: [companyId], references: [id], onDelete: Cascade)
+  subCompany   Company?  @relation(name: "InfraNotificationSubCompany", fields: [subCompanyId], references: [id], onDelete: Cascade)
 }
