@@ -7,7 +7,7 @@ import { buildReactivationCorrelationId } from "@/server/queues/campaign-executi
 // Run every night at 11:59 PM IST — schedules Wave 1 only.
 // Wave 2 and Wave 3 are auto-chained in campaign-runner.service.ts after each wave completes.
 cron.schedule(
-  "59 23 * * *",
+  "50 23 * * *",
   async () => {
     console.log("[Reactivation Engine] Starting daily extraction of failed calls...");
     try {
@@ -30,8 +30,9 @@ cron.schedule(
           ],
           leadId: { not: null },
           companyId: { not: null },
-          campaignId: null,
-          correlationId: null,
+          NOT: {
+            correlationId: { startsWith: "reactivation-" }
+          }
         },
         include: { lead: true, phoneNumber: true },
       });
@@ -52,14 +53,20 @@ cron.schedule(
           };
         }
         if (!buckets[key].leads.find((l) => l.id === call.leadId)) {
-          buckets[key].leads.push({ ...call.lead, id: call.leadId, phone: call.lead.phone });
+          const originalCallType = call.campaignId || (call.correlationId && call.correlationId.startsWith("camp-")) 
+            ? "Campaign" 
+            : call.leadId && !call.campaignId && !call.correlationId 
+            ? "Lead" 
+            : "Internal";
+          buckets[key].leads.push({ ...call.lead, id: call.leadId, phone: call.lead.phone, originalCallType });
         }
       }
 
-      // Calculate delays from 11:59 PM IST
-      const q1Delay = 10 * 60 * 60 * 1000 + 1 * 60 * 1000; // 10 AM
-      const q2Delay = 15 * 60 * 60 * 1000 + 1 * 60 * 1000; // 3 PM
-      const q3Delay = 20 * 60 * 60 * 1000 + 1 * 60 * 1000; // 8 PM
+      // Calculate delays from 11:50 PM IST
+      // 11:50 PM -> 10:00 AM = 10h 10m
+      const q1Delay = 10 * 60 * 60 * 1000 + 10 * 60 * 1000; // 10 AM
+      const q2Delay = 15 * 60 * 60 * 1000 + 10 * 60 * 1000; // 3 PM
+      const q3Delay = 20 * 60 * 60 * 1000 + 10 * 60 * 1000; // 8 PM
 
       for (const key of Object.keys(buckets)) {
         const bucket = buckets[key];
