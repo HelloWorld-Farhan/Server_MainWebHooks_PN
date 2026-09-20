@@ -455,7 +455,11 @@ export const campaignExecutionWorker = redisConnection
                          const phone = leadPhoneMap.get(callLogId) || "";
                          
                          const timeElapsed = Date.now() - (activeCallTimeouts.get(callLogId) || 0);
-                         const hasTimedOut = timeElapsed > CALL_TIMEOUT_MS;
+                         const status = c ? (c.status?.toLowerCase() || "") : "";
+                         const isAnswered = status === "answered" || status === "in-progress";
+                         // 30 minutes max if answered, 3 minutes max if stuck ringing
+                         const dynamicTimeout = isAnswered ? 30 * 60 * 1000 : 3 * 60 * 1000;
+                         const hasTimedOut = timeElapsed > dynamicTimeout;
                          
                          let isFinished = false;
                          let isFailed = false;
@@ -467,7 +471,6 @@ export const campaignExecutionWorker = redisConnection
                                  await prisma.callLog.update({ where: { id: callLogId }, data: { status: "FAILED" } }).catch(()=>{});
                              }
                          } else {
-                             const status = c.status?.toLowerCase() || "";
                              if (!["pending", "ringing", "queued", "dispatching", "queued_at_provider", "answered", "in-progress"].includes(status)) {
                                  isFinished = true;
                                  if (["failed", "missed", "busy", "no-answer", "cancelled"].includes(status)) {
