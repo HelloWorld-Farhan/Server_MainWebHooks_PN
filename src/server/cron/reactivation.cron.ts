@@ -50,6 +50,7 @@ export async function runReactivationExtraction(now: Date): Promise<void> {
         dateKey: callDateKey,
         companyId: call.companyId!,
         didNumber: call.phoneNumber?.number || "",
+        channels: call.phoneNumber?.channels || 1,
         leads: [],
       };
     }
@@ -170,7 +171,7 @@ export async function runReactivationExtraction(now: Date): Promise<void> {
           campaignId:         correlationId,
           didNumber:          bucket.didNumber,
           leads:              bucket.leads,
-          channels:           1,
+          channels:           bucket.channels,
           isReactivation:     true,
           qStage:             label as "Q1" | "Q2" | "Q3",
           uploadedFileName,
