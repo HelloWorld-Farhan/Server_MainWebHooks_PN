@@ -38,7 +38,7 @@ export async function runReactivationExtraction(now: Date): Promise<void> {
   console.log(`[Reactivation Engine] Found ${failedCalls.length} failed calls today.`);
 
   // Group by exact IST calendar day + companyId + didNumber
-  const buckets: Record<string, { dateKey: string; companyId: string; didNumber: string; leads: any[] }> = {};
+  const buckets: Record<string, { dateKey: string; companyId: string; didNumber: string; channels: number; leads: any[] }> = {};
   const istFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" });
 
   for (const call of failedCalls) {
