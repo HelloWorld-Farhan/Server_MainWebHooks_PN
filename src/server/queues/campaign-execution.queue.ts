@@ -49,7 +49,7 @@ export async function startCampaignJob(data: CampaignExecutionJobData, delayMs?:
   }
   
   // We use a unique Job ID so multiple schedules can coexist without overwriting each other
-  const uniqueJobId = `campaign-${data.companyId}-${Date.now()}`;
+  const uniqueJobId = `campaign-${data.companyId}-${data.qStage || 'new'}-${Date.now()}`;
   
   // Prevent immediate running campaigns if one is already active
   if (!delayMs) {
