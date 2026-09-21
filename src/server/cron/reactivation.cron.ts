@@ -22,15 +22,22 @@ export async function runReactivationExtraction(now: Date): Promise<void> {
     where: {
       direction: "OUTBOUND",
       startedAt: { gte: yesterday, lte: now },
-      OR: [
-        { status: { in: ["FAILED", "MISSED", "BUSY", "NO_ANSWER", "CANCELLED"] } },
-        { durationSeconds: 0 },
-      ],
       leadId:    { not: null },
       companyId: { not: null },
-      OR: [
-        { correlationId: null },
-        { correlationId: { not: { startsWith: "reactivation-" } } }
+      AND: [
+        {
+          OR: [
+            { status: { in: ["FAILED", "MISSED", "BUSY", "NO_ANSWER", "CANCELLED"] } },
+            { durationSeconds: 0 },
+          ]
+        },
+        {
+          OR: [
+            { correlationId: { isSet: false } },
+            { correlationId: null },
+            { correlationId: { not: { startsWith: "reactivation-" } } }
+          ]
+        }
       ]
     },
     include: { lead: true, phoneNumber: true },
