@@ -28,9 +28,10 @@ export async function runReactivationExtraction(now: Date): Promise<void> {
       ],
       leadId:    { not: null },
       companyId: { not: null },
-      NOT: {
-        correlationId: { startsWith: "reactivation-" }
-      }
+      OR: [
+        { correlationId: null },
+        { correlationId: { not: { startsWith: "reactivation-" } } }
+      ]
     },
     include: { lead: true, phoneNumber: true },
   });
