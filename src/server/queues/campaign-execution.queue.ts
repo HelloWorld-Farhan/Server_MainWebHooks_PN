@@ -4,6 +4,7 @@ import { CampaignGateway } from "@/modules/websockets/campaign.gateway";
 import prisma from "@/server/lib/prisma";
 
 export const CAMPAIGN_EXECUTION_QUEUE_NAME = "campaign-execution-queue";
+export const REACTIVATION_EXECUTION_QUEUE_NAME = "reactivation-execution-queue";
 
 export function buildReactivationCorrelationId(
   dateStr: string,   // "2026-09-17"
@@ -43,6 +44,17 @@ export const campaignExecutionQueue = redisConnection
     })
   : null;
 
+export const reactivationExecutionQueue = redisConnection 
+  ? new Queue<CampaignExecutionJobData>(REACTIVATION_EXECUTION_QUEUE_NAME, {
+      connection: redisConnection,
+      defaultJobOptions: {
+        attempts: 1, // Don't auto-retry the entire campaign loop
+        removeOnComplete: true,
+        removeOnFail: true,
+      },
+    })
+  : null;
+
 export async function startCampaignJob(data: CampaignExecutionJobData, delayMs?: number) {
   if (!campaignExecutionQueue) {
     throw new Error("Redis not configured. Cannot start campaign.");
@@ -51,26 +63,44 @@ export async function startCampaignJob(data: CampaignExecutionJobData, delayMs?:
   // We use a unique Job ID so multiple schedules can coexist without overwriting each other
   const uniqueJobId = `campaign-${data.companyId}-${data.qStage || 'new'}-${Date.now()}`;
   
-  // Prevent immediate running campaigns if one is already active
+  // Determine the correct state key and queue based on campaign type
+  const redisKey = data.isReactivation 
+    ? `campaign-state:reactivation:${data.companyId}` 
+    : `campaign-state:live:${data.companyId}`;
+  const targetQueue = data.isReactivation ? reactivationExecutionQueue : campaignExecutionQueue;
+
+  if (!targetQueue) {
+    throw new Error("Target queue not configured.");
+  }
+  
+  // Prevent immediate running campaigns if one is already active in their respective queue
   if (!delayMs) {
     try {
-      const stateStr = await redisConnection!.get(`campaign-state:${data.companyId}`);
+      const stateStr = await redisConnection!.get(redisKey);
       if (stateStr) {
         const state = JSON.parse(stateStr);
         if (state.status === "running") {
-          // Priority Engine: If a live campaign starts while a reactivation is running, pause the reactivation
-          if (!data.isReactivation && (state.isReactivation || state.qStage)) {
-            console.log(`[Traffic Cop] Preempting Reactivation for company ${data.companyId} to start Live Campaign.`);
-            const pausedState = { ...state, status: "paused" };
-            await redisConnection!.set(`campaign-state:paused:${data.companyId}`, JSON.stringify(pausedState));
-            // Proceed to overwrite `campaign-state:${data.companyId}` below
-          } else {
-            throw new Error("A campaign is already currently running for this company.");
+          throw new Error("A campaign of this type is already currently running for this company.");
+        }
+      }
+
+      // Priority Engine: If a LIVE campaign starts, pause any running REACTIVATION
+      if (!data.isReactivation) {
+        const reactStateStr = await redisConnection!.get(`campaign-state:reactivation:${data.companyId}`);
+        if (reactStateStr) {
+          const reactState = JSON.parse(reactStateStr);
+          if (reactState.status === "running" || reactState.status === "scheduled") {
+            console.log(`[Traffic Cop] Live Campaign started. Pausing Reactivation for company ${data.companyId}.`);
+            const pausedState = { ...reactState, status: "paused", pausedBy: "campaign" };
+            await redisConnection!.set(`campaign-state:reactivation:${data.companyId}`, JSON.stringify(pausedState));
+            // Broadcast pause to UI
+            const gateway = CampaignGateway.getInstance();
+            if (gateway) gateway.broadcastCampaignUpdate(data.companyId, pausedState);
           }
         }
       }
     } catch (e: any) {
-      if (e.message.includes("already running")) throw e;
+      if (e.message.includes("already currently running")) throw e;
       console.error("Error checking existing campaign state:", e);
     }
   }
@@ -104,7 +134,7 @@ export async function startCampaignJob(data: CampaignExecutionJobData, delayMs?:
     allOriginalLeads: data.allOriginalLeads ?? data.leads,
     reactivationDateKey: data.reactivationDateKey,
   };
-  await redisConnection!.set(`campaign-state:${data.companyId}`, JSON.stringify(initialState));
+  await redisConnection!.set(redisKey, JSON.stringify(initialState));
 
   // Broadcast WebSocket event so UI instantly updates to Scheduled/Running
   const gateway = CampaignGateway.getInstance();
@@ -113,7 +143,7 @@ export async function startCampaignJob(data: CampaignExecutionJobData, delayMs?:
   }
 
   // Enqueue the job (with optional delay for scheduled waves)
-  await campaignExecutionQueue!.add(uniqueJobId, data, {
+  await targetQueue.add(uniqueJobId, data, {
     jobId: uniqueJobId,
     delay: delayMs ? Math.max(0, delayMs) : undefined,
     removeOnComplete: true,
@@ -121,18 +151,20 @@ export async function startCampaignJob(data: CampaignExecutionJobData, delayMs?:
   });
 }
 
-export async function getCampaignState(companyId: string) {
+export async function getCampaignState(companyId: string, type: "live" | "reactivation" = "live") {
   if (!redisConnection) return null;
-  const state = await redisConnection.get(`campaign-state:${companyId}`);
+  const redisKey = type === "reactivation" ? `campaign-state:reactivation:${companyId}` : `campaign-state:live:${companyId}`;
+  const state = await redisConnection.get(redisKey);
   if (state) return JSON.parse(state);
 
   // Fallback: if Redis has no state, check BullMQ for any pending delayed reactivation jobs
   // This handles the case where Redis state was cleared but the BullMQ job is still scheduled
-  if (campaignExecutionQueue) {
+  const targetQueue = type === "reactivation" ? reactivationExecutionQueue : campaignExecutionQueue;
+  if (targetQueue) {
     try {
-      const delayedJobs = await campaignExecutionQueue.getDelayed();
+      const delayedJobs = await targetQueue.getDelayed();
       const pending = delayedJobs.find(
-        (job) => job.data.companyId === companyId && job.data.isReactivation
+        (job) => job.data.companyId === companyId
       );
       if (pending) {
         const scheduledState = {
@@ -160,9 +192,10 @@ export async function getCampaignState(companyId: string) {
   return null;
 }
 
-export async function clearCampaignState(companyId: string) {
+export async function clearCampaignState(companyId: string, type: "live" | "reactivation" = "live") {
   if (!redisConnection) return;
-  await redisConnection.del(`campaign-state:${companyId}`);
+  const redisKey = type === "reactivation" ? `campaign-state:reactivation:${companyId}` : `campaign-state:live:${companyId}`;
+  await redisConnection.del(redisKey);
   
   const gateway = CampaignGateway.getInstance();
   if (gateway) {
@@ -170,9 +203,10 @@ export async function clearCampaignState(companyId: string) {
   }
 }
 
-export async function forceStopCampaignState(companyId: string) {
+export async function forceStopCampaignState(companyId: string, type: "live" | "reactivation" = "live") {
   if (!redisConnection) return;
-  const stateStr = await redisConnection.get(`campaign-state:${companyId}`);
+  const redisKey = type === "reactivation" ? `campaign-state:reactivation:${companyId}` : `campaign-state:live:${companyId}`;
+  const stateStr = await redisConnection.get(redisKey);
   if (stateStr) {
     const state = JSON.parse(stateStr);
     
@@ -196,7 +230,7 @@ export async function forceStopCampaignState(companyId: string) {
       completedCalls: (state.completedCalls || 0) + updatedCount.count,
     };
     
-    await redisConnection.set(`campaign-state:${companyId}`, JSON.stringify(newState));
+    await redisConnection.set(redisKey, JSON.stringify(newState));
     
     // Broadcast WebSocket event so UI instantly updates
     const gateway = CampaignGateway.getInstance();
@@ -209,14 +243,15 @@ export async function forceStopCampaignState(companyId: string) {
   return null;
 }
 
-export async function pauseCampaignState(companyId: string) {
+export async function pauseCampaignState(companyId: string, type: "live" | "reactivation" = "live") {
   if (!redisConnection) return null;
-  const stateStr = await redisConnection.get(`campaign-state:${companyId}`);
+  const redisKey = type === "reactivation" ? `campaign-state:reactivation:${companyId}` : `campaign-state:live:${companyId}`;
+  const stateStr = await redisConnection.get(redisKey);
   if (stateStr) {
     const state = JSON.parse(stateStr);
     if (state.status === "running") {
       const newState = { ...state, status: "paused" };
-      await redisConnection.set(`campaign-state:${companyId}`, JSON.stringify(newState));
+      await redisConnection.set(redisKey, JSON.stringify(newState));
       const gateway = CampaignGateway.getInstance();
       if (gateway) gateway.broadcastCampaignUpdate(companyId, newState);
       return newState;
@@ -225,14 +260,15 @@ export async function pauseCampaignState(companyId: string) {
   return null;
 }
 
-export async function resumeCampaignState(companyId: string) {
+export async function resumeCampaignState(companyId: string, type: "live" | "reactivation" = "live") {
   if (!redisConnection) return null;
-  const stateStr = await redisConnection.get(`campaign-state:${companyId}`);
+  const redisKey = type === "reactivation" ? `campaign-state:reactivation:${companyId}` : `campaign-state:live:${companyId}`;
+  const stateStr = await redisConnection.get(redisKey);
   if (stateStr) {
     const state = JSON.parse(stateStr);
     if (state.status === "paused") {
       const newState = { ...state, status: "running" };
-      await redisConnection.set(`campaign-state:${companyId}`, JSON.stringify(newState));
+      await redisConnection.set(redisKey, JSON.stringify(newState));
       const gateway = CampaignGateway.getInstance();
       if (gateway) gateway.broadcastCampaignUpdate(companyId, newState);
       return newState;

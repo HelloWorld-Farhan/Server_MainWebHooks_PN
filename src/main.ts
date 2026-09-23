@@ -96,6 +96,25 @@ bootstrap();
   try {
     await new Promise((r) => setTimeout(r, 5000)); // wait 5s for Redis to connect
 
+    // Auto-Pause running campaigns on Server Restart so user explicitly knows it was interrupted
+    if (redisConnection) {
+      try {
+        const keys = await redisConnection.keys('campaign-state:*');
+        for (const key of keys) {
+          const stateStr = await redisConnection.get(key);
+          if (stateStr) {
+            const state = JSON.parse(stateStr);
+            if (state.status === 'running') {
+              console.log(`[Startup Recovery] Pausing interrupted campaign ${key} due to Server Restart`);
+              await redisConnection.set(key, JSON.stringify({ ...state, status: 'paused', pausedBy: 'server' }));
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[Startup Recovery] Failed to auto-pause campaigns', err);
+      }
+    }
+
     const now = new Date();
     // Determine IST date string for today
     const istDate = new Date(now.getTime() + 5.5 * 60 * 60 * 1000);

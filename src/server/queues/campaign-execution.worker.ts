@@ -1,6 +1,6 @@
 import { Worker, Job } from "bullmq";
 import { redisConnection } from "./redis.client";
-import { CAMPAIGN_EXECUTION_QUEUE_NAME, CampaignExecutionJobData, campaignExecutionQueue } from "./campaign-execution.queue";
+import { CAMPAIGN_EXECUTION_QUEUE_NAME, REACTIVATION_EXECUTION_QUEUE_NAME, CampaignExecutionJobData, campaignExecutionQueue, reactivationExecutionQueue } from "./campaign-execution.queue";
 import prisma from "@/server/lib/prisma";
 import { CampaignGateway } from "@/modules/websockets/campaign.gateway";
 
@@ -12,10 +12,8 @@ async function loginToBonvoice() {
   return token;
 }
 
-export const campaignExecutionWorker = redisConnection
-  ? new Worker<CampaignExecutionJobData>(
-      CAMPAIGN_EXECUTION_QUEUE_NAME,
-      async (job: Job<CampaignExecutionJobData>) => {
+const processCampaignJob = async (job: Job<CampaignExecutionJobData>) => {
+        const redisKey = job.data.isReactivation ? `campaign-state:reactivation:${job.data.companyId}` : `campaign-state:live:${job.data.companyId}`;
         let { companyId, campaignId, didNumber: rawDidNumber, leads, channels: rawChannels, isReactivation, qStage, reactivationDateKey, allOriginalLeads } = job.data;
         const channels = Number(rawChannels) || 1;
         let didNumber = rawDidNumber ? rawDidNumber.trim() : "";
@@ -72,7 +70,7 @@ export const campaignExecutionWorker = redisConnection
 
         // Safety check for queued schedules: if another campaign is currently running, wait 5 mins
         try {
-          const currentStateStr = await redisConnection!.get(`campaign-state:${companyId}`);
+          const currentStateStr = await redisConnection!.get(redisKey);
           if (currentStateStr) {
             const state = JSON.parse(currentStateStr);
             // Check if there's a running campaign that is NOT this current job
@@ -94,10 +92,10 @@ export const campaignExecutionWorker = redisConnection
 
         // When we start running, make sure to claim this job ID so others know WE are the ones running
         try {
-          const currentStateStr = await redisConnection!.get(`campaign-state:${companyId}`);
+          const currentStateStr = await redisConnection!.get(redisKey);
           if (currentStateStr) {
             const state = JSON.parse(currentStateStr);
-            await redisConnection!.set(`campaign-state:${companyId}`, JSON.stringify({ ...state, activeJobId: job.id }));
+            await redisConnection!.set(redisKey, JSON.stringify({ ...state, activeJobId: job.id }));
           }
         } catch (e) {
           console.error("Failed to set activeJobId:", e);
@@ -169,11 +167,11 @@ export const campaignExecutionWorker = redisConnection
           };
 
           const updateRedisState = async (updateFn: (prevState: any) => any) => {
-             const stateStr = await redisConnection!.get(`campaign-state:${companyId}`);
+             const stateStr = await redisConnection!.get(redisKey);
              if (stateStr) {
                 const state = JSON.parse(stateStr);
                 const newState = updateFn(state);
-                await redisConnection!.set(`campaign-state:${companyId}`, JSON.stringify(newState));
+                await redisConnection!.set(redisKey, JSON.stringify(newState));
                 // Broadcast WebSocket event
                 const gateway = CampaignGateway.getInstance();
                 if (gateway) {
@@ -183,14 +181,20 @@ export const campaignExecutionWorker = redisConnection
           };
 
           // Update status to running immediately when the job starts (useful for scheduled jobs)
-          await updateRedisState(prev => ({ ...prev, status: "running" }));
+          await updateRedisState(prev => {
+             // If we're resuming/restarting, load leads from Redis to prevent double-calling
+             if (prev.leads && prev.leads.length > 0) {
+                 leads = prev.leads;
+             }
+             return { ...prev, status: "running" };
+          });
 
           let shouldAbort = false;
           let isPaused = false;
           while (currentIndex < leads.length || activeCallCount > 0) {
             let isPreempted = false;
             // Check if the user force-stopped (cleared or stopped) the campaign
-            const currentStateStr = await redisConnection!.get(`campaign-state:${companyId}`);
+            const currentStateStr = await redisConnection!.get(redisKey);
             if (!currentStateStr) {
               shouldAbort = true;
             } else {
@@ -198,19 +202,7 @@ export const campaignExecutionWorker = redisConnection
               if (state.status === "force_stopped" && state.activeJobId === job.id) {
                 shouldAbort = true;
               } else if (state.activeJobId !== job.id) {
-                // My job got preempted! Check if I was moved to the paused holding key
-                const pausedStateStr = await redisConnection!.get(`campaign-state:paused:${companyId}`);
-                if (pausedStateStr) {
-                  const pausedState = JSON.parse(pausedStateStr);
-                  if (pausedState.activeJobId === job.id) {
-                    isPaused = true;
-                    isPreempted = true;
-                  } else {
-                    shouldAbort = true; // Something else took over
-                  }
-                } else {
-                  shouldAbort = true;
-                }
+                shouldAbort = true; // Another job took over this queue, I should abort.
               } else {
                 isPaused = state.status === "paused";
               }
@@ -630,20 +622,21 @@ export const campaignExecutionWorker = redisConnection
           // PHASE 3: PRIORITY ENGINE AUTO-RESUME
           // -------------------------------------------------------------
           try {
-            const pausedStateStr = await redisConnection!.get(`campaign-state:paused:${companyId}`);
-            if (pausedStateStr) {
-              const pausedState = JSON.parse(pausedStateStr);
-              if (!job.data.isReactivation) {
-                 console.log(`[Traffic Cop] Live Campaign finished. Auto-resuming Reactivation for company ${companyId}`);
-                 const resumedState = { ...pausedState, status: "running" };
-                 await redisConnection!.set(`campaign-state:${companyId}`, JSON.stringify(resumedState));
-                 await redisConnection!.del(`campaign-state:paused:${companyId}`);
-                 const gateway = CampaignGateway.getInstance();
-                 if (gateway) gateway.broadcastCampaignUpdate(companyId, resumedState);
+            if (!job.data.isReactivation) {
+              const reactStateStr = await redisConnection!.get(`campaign-state:reactivation:${companyId}`);
+              if (reactStateStr) {
+                const reactState = JSON.parse(reactStateStr);
+                if (reactState.status === "paused") {
+                   console.log(`[Traffic Cop] Live Campaign finished. Auto-resuming Reactivation for company ${companyId}`);
+                   const resumedState = { ...reactState, status: "running" };
+                   await redisConnection!.set(`campaign-state:reactivation:${companyId}`, JSON.stringify(resumedState));
+                   const gateway = CampaignGateway.getInstance();
+                   if (gateway) gateway.broadcastCampaignUpdate(companyId, resumedState);
+                }
               }
             } else {
               // If we reached the end of the last campaign, clear the state so UI returns to idle
-              const currentStateStr = await redisConnection!.get(`campaign-state:${companyId}`);
+              const currentStateStr = await redisConnection!.get(redisKey);
               if (currentStateStr) {
                  const currentState = JSON.parse(currentStateStr);
                  if (currentState.status === "completed" || currentState.status === "force_stopped" || shouldAbort) {
@@ -657,19 +650,29 @@ export const campaignExecutionWorker = redisConnection
 
         } catch (error) {
           console.error("Campaign worker error:", error);
-          const stateStr = await redisConnection!.get(`campaign-state:${companyId}`);
+          const stateStr = await redisConnection!.get(redisKey);
           if (stateStr) {
              const state = JSON.parse(stateStr);
              state.status = "failed";
              state.error = (error as Error).message;
-             await redisConnection!.set(`campaign-state:${companyId}`, JSON.stringify(state));
+             await redisConnection!.set(redisKey, JSON.stringify(state));
           }
           throw error;
         }
-      },
-      {
-        connection: redisConnection,
-        concurrency: 5,
-      }
+};
+
+export const campaignExecutionWorker = redisConnection
+  ? new Worker<CampaignExecutionJobData>(
+      CAMPAIGN_EXECUTION_QUEUE_NAME,
+      processCampaignJob,
+      { connection: redisConnection, concurrency: 5 }
+    )
+  : null;
+
+export const reactivationExecutionWorker = redisConnection
+  ? new Worker<CampaignExecutionJobData>(
+      REACTIVATION_EXECUTION_QUEUE_NAME,
+      processCampaignJob,
+      { connection: redisConnection, concurrency: 5 }
     )
   : null;

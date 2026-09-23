@@ -92,7 +92,8 @@ export class OutboundCampaignExecutionController {
         finalCompanyId = requestedCompanyId;
       }
 
-      const state = await getCampaignState(finalCompanyId);
+      const type = (req.query.type as "live" | "reactivation") || "live";
+      const state = await getCampaignState(finalCompanyId, type);
       return res.json({ success: true, data: state });
     } catch (e: any) {
       console.error("Failed to fetch campaign state", e);
@@ -120,7 +121,8 @@ export class OutboundCampaignExecutionController {
         finalCompanyId = requestedCompanyId;
       }
 
-      await clearCampaignState(finalCompanyId);
+      const type = (req.body.type as "live" | "reactivation") || "live";
+      await clearCampaignState(finalCompanyId, type);
       return res.json({ success: true, message: "Campaign state cleared" });
     } catch (e: any) {
       console.error("Failed to clear campaign state", e);
