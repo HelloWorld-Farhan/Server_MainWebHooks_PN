@@ -330,6 +330,10 @@ enum InvoiceStatus {
 }
 
 enum SystemEventType {
+  DOMAIN_ADDED
+  DOMAIN_EDITED
+  DOMAIN_DELETED
+  DOMAIN_CHECKED
   CALL_COMPLETED
   LEAD_CREATED
   AGENT_DEPLOYED
@@ -1918,4 +1922,21 @@ model InfraCostNotification {
 
   company      Company?  @relation(name: "InfraNotificationCompany", fields: [companyId], references: [id], onDelete: Cascade)
   subCompany   Company?  @relation(name: "InfraNotificationSubCompany", fields: [subCompanyId], references: [id], onDelete: Cascade)
+}
+
+
+model WhiteLabelDomain {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  domain          String   @unique
+  companyName     String
+  supportEmail    String
+  supportPhone    String?
+  logoUrl         String?
+  faviconUrl      String?
+  instagramUrl    String?
+  linkedinUrl     String?
+  status          String   @default("PENDING") // PENDING, ACTIVE, STOPPED
+  pagesConfig Json @default("{}")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
