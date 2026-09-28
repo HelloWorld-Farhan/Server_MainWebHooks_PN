@@ -356,6 +356,10 @@ enum SystemEventType {
   FORM_INFO
   USER_PASSWORD_CHANGED
   USER_SIGNUP
+  ADMIN_LOGIN
+  JOB_EDITED
+  JOB_DELETED
+  NUMBER_EDITED
 }
 
 enum SupportRequestReason {
