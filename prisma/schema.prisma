@@ -364,6 +364,7 @@ enum SystemEventType {
   INFRA_COST_TRANSFERRED
   FORM_SUBMITTED
   VERIFICATION_UPDATED
+  USER_PASSWORD_CHANGED
 }
 
 enum SupportRequestReason {
