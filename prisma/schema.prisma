@@ -354,17 +354,8 @@ enum SystemEventType {
   COMPANY_CREATED
   JOB_POSTED
   FORM_INFO
-  USER_SIGNUP
-  USER_LOGIN
-  ADMIN_LOGIN
-  COMPANY_EDITED
-  COMPANY_DELETED
-  NUMBER_EDITED
-  INFRA_COST_EDITED
-  INFRA_COST_TRANSFERRED
-  FORM_SUBMITTED
-  VERIFICATION_UPDATED
   USER_PASSWORD_CHANGED
+  USER_SIGNUP
 }
 
 enum SupportRequestReason {
@@ -533,6 +524,8 @@ model User {
   passwordHash String?
   status      UserStatus @default(ACTIVE)
   lastLoginAt DateTime?
+  resetPasswordOtp      String?
+  resetPasswordExpires  DateTime?
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
@@ -1931,6 +1924,7 @@ model WhiteLabelDomain {
   id              String   @id @default(auto()) @map("_id") @db.ObjectId
   domain          String   @unique
   companyName     String
+  tabTitle        String?
   supportEmail    String
   supportPhone    String?
   logoUrl         String?
@@ -1938,7 +1932,7 @@ model WhiteLabelDomain {
   instagramUrl    String?
   linkedinUrl     String?
   status          String   @default("PENDING") // PENDING, ACTIVE, STOPPED
-  pagesConfig Json @default("{}")
+  pagesConfig     Json     @default("{}")
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
