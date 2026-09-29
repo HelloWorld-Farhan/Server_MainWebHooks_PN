@@ -50,7 +50,15 @@ export async function runReactivationExtraction(now: Date): Promise<void> {
   const istFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" });
 
   for (const call of failedCalls) {
-    if (!call.lead) continue;
+    if (!call.lead || !call.lead.phone) continue;
+
+    // Strict validation: Skip any number that doesn't have at least 10 digits
+    const digitsOnly = call.lead.phone.replace(/\D/g, "");
+    if (digitsOnly.length < 10) {
+      console.warn(`[Reactivation Engine] Skipping invalid lead phone: ${call.lead.phone}`);
+      continue;
+    }
+
     const callDateKey = istFmt.format(call.startedAt);
     const key = `${callDateKey}-${call.companyId}-${call.phoneNumber?.number || "default"}`;
     if (!buckets[key]) {

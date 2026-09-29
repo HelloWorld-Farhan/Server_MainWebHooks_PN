@@ -388,9 +388,22 @@ const processCampaignJob = async (job: Job<CampaignExecutionJobData>) => {
                     // responseJson was already parsed from responseText above — do NOT call res.json() again
                     // Bonvoice autoCallBridging returns { responseCode: 200, responseDescription: "Success" }
                     // There is no UUID returned; tracking is done via eventID (callLog.id)
-                    const isSuccess = responseJson?.responseCode === 200 || responseJson?.responseType === "Success" || res.ok;
+                    const isSuccess = responseJson?.responseCode === 200 || responseJson?.responseType === "Success" || (res.ok && !responseJson?.error);
                     if (!isSuccess) {
                       console.warn(`Bonvoice returned non-success for ${lead.phone}:`, responseText);
+                      await prisma.callLog.update({
+                        where: { id: callLog.id },
+                        data: { status: "FAILED", providerStatus: "rejected" }
+                      }).catch(console.error);
+                      
+                      await markAsFailed(lead.phone, didNumber);
+                      await updateRedisState((prev) => {
+                         const updatedLeads = (prev.leads || []).map((l: any) => l.phone === lead.phone ? { ...l, called: true, isFailed: true } : l);
+                         return { ...prev, leads: updatedLeads, failedCalls: updatedLeads.filter((l: any) => l.isFailed).length, completedCalls: prev.completedCalls + 1 };
+                      });
+                      
+                      activeCallCount--;
+                      completedCount++;
                     } else {
                       console.log(`✅ Call initiated for ${lead.phone} via Bonvoice (eventID: ${callLog.id})`);
                       
@@ -400,11 +413,11 @@ const processCampaignJob = async (job: Job<CampaignExecutionJobData>) => {
                         where: { id: callLog.id },
                         data: { status: "RINGING" }
                       }).catch(console.error);
+                      
+                      activeCallIds.add(callLog.id);
+                      leadPhoneMap.set(callLog.id, lead.phone);
+                      activeCallTimeouts.set(callLog.id, Date.now());
                     }
-                    
-                    activeCallIds.add(callLog.id);
-                    leadPhoneMap.set(callLog.id, lead.phone);
-                    activeCallTimeouts.set(callLog.id, Date.now());
                   }
                 } catch (err: any) {
                   console.error(`Failed to push lead ${lead.phone}:`, err.message);
