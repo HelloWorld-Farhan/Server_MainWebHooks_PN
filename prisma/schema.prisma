@@ -439,6 +439,7 @@ model Company {
   ownerUserId         String?
   name                String
   slug                String           @unique
+  domain              String?
   status              CompanyStatus    @default(ACTIVE)
   blockedUntil        DateTime?
   tenantType          TenantType       @default(PARENT)
@@ -618,6 +619,7 @@ model Invitation {
 model PendingApproval {
   id          String                @id @default(auto()) @map("_id") @db.ObjectId
   email       String                @unique
+  domain      String?
   status      PendingApprovalStatus @default(PENDING)
   remindedAt  DateTime?
   createdAt   DateTime              @default(now())
